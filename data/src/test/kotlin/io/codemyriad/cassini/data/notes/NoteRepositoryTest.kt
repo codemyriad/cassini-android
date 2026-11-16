@@ -52,6 +52,19 @@ class NoteRepositoryTest {
     private suspend fun insertJob(id: String, state: JobState, kind: JobKind = JobKind.TRANSCRIBE) =
         h.db.jobs().insert(JobEntity(id, 1, kind, state, enqueuedAt = 1, updatedAt = 1))
 
+    @Test fun libraryDurationExcludesTrashAndFollowsRestore() = runTest {
+        assertEquals(0L, h.notes.audioDuration().first())
+        val first = h.notes.createRecording("First", createdAt = 1, format = "opus")
+        val second = h.notes.createRecording("Second", createdAt = 2, format = "opus")
+        h.notes.finishRecording(first, 3_600_000)
+        h.notes.finishRecording(second, 900_000)
+        assertEquals(4_500_000L, h.notes.audioDuration().first())
+        h.notes.moveToTrash(first)
+        assertEquals(900_000L, h.notes.audioDuration().first())
+        h.notes.restore(first)
+        assertEquals(4_500_000L, h.notes.audioDuration().first())
+    }
+
     @Test fun aRecordingStartsLiveAndEndsPlain() = runTest {
         val id = h.notes.createRecording(" Recording 9 Oct ", createdAt = 42, format = "opus")
 

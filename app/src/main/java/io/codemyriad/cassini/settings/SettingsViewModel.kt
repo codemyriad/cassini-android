@@ -7,11 +7,14 @@ import androidx.navigation3.runtime.NavKey
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
+import io.codemyriad.cassini.nav.LicenseDetailKey
 import io.codemyriad.cassini.nav.LicensesKey
 import io.codemyriad.cassini.nav.ModelDownloadKey
 import io.codemyriad.cassini.nav.SavedVoicesKey
 import io.codemyriad.cassini.nav.TrashKey
 import io.codemyriad.cassini.notices.Notices
+import io.codemyriad.cassini.ui.licenses.LicenseEntry
+import io.codemyriad.cassini.ui.licenses.SOURCE_CODE_URL
 import io.codemyriad.cassini.ui.settings.BackupSettingsUi
 import io.codemyriad.cassini.ui.settings.LanguageChoice
 import io.codemyriad.cassini.ui.settings.ModelRowUi
@@ -37,6 +40,8 @@ import kotlinx.coroutines.launch
 
 /** What the Settings route does for the ViewModel. */
 sealed interface SettingsEffect {
+    data class OpenUrl(val url: String) : SettingsEffect
+
     data object Close : SettingsEffect
 
     data class Open(val key: NavKey) : SettingsEffect
@@ -53,6 +58,7 @@ sealed interface SettingsEffect {
  * A language change goes to AppCompat at once; the activity is created again in the new language, and this
  * ViewModel (kept by the back stack entry) keeps the chosen segment.
  */
+@Suppress("TooManyFunctions") // One command per Settings action.
 class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     private val effectChannel = Channel<SettingsEffect>(Channel.BUFFERED)
 
@@ -79,7 +85,7 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         }
     }
 
-    val state: StateFlow<SettingsUiState> = combine(
+    private val baseState = combine(
         combine(language, backup) { language, backup -> language to backup },
         ports.models.onStart { emit(emptyMap()) }.combine(ports.speech) { models, speech -> models to speech },
         ports.voices().guarded("voices"),
@@ -110,6 +116,28 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             parakeetSuggestion = Notices.parakeetSuggestion(facts),
             parakeetNowDefault = facts.parakeetNowDefault,
         )
+    }
+
+    private val speakerSaving = MutableStateFlow(false)
+    private val speakerError = MutableStateFlow(false)
+    private val speakerState = combine(ports.speakers, speakerSaving, speakerError) { choices, saving, error ->
+        Triple(choices, saving, error)
+    }
+    private val totals = combine(
+        ports.meetings().guarded("meetings"),
+        ports.audioDuration().catch { emit(0L) },
+    ) { count, duration ->
+        count to (duration / HOUR_MS).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+    }
+    val state: StateFlow<SettingsUiState> = combine(baseState, speakerState, totals) { base, speakers, totals ->
+        base.copy(
+            tellSpeakersApart = speakers.first.tellApart,
+            recogniseVoices = speakers.first.recognise,
+            speakerSaving = speakers.second,
+            speakerError = speakers.third,
+            meetings = totals.first,
+            audioHours = totals.second,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initial())
 
     init {
@@ -124,6 +152,7 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         }
     }
 
+    @Suppress("CyclomaticComplexMethod") // Exhaustive dispatch of independent UI events.
     fun onEvent(event: SettingsEvent) {
         when (event) {
             SettingsEvent.DownloadParakeet -> emit(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true)))
@@ -134,10 +163,35 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             is SettingsEvent.Language -> choose(event.language)
             is SettingsEvent.ChooseSpeech -> chooseSpeech(event.model)
             is SettingsEvent.OpenModel -> openModel(event)
+            is SettingsEvent.SpeakerChoice -> speakerChoice(event)
+            SettingsEvent.OpenPrivacy -> emit(SettingsEffect.Open(LicenseDetailKey(LicenseEntry.PRIVACY.name)))
+            SettingsEvent.OpenSources -> emit(SettingsEffect.Open(LicenseDetailKey(LicenseEntry.MODEL_SOURCES.name)))
+            SettingsEvent.OpenHelp -> emit(SettingsEffect.OpenUrl("https://cassini.talk/help"))
+            SettingsEvent.OpenSourceCode -> emit(SettingsEffect.OpenUrl(SOURCE_CODE_URL))
             SettingsEvent.OpenVoices -> emit(SettingsEffect.Open(SavedVoicesKey))
             SettingsEvent.OpenTrash -> emit(SettingsEffect.Open(TrashKey))
             SettingsEvent.OpenLicenses -> emit(SettingsEffect.Open(LicensesKey))
             SettingsEvent.TurnOnNotifications -> emit(SettingsEffect.OpenNotificationSettings)
+        }
+    }
+
+    private fun speakerChoice(event: SettingsEvent.SpeakerChoice) {
+        if (speakerSaving.value || event.part == io.codemyriad.cassini.ui.format.ModelPartUi.SPEECH) return
+        speakerSaving.value = true
+        speakerError.value = false
+        viewModelScope.launch {
+            try {
+                val part = ModelPart.entries.single { Notices.partUi(it) == event.part }
+                ports.setSpeakerChoice(part, event.enabled)
+                if (event.enabled) openModel(SettingsEvent.OpenModel(event.part))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                speakerError.value = true
+                Log.w(TAG, "Cannot save the speaker choice", error)
+            } finally {
+                speakerSaving.value = false
+            }
         }
     }
 
@@ -240,6 +294,7 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     }
 
     companion object {
+        private const val HOUR_MS = 3_600_000L
         private const val TAG = "CassiniSettings"
         private const val STOP_TIMEOUT_MS = 5_000L
 

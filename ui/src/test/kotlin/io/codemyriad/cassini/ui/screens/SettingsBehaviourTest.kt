@@ -8,7 +8,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -24,7 +23,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performFirstLinkClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
@@ -41,6 +39,7 @@ import io.codemyriad.cassini.ui.models.ModelDownloadScreen
 import io.codemyriad.cassini.ui.settings.LanguageChoice
 import io.codemyriad.cassini.ui.settings.ModelStatusUi
 import io.codemyriad.cassini.ui.settings.SettingsEvent
+import io.codemyriad.cassini.ui.settings.SettingsPage
 import io.codemyriad.cassini.ui.settings.SettingsScreen
 import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import io.codemyriad.cassini.ui.theme.CassiniTheme
@@ -148,8 +147,10 @@ class SettingsBehaviourTest {
             }.toImmutableList(),
             speechChecking = false,
         )
-        setThemed { SettingsScreen(state, onEvent = { events += it }) }
-        rule.onNodeWithText("Parakeet Ultra").assertHasNoClickAction()
+        setThemed { SettingsScreen(state, onEvent = { events += it }, initialPage = SettingsPage.TRANSCRIPTION) }
+        rule.onNodeWithText("Parakeet Ultra").assertIsNotEnabled()
+        rule.onNodeWithContentDescription("Back to settings").performClick()
+        rule.onNodeWithText("Speakers").performClick()
         rule.onNodeWithText("Telling speakers apart").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(listOf(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS)), events) }
     }
@@ -157,8 +158,8 @@ class SettingsBehaviourTest {
     @Test fun unavailableWhistleHasNoActionAndParakeetCanBeSelected() {
         val events = mutableListOf<SettingsEvent>()
         val state = VariantFixtures.settings.getValue("settings-included-unavailable")
-        setThemed { SettingsScreen(state, onEvent = { events += it }) }
-        rule.onNode(hasText("Whistle") and hasText("Unavailable")).assertHasNoClickAction()
+        setThemed { SettingsScreen(state, onEvent = { events += it }, initialPage = SettingsPage.TRANSCRIPTION) }
+        rule.onNode(hasText("Whistle") and hasText("Unavailable")).assertIsNotEnabled()
         rule.onNodeWithText("Parakeet Ultra").performClick()
         rule.runOnIdle {
             assertEquals(
@@ -176,27 +177,19 @@ class SettingsBehaviourTest {
         rule.onNode(hasText("Phone") and hasClickAction()).performClick()
         rule.onNode(hasText("Phone") and isSelectable()).assertIsSelected()
         rule.onNodeWithText("Italiano").performClick()
-        rule.onAllNodes(isSelectable()).assertCountEquals(2)
-        rule.onNodeWithText("Turn on").performClick()
-        // A Not downloaded row and a Failed row open Model download; the other model rows are not buttons.
-        rule.onNode(
-            hasText("Recognising saved voices", substring = true) and hasClickAction(),
-        ).performScrollTo().performClick()
-        rule.onNode(
-            hasText("Telling speakers apart", substring = true) and hasClickAction(),
-        ).performScrollTo().performClick()
-        rule.onNode(hasText("Parakeet Ultra", substring = true)).assertHasNoClickAction()
+        rule.onAllNodes(isSelectable()).assertCountEquals(0)
+        rule.onNodeWithText("Turn on").performScrollTo().performClick()
         rule.onNodeWithText("Saved voices").performScrollTo().performClick()
         rule.onNodeWithText("Trash").performScrollTo().performClick()
-        rule.onNodeWithText("Free software under GPLv3", substring = true).performScrollTo().performFirstLinkClick()
-        rule.onNodeWithContentDescription("Back to all meetings").performScrollTo().performClick()
+        rule.onNodeWithText("About, privacy and help").performScrollTo().performClick()
+        rule.onNodeWithText("Licences and notices").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Back to settings").performClick()
+        rule.onNodeWithContentDescription("Back to all meetings").performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(
                     SettingsEvent.Language(LanguageChoice.ITALIAN),
                     SettingsEvent.TurnOnNotifications,
-                    SettingsEvent.OpenModel(ModelPartUi.VOICES),
-                    SettingsEvent.OpenModel(ModelPartUi.SPEAKERS),
                     SettingsEvent.OpenVoices,
                     SettingsEvent.OpenTrash,
                     SettingsEvent.OpenLicenses,
@@ -255,7 +248,7 @@ class SettingsBehaviourTest {
     @Test fun bundledWhistleSelectsTheIncludedModelWithoutADownloadEvent() {
         val events = mutableListOf<SettingsEvent>()
         val state = BoardFixtures.settings.copy(includedAvailable = true, speechChecking = false)
-        setThemed { SettingsScreen(state, onEvent = { events += it }) }
+        setThemed { SettingsScreen(state, onEvent = { events += it }, initialPage = SettingsPage.TRANSCRIPTION) }
         rule.onNodeWithText("Whistle").performScrollTo().performClick()
         rule.runOnIdle {
             assertEquals(listOf(SettingsEvent.ChooseSpeech(SpeechModelUi.INCLUDED)), events)
@@ -263,8 +256,8 @@ class SettingsBehaviourTest {
     }
 
     @Test fun aModelRowReadsItsStatusWithItsName() {
-        setThemed { SettingsScreen(BoardFixtures.settings, onEvent = {}) }
-        rule.onNode(hasText("Whistle") and hasText("Default") and hasText("Included · 17 MB")).assertExists()
+        setThemed { SettingsScreen(BoardFixtures.settings, onEvent = {}, initialPage = SettingsPage.TRANSCRIPTION) }
+        rule.onNode(hasText("Whistle") and hasText("Built in")).assertExists()
     }
 
     @Test fun theOptionsMenuRenamesAndForgets() {
@@ -341,13 +334,13 @@ class SettingsBehaviourTest {
         val events = mutableListOf<LicensesEvent>()
         setThemed { LicensesScreen(VariantFixtures.licenses.getValue("licenses"), onEvent = { events += it }) }
         rule.onNodeWithText("Cassini talk").performClick()
-        rule.onNodeWithText("Source code on GitHub").performScrollTo().performClick()
+        rule.onNodeWithText("Source code on GitHub").assertDoesNotExist()
+        rule.onNodeWithText("Privacy").assertDoesNotExist()
         rule.onNodeWithContentDescription("Back to settings").performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(
                     LicensesEvent.Open(LicenseEntry.CASSINI),
-                    LicensesEvent.Open(LicenseEntry.SOURCE_CODE),
                     LicensesEvent.Back,
                 ),
                 events,

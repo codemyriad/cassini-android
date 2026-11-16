@@ -134,7 +134,13 @@ private fun InfoBlock(heading: Int, body: Int) {
 }
 
 @Composable
-private fun BackupSwitch(title: String, body: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+internal fun BackupSwitch(
+    title: String,
+    body: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
     val colors = CassiniTheme.colors
     Row(
         Modifier.fillMaxWidth().toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)

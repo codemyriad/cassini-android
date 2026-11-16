@@ -43,6 +43,15 @@ data class Settings(
     val trashLastPurgeAt: Long?,
 )
 
+/** Processing choices are independent of permission to download the optional files. */
+data class SpeakerChoices(val tellApart: Boolean = true, val recognise: Boolean = true) {
+    fun enabled(part: ModelPart): Boolean = when (part) {
+        ModelPart.SPEECH -> true
+        ModelPart.SPEAKERS -> tellApart
+        ModelPart.VOICES -> recognise
+    }
+}
+
 /**
  * The small settings in `settings.preferences_pb` (docs/architecture.md, section 3.4), with one typed accessor per
  * key. The app creates one instance per process with [create]: DataStore allows one instance per file.
@@ -52,6 +61,15 @@ data class Settings(
 class SettingsRepository(private val store: DataStore<Preferences>) {
     private val preferences: Flow<Preferences> = store.data.catch { error ->
         if (error is IOException) emit(emptyPreferences()) else throw error
+    }
+
+    val speakerChoices: Flow<SpeakerChoices> = preferences.map {
+        SpeakerChoices(it[Keys.TELL_SPEAKERS_APART] ?: true, it[Keys.RECOGNISE_VOICES] ?: true)
+    }.distinctUntilChanged()
+
+    suspend fun setSpeakerChoice(part: ModelPart, enabled: Boolean) {
+        require(part != ModelPart.SPEECH)
+        set(if (part == ModelPart.SPEAKERS) Keys.TELL_SPEAKERS_APART else Keys.RECOGNISE_VOICES, enabled)
     }
 
     /** Every setting at once. */
@@ -230,6 +248,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     /** The stored key names of architecture 3.4. They are persisted: never rename one. */
     object Keys {
+        val TELL_SPEAKERS_APART = booleanPreferencesKey("speakers.tellApart")
+        val RECOGNISE_VOICES = booleanPreferencesKey("speakers.recognise")
         val PARAKEET_DEFAULT_NOTICE = booleanPreferencesKey("notices.parakeetDefault")
         val FIRST_WHISTLE_NOTE = stringPreferencesKey("recognition.firstWhistleNote")
         val PARAKEET_SUGGESTION_DISMISSED = booleanPreferencesKey("notices.parakeetSuggestionDismissed")

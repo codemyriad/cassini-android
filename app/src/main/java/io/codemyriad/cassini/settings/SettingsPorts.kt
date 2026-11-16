@@ -9,6 +9,7 @@ import io.codemyriad.cassini.core.backup.BackupChoices
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
+import io.codemyriad.cassini.data.settings.SpeakerChoices
 import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.notices.NoticeFacts
 import io.codemyriad.cassini.ui.banner.BannerKind
@@ -49,6 +50,14 @@ interface SettingsPorts {
     suspend fun setCloud(enabled: Boolean) { error("Backup choices are unavailable") }
 
     suspend fun setVoices(enabled: Boolean) { error("Backup choices are unavailable") }
+
+    val speakers: Flow<SpeakerChoices> get() = flowOf(SpeakerChoices())
+
+    suspend fun setSpeakerChoice(part: ModelPart, enabled: Boolean) { error("Speaker choices are unavailable") }
+
+    fun meetings(): Flow<Int> = flowOf(0)
+
+    fun audioDuration(): Flow<Long> = flowOf(0L)
 
     val speech: Flow<SpeechChoice>
 
@@ -93,6 +102,15 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
     override suspend fun setCloud(enabled: Boolean) = graph.backupChoices.setCloud(enabled)
 
     override suspend fun setVoices(enabled: Boolean) = graph.backupChoices.setVoices(enabled)
+
+    override val speakers: Flow<SpeakerChoices> get() = graph.settings.speakerChoices
+
+    override suspend fun setSpeakerChoice(part: ModelPart, enabled: Boolean) =
+        graph.settings.setSpeakerChoice(part, enabled)
+
+    override fun meetings(): Flow<Int> = flow { emitAll(graph.awaitCatalogue().notes.counts()) }.map { it.live }
+
+    override fun audioDuration(): Flow<Long> = flow { emitAll(graph.awaitCatalogue().notes.audioDuration()) }
 
     override val speech: Flow<SpeechChoice> get() = graph.speech.state
 

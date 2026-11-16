@@ -1,10 +1,12 @@
 package io.codemyriad.cassini.settings
 
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -26,6 +28,8 @@ fun SettingsRoute(viewModel: SettingsViewModel, navigator: ScreenNavigator, modi
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.effects.collect { effect ->
                 when (effect) {
+                    is SettingsEffect.OpenUrl ->
+                        context.startSystemScreen(Intent(Intent.ACTION_VIEW, effect.url.toUri()))
                     SettingsEffect.Close -> navigator.close()
                     is SettingsEffect.Open -> navigator.open(effect.key)
                     SettingsEffect.OpenNotificationSettings ->

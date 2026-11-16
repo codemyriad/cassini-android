@@ -60,16 +60,19 @@ class LicensesViewModel(
     private val saved: SavedStateHandle,
     private val ports: LicensesPorts,
     private val backTo: LicensesBackTo,
+    private val detail: LicenseEntry? = null,
 ) : ViewModel() {
     private val effectChannel = Channel<LicensesEffect>(Channel.BUFFERED)
 
     /** One-shot navigation requests; the route collects them. */
     val effects: Flow<LicensesEffect> = effectChannel.receiveAsFlow()
 
-    private val opened = saved.getStateFlow<String?>(KEY_OPEN, null)
+    private val opened = saved.getStateFlow<String?>(KEY_OPEN, detail?.name)
     private val loaded = MutableStateFlow<LicenseText?>(null)
 
-    private val entries = LicenseEntry.entries.toImmutableList()
+    private val entries = LicenseEntry.entries.filterNot {
+        it == LicenseEntry.PRIVACY || it == LicenseEntry.SOURCE_CODE
+    }.toImmutableList()
 
     val state: StateFlow<LicensesUiState> = combine(opened, loaded) { open, text ->
         LicensesUiState(entries = entries, open = text?.takeIf { it.entry.name == open }, backTo = backTo)
@@ -83,7 +86,9 @@ class LicensesViewModel(
         when (event) {
             LicensesEvent.Back -> effectChannel.trySend(LicensesEffect.Close)
             is LicensesEvent.Open -> open(event.entry)
-            LicensesEvent.CloseText -> {
+            LicensesEvent.CloseText -> if (detail != null) {
+                effectChannel.trySend(LicensesEffect.Close)
+            } else {
                 saved[KEY_OPEN] = null
                 loaded.value = null
             }

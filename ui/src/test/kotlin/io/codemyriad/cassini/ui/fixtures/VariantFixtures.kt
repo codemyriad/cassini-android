@@ -800,10 +800,14 @@ internal object VariantFixtures {
 
     // Licenses (no board; features.md section 11).
 
+    private val licenseEntries = LicenseEntry.entries.filterNot {
+        it == LicenseEntry.PRIVACY || it == LicenseEntry.SOURCE_CODE
+    }.toImmutableList()
+
     val licenses = mapOf(
-        "licenses" to LicensesUiState(entries = LicenseEntry.entries.toImmutableList()),
+        "licenses" to LicensesUiState(entries = licenseEntries),
         "licenses-text" to LicensesUiState(
-            entries = LicenseEntry.entries.toImmutableList(),
+            entries = licenseEntries,
             open = LicenseText(
                 LicenseEntry.CASSINI,
                 "GNU GENERAL PUBLIC LICENSE\n\nVersion 3, 29 June 2007",

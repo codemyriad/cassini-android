@@ -8,7 +8,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Brand, file extensions and pure punctuation: the same in every language. -->
     <string name="ui_brand" translatable="false">Cassini talk</string>
-    <string name="ui_brand_version" translatable="false">Cassini talk %1$s</string>
     <string name="ui_ext_opus" translatable="false">.opus</string>
     <string name="ui_ext_txt" translatable="false">.txt</string>
     <string name="ui_ext_srt" translatable="false">.srt</string>
@@ -33,7 +32,6 @@
     <string name="ui_of_clock" translatable="false">%1$s / %2$s</string>
     <string name="ui_skip_seconds" translatable="false">10</string>
     <string name="ui_speed_times" translatable="false">%1$s×</string>
-    <string name="ui_models_int8_size" translatable="false">INT8 · %1$s</string>
     <string name="ui_licence_gpl" translatable="false">GNU General Public License v3</string>
 
     <!-- Units (D50: French writes Mo and Go, and French and Spanish put a space before %). -->
@@ -389,8 +387,6 @@
     <!-- Settings (board 08, features.md section 11). -->
     <string name="ui_settings_title">Settings</string>
     <string name="ui_settings_language">App language</string>
-    <string name="ui_settings_language_phone">Phone</string>
-    <string name="ui_settings_language_footnote">Speech is recognised in any language, automatically.</string>
     <string name="ui_settings_models">On-device models</string>
     <string name="ui_settings_model_ready">Ready</string>
     <string name="ui_settings_model_downloading">Downloading %1$d%%</string>
@@ -399,18 +395,8 @@
     <string name="ui_settings_model_not_downloaded">Not downloaded</string>
     <string name="ui_settings_model_failed">Download failed — tap to try again</string>
     <string name="ui_settings_models_footnote">Transcription runs on this phone.</string>
-    <string name="ui_settings_privacy">Privacy</string>
-    <string name="ui_settings_voices">Saved voices</string>
-    <string name="ui_settings_voices_none">None yet</string>
-    <string name="ui_settings_trash">Trash</string>
-    <string name="ui_settings_trash_empty">Empty</string>
-    <string name="ui_settings_about">About</string>
-    <string name="ui_settings_about_body">— turns speech into searchable, timed text on your phone.</string>
-    <string name="ui_settings_free_software">Free software under GPLv3.</string>
-    <string name="ui_settings_source_and_notices">Source code and notices</string>
 
     <!-- Licenses (no board; features.md section 11). -->
-    <string name="ui_licenses_title">Source code and notices</string>
     <string name="ui_licenses_third_party">Third-party notices</string>
     <string name="ui_licenses_third_party_body">Libraries Cassini uses and their licences</string>
     <string name="ui_licenses_native">Native libraries</string>
@@ -527,12 +513,8 @@
     <string name="ui_banner_voices_unreadable_body">They were made by a newer Cassini or are damaged. Nothing was changed.</string>
     <string name="ui_banner_lib_unavailable_title">Your notes can’t be opened</string>
     <string name="ui_banner_lib_unavailable_body">Your files are kept. Free some storage, then open Cassini again.</string>
-    <string name="ui_settings_included">Included · 17 MB</string>
-    <string name="ui_settings_optional">Optional download</string>
     <string name="ui_settings_optional_size">Optional download · %1$s</string>
-    <string name="ui_settings_default">Default</string>
     <string name="ui_settings_unavailable">Unavailable</string>
-    <string name="ui_settings_model_choice_footnote">Used for new transcriptions. Queued and paused transcriptions keep their model.</string>
     <string name="ui_settings_not_available">Not available on this device.</string>
 
     <!-- Coordinator D78; ux-draft/strings.json. -->

@@ -363,8 +363,6 @@
     <!-- Settings. -->
     <string name="ui_settings_title">Ajustes</string>
     <string name="ui_settings_language">Idioma de la app</string>
-    <string name="ui_settings_language_phone">Teléfono</string>
-    <string name="ui_settings_language_footnote">El habla se reconoce en cualquier idioma, automáticamente.</string>
     <string name="ui_settings_models">Modelos en el dispositivo</string>
     <string name="ui_settings_model_ready">Listo</string>
     <string name="ui_settings_model_downloading">Descargando %1$d\u00A0%%</string>
@@ -373,18 +371,8 @@
     <string name="ui_settings_model_not_downloaded">Sin descargar</string>
     <string name="ui_settings_model_failed">Error de descarga — toca para reintentar</string>
     <string name="ui_settings_models_footnote">La transcripción se hace en este teléfono.</string>
-    <string name="ui_settings_privacy">Privacidad</string>
-    <string name="ui_settings_voices">Voces guardadas</string>
-    <string name="ui_settings_voices_none">Ninguna todavía</string>
-    <string name="ui_settings_trash">Papelera</string>
-    <string name="ui_settings_trash_empty">Vacía</string>
-    <string name="ui_settings_about">Acerca de</string>
-    <string name="ui_settings_about_body">— convierte el habla en texto con tiempos y que puedes buscar, en tu teléfono.</string>
-    <string name="ui_settings_free_software">Software libre con licencia GPLv3.</string>
-    <string name="ui_settings_source_and_notices">Código fuente y avisos</string>
 
     <!-- Licenses. -->
-    <string name="ui_licenses_title">Código fuente y avisos</string>
     <string name="ui_licenses_third_party">Avisos de terceros</string>
     <string name="ui_licenses_third_party_body">Las bibliotecas que usa Cassini y sus licencias</string>
     <string name="ui_licenses_native">Bibliotecas nativas</string>
@@ -503,12 +491,8 @@
     <string name="ui_banner_voices_unreadable_body">Las creó una versión más reciente de Cassini o están dañadas. No se cambió nada.</string>
     <string name="ui_banner_lib_unavailable_title">No se pueden abrir tus notas</string>
     <string name="ui_banner_lib_unavailable_body">Tus archivos se conservan. Libera almacenamiento y vuelve a abrir Cassini.</string>
-    <string name="ui_settings_included">Incluido · 17 MB</string>
-    <string name="ui_settings_optional">Descarga opcional</string>
     <string name="ui_settings_optional_size">Descarga opcional · %1$s</string>
-    <string name="ui_settings_default">Predeterminado</string>
     <string name="ui_settings_unavailable">No disponible</string>
-    <string name="ui_settings_model_choice_footnote">Se usa para las nuevas transcripciones. Las transcripciones en cola y en pausa conservan su modelo.</string>
     <string name="ui_settings_not_available">No disponible en este dispositivo.</string>
 
     <!-- Coordinator D78; ux-draft/strings.json. -->

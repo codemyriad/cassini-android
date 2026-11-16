@@ -52,7 +52,7 @@ class ModelDownloadFlowTest {
         compose.onNodeWithText(text(UiR.string.ui_part_speakers)).assertDoesNotExist()
 
         compose.onNodeWithText(text(UiR.string.ui_models_sources), substring = true).performClick()
-        compose.awaitUi(TIMEOUT_MS) { shows(text(UiR.string.ui_licenses_title)) }
+        compose.awaitUi(TIMEOUT_MS) { shows(text(UiR.string.ui_about_licences)) }
         compose.onNodeWithContentDescription(text(UiR.string.ui_back)).performClick()
 
         compose.awaitUi(TIMEOUT_MS) { shows(text(UiR.string.ui_models_not_now)) }

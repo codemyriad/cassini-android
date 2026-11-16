@@ -41,7 +41,7 @@ class FontScaleScreenshotTest : BoardTest() {
 
     @Test fun settings() = large("08-settings")
 
-    @Test fun settingsEnd() = largeEnd("08-settings", "Free software")
+    @Test fun settingsEnd() = largeEnd("08-settings", "About, privacy and help")
 
     private companion object {
         const val SETTLE_MS = 1_000L

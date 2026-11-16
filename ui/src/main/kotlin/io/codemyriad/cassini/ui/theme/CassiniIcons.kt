@@ -49,6 +49,11 @@ private fun dots(r: Float): List<GlyphPart> = listOf(5f, 12f, 19f).map { circle(
  * glyphs ignore it. Draw one with [CassiniIcon]; the board sizes and strokes are in the ui.md table.
  */
 enum class Glyph(internal val parts: List<GlyphPart>, val filled: Boolean = false, val viewport: Float = 24f) {
+    Wave(paths("M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2")),
+    People(
+        listOf(circle(9f, 7f, 3f), circle(17f, 8f, 2f)) + paths("M3 20v-2a6 6 0 0 1 12 0v2M17 13a4 4 0 0 1 4 4v3"),
+    ),
+    Language(paths("M4 6h9M8.5 4v2M6 6c.5 3 2.5 5.5 5.5 7M11 6c-.7 3.5-3 6.5-6.5 8M13 20l4-9 4 9M14.3 17h5.4")),
     Trash(paths("M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13")),
     Settings(
         listOf(circle(12f, 12f, 3f)) + paths(
