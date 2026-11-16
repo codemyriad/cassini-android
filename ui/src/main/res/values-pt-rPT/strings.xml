@@ -350,7 +350,6 @@
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Vozes guardadas</string>
-    <string name="ui_voices_privacy">As impressões vocais ficam na aplicação e nunca são incluídas nos ficheiros partilhados. Só os nomes que escolher são partilhados.</string>
     <string name="ui_voices_confirmed_speech">%1$s de fala confirmada</string>
     <string name="ui_voices_options">Opções para %1$s</string>
     <string name="ui_voices_forget">Esquecer…</string>
@@ -530,7 +529,6 @@
     <string name="ui_meeting_duration_minutes">{m} min</string>
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Data desconhecida</string>
-    <string name="ui_settings_transfer_heading">Mudança para um telemóvel novo</string>
     <string name="ui_settings_transfer_title">Passar para um telemóvel novo</string>
     <string name="ui_settings_transfer_export_hint">Para guardar uma cópia num local seguro, utilize «Exportar tudo como ZIP».</string>
     <string name="ui_settings_transfer_unavailable">Esta opção requer o Android 9 ou mais recente.</string>

@@ -19,8 +19,6 @@ LABELS = {
     'settings_transfer_body': ('settings.transfer.body', None),
     'settings_transfer_body_off': ('settings.transfer.body.off', None),
     'settings_transfer_too_large': ('settings.transfer.tooLarge', None),
-    'name_remember_body': ('android.speakers.rememberVoice.description', 'name'),
-    'name_remember_body_unnamed': ('android.speakers.rememberVoice.description.unnamed', None),
     'count_notes': ('format.searchCount.meetings', 'n'),
     'voices_stale': ('savedVoices.row.stale', None),
     'voices_footnote': ('android.savedVoices.howToAdd', None),

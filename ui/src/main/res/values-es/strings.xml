@@ -349,7 +349,6 @@
 
     <!-- Saved voices. -->
     <string name="ui_voices_title">Voces guardadas</string>
-    <string name="ui_voices_privacy">Las huellas de voz se guardan en la aplicación y nunca se incluyen en los archivos compartidos. Solo se comparten los nombres que eliges.</string>
     <string name="ui_voices_confirmed_speech">%1$s de habla confirmada</string>
     <string name="ui_voices_options">Opciones de %1$s</string>
     <string name="ui_voices_forget">Olvidar…</string>
@@ -529,7 +528,6 @@
     <string name="ui_meeting_duration_minutes">{m} min</string>
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Fecha desconocida</string>
-    <string name="ui_settings_transfer_heading">Cambio a un teléfono nuevo</string>
     <string name="ui_settings_transfer_title">Transferir a un teléfono nuevo</string>
     <string name="ui_settings_transfer_export_hint">Para guardar una copia en un lugar seguro, usa “Exportar todo como ZIP”.</string>
     <string name="ui_settings_transfer_unavailable">Esta opción necesita Android 9 o posterior.</string>

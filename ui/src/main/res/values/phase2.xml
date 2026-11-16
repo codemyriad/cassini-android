@@ -10,8 +10,6 @@
     <string name="ui_settings_transfer_body">When you set up a new Android phone from this one, your meetings and saved voices are copied directly to it. Nothing is sent to a cloud account. Downloaded models are not copied; the new phone downloads them again.</string>
     <string name="ui_settings_transfer_body_off">Nothing is copied to a new phone. If this phone is lost or replaced, your meetings are gone unless you exported them.</string>
     <string name="ui_settings_transfer_too_large">Your meetings and saved voices are too large to move in one transfer. Export your meetings as a ZIP instead.</string>
-    <string name="ui_name_remember_body">Future meetings will name %1$s automatically.</string>
-    <string name="ui_name_remember_body_unnamed">Future meetings will name this person automatically.</string>
     <plurals name="ui_count_notes">
         <item quantity="one">%1$s meeting</item>
         <item quantity="other">%1$s meetings</item>

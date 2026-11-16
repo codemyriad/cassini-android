@@ -11,8 +11,6 @@
     <string name="ui_settings_transfer_body">Quando configuri un nuovo telefono Android a partire da questo, le tue riunioni e le voci salvate vengono copiate direttamente sul nuovo telefono. Nulla viene inviato a un account cloud. I modelli scaricati non vengono copiati: il nuovo telefono li scarica di nuovo.</string>
     <string name="ui_settings_transfer_body_off">Nulla viene copiato su un nuovo telefono. Se questo telefono viene perso o sostituito, le tue riunioni vanno perse, a meno che tu non le abbia esportate.</string>
     <string name="ui_settings_transfer_too_large">Le tue riunioni e le voci salvate sono troppo grandi per essere trasferite in una sola volta. Esporta le riunioni come ZIP.</string>
-    <string name="ui_name_remember_body">Le prossime riunioni riconosceranno %1$s automaticamente.</string>
-    <string name="ui_name_remember_body_unnamed">Le prossime riunioni riconosceranno questa persona automaticamente.</string>
     <plurals name="ui_count_notes">
         <item quantity="one">%1$s riunione</item>
         <item quantity="many">%1$s riunioni</item>
