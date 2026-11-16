@@ -44,7 +44,7 @@ sherpaOnnx = "1.13.7-0c2ee3f3"
 junit = "4.13.2"
 robolectric = "4.17"
 # Screenshot tests in :ui (Robolectric native graphics).
-roborazzi = "1.77.0"
+roborazzi = "1.79.0"
 turbine = "1.2.1"
 androidxTestRunner = "1.7.0"
 androidxTestCore = "1.7.0"
