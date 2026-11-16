@@ -11,8 +11,6 @@
     <string name="ui_settings_transfer_body">Ao configurar um telemóvel Android novo a partir deste, as suas reuniões e vozes guardadas são copiadas diretamente para ele. Nada é enviado para uma conta na nuvem. Os modelos transferidos não são copiados; o telemóvel novo volta a transferi-los.</string>
     <string name="ui_settings_transfer_body_off">Nada é copiado para um telemóvel novo. Se este telemóvel for perdido ou substituído, as suas reuniões perdem-se, a menos que as tenha exportado.</string>
     <string name="ui_settings_transfer_too_large">As suas reuniões e vozes guardadas são demasiado grandes para serem passadas de uma só vez. Exporte as suas reuniões como ZIP.</string>
-    <string name="ui_name_remember_body">Nas próximas reuniões, o Cassini reconhece %1$s automaticamente.</string>
-    <string name="ui_name_remember_body_unnamed">Nas próximas reuniões, o Cassini reconhece esta pessoa automaticamente.</string>
     <plurals name="ui_count_notes">
         <item quantity="one">%1$s reunião</item>
         <item quantity="many">%1$s reuniões</item>

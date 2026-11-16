@@ -375,7 +375,6 @@
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Saved voices</string>
-    <string name="ui_voices_privacy">Voiceprints are kept in the app and are never written into shared files. Only the names you choose are shared.</string>
     <string name="ui_voices_confirmed_speech">%1$s confirmed speech</string>
     <string name="ui_voices_options">Options for %1$s</string>
     <string name="ui_voices_forget">Forget…</string>
@@ -557,7 +556,6 @@
 
     <string name="ui_settings_transfer_title">Move to a new phone</string>
     <string name="ui_settings_transfer_unavailable">Choosing this needs Android 9 or newer.</string>
-    <string name="ui_settings_transfer_heading">Moving to a new phone</string>
     <string name="ui_settings_transfer_export_hint">To keep a copy somewhere safe, use Export All as ZIP.</string>
     <string name="ui_settings_transfer_choice_failed">Couldn’t save this choice. Try again.</string>
     <string name="ui_search_filter_any_date">Any date</string>

@@ -172,8 +172,6 @@ class TranslationsTest {
         fun canonicalVoiceDescription(name: String, tag: String): String? {
             val id = when (name) {
                 "ui_voices_stale" -> "savedVoices.row.stale"
-                "ui_name_remember_body" -> "android.speakers.rememberVoice.description"
-                "ui_name_remember_body_unnamed" -> "android.speakers.rememberVoice.description.unnamed"
                 else -> return null
             }
             val source = File("../third_party/cassini-ux/phase2/strings.json").readText()

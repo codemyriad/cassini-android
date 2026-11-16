@@ -8,6 +8,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.espresso.Espresso
 import io.codemyriad.cassini.MainActivity
@@ -104,9 +105,10 @@ class SpeakerNamingFlowTest {
         Espresso.pressBack()
         rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_library_settings)))
         rule.onNode(hasContentDescription(rule.text(UiR.string.ui_library_settings))).performClick()
-        rule.waitShown(hasText(rule.text(UiR.string.ui_voices_title), substring = true) and hasClickAction())
-        rule.onNode(hasText(rule.text(UiR.string.ui_voices_title), substring = true) and hasClickAction())
-            .performClick()
+        // The Settings row's exact title: a substring also matches the "Saved voices are …" backup switch subtitle.
+        val voices = hasText(rule.text(UiR.string.ui_settings_voices)) and hasClickAction()
+        rule.waitShown(voices)
+        rule.onNode(voices).performScrollTo().performClick()
         rule.waitText(NAME)
         val notes = rule.activity.resources.getQuantityString(UiR.plurals.ui_count_notes, 1, "1")
         rule.waitShown(hasText(notes, substring = true))
