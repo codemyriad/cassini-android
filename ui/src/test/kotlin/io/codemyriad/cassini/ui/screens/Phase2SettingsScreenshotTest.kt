@@ -49,7 +49,7 @@ class Phase2SettingsScreenshotTest : BoardTest() {
             }.toImmutableList(),
             version = "0.4.2-beta.3",
             meetings = 38,
-            audioHours = 41,
+            audioDurationMs = 41L * 3_600_000,
             backup = BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false),
         )
         board(if (dark) "dark" else "light", "phase2-settings-${page.name.lowercase()}", dark) {

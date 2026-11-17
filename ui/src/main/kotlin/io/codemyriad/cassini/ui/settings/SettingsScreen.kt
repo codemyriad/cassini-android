@@ -33,6 +33,7 @@ import io.codemyriad.cassini.ui.components.HelperText
 import io.codemyriad.cassini.ui.components.SectionHeader
 import io.codemyriad.cassini.ui.components.screenContentWidth
 import io.codemyriad.cassini.ui.format.Counts
+import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 
@@ -125,7 +126,7 @@ private fun SettingsMap(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit
         stringResource(
             R.string.ui_settings_library_stats,
             Counts.plural(R.plurals.ui_settings_meeting_count, state.meetings),
-            Counts.plural(R.plurals.ui_settings_audio_hours, state.audioHours),
+            libraryAudioDuration(state.audioDurationMs),
         ),
     )
     SectionHeader(stringResource(R.string.ui_settings_app))
@@ -174,4 +175,12 @@ private fun LanguageSection(current: LanguageChoice, onEvent: (SettingsEvent) ->
             sheet = true
         }
     }
+}
+
+/** Catalog settings.phone.audioHours: whole hours from one hour, HARMONY §6 duration below it. */
+@Composable
+private fun libraryAudioDuration(ms: Long): String = if (ms < 3_600_000L) {
+    Durations.roughMinutes(ms)
+} else {
+    Counts.plural(R.plurals.ui_settings_audio_hours, (ms / 3_600_000L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
 }

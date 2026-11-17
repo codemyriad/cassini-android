@@ -61,6 +61,8 @@ data class NoticeFacts(
     val parakeetNowDefault: Boolean = false,
     /** Null until readiness is known; installation failures remain missing, never a reason to transcribe again. */
     val speakerModel: ModelStatus? = null,
+    /** A deliberate opt-out is not a failed speaker pass; NotePorts supplies the current device choice. */
+    val speakerSeparationEnabled: Boolean = true,
 )
 
 /**

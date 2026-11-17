@@ -2,6 +2,7 @@ package io.codemyriad.cassini.ui.settings
 
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -49,6 +50,18 @@ class SettingsMapTest {
             back.onBackPressed()
         }
         rule.onNodeWithText("Language").assertExists()
+    }
+
+    @Test fun libraryTotalsUseMinutesBelowAnHourAndWholeHoursAboveIt() {
+        val duration = mutableStateOf(40L * 60_000)
+        rule.setContent {
+            CassiniTheme {
+                SettingsScreen(BoardFixtures.settings.copy(meetings = 3, audioDurationMs = duration.value), {})
+            }
+        }
+        rule.onNodeWithText("3 meetings, 40\u00a0min of audio.").assertExists()
+        rule.runOnIdle { duration.value = 3_600_000 + 40L * 60_000 }
+        rule.onNodeWithText("3 meetings, 1 hour of audio.").assertExists()
     }
 
     @Test fun aboutHasFourDistinctDestinations() {

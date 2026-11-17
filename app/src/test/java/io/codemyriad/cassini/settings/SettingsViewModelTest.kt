@@ -24,8 +24,10 @@ import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -94,18 +96,36 @@ class SettingsViewModelTest {
         assertTrue(effects.isEmpty())
     }
 
-    @Test fun libraryTotalsFollowTheRepositoryAndRoundHoursDown() = runTest(dispatcher) {
+    @Test fun libraryTotalsPreserveShortAndLongDurations() = runTest(dispatcher) {
         val vm = viewModel()
         ports.meetingCount.value = 38
         ports.duration.value = 41L * 3_600_000 + 3_599_999
         advanceUntilIdle()
         assertEquals(38, vm.now().meetings)
-        assertEquals(41, vm.now().audioHours)
+        assertEquals(41L * 3_600_000 + 3_599_999, vm.now().audioDurationMs)
         ports.meetingCount.value = 0
-        ports.duration.value = 0
+        ports.duration.value = 40L * 60_000
         advanceUntilIdle()
         assertEquals(0, vm.now().meetings)
-        assertEquals(0, vm.now().audioHours)
+        assertEquals(40L * 60_000, vm.now().audioDurationMs)
+    }
+
+    @Test fun settingsStillUpdateWhileAudioDurationHasNotEmitted() = runTest(dispatcher) {
+        ports.durationPending = true
+        ports.speakers.value = SpeakerChoices(tellApart = false, recognise = false)
+        ports.backup.value = BackupChoices(cloud = false)
+        ports.models.value = mapOf(ModelPart.SPEECH to ModelStatus.Ready)
+        val vm = viewModel()
+        assertEquals(false, vm.now().tellSpeakersApart)
+        assertEquals(false, vm.now().recogniseVoices)
+        assertEquals(false, vm.now().backup?.cloudOn)
+        assertEquals(false, vm.now().speechChecking)
+        assertEquals(0L, vm.now().audioDurationMs)
+        ports.speakers.value = SpeakerChoices()
+        ports.meetingCount.value = 3
+        advanceUntilIdle()
+        assertTrue(vm.now().tellSpeakersApart)
+        assertEquals(3, vm.now().meetings)
     }
 
     @Test fun optionalRowsStayActionableWhileParakeetStillNeedsConsent() = runTest(dispatcher) {
@@ -510,7 +530,8 @@ class SettingsViewModelTest {
         val meetingCount = MutableStateFlow(0)
         val duration = MutableStateFlow(0L)
         override fun meetings(): Flow<Int> = meetingCount
-        override fun audioDuration(): Flow<Long> = duration
+        var durationPending = false
+        override fun audioDuration(): Flow<Long> = if (durationPending) flow { awaitCancellation() } else duration
 
         override val backup = MutableStateFlow<BackupChoices?>(null)
         override var transferAvailable = true

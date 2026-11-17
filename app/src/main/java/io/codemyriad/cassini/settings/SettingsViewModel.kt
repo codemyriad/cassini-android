@@ -125,9 +125,9 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     }
     private val totals = combine(
         ports.meetings().guarded("meetings"),
-        ports.audioDuration().catch { emit(0L) },
+        ports.audioDuration().onStart { emit(0L) }.catch { emit(0L) },
     ) { count, duration ->
-        count to (duration / HOUR_MS).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+        count to duration.coerceAtLeast(0L)
     }
     val state: StateFlow<SettingsUiState> = combine(baseState, speakerState, totals) { base, speakers, totals ->
         base.copy(
@@ -136,7 +136,7 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             speakerSaving = speakers.second,
             speakerError = speakers.third,
             meetings = totals.first,
-            audioHours = totals.second,
+            audioDurationMs = totals.second,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initial())
 
@@ -294,7 +294,6 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     }
 
     companion object {
-        private const val HOUR_MS = 3_600_000L
         private const val TAG = "CassiniSettings"
         private const val STOP_TIMEOUT_MS = 5_000L
 

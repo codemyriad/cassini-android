@@ -17,7 +17,7 @@ data class SettingsUiState(
     val trash: Int,
     val version: String,
     val meetings: Int = 0,
-    val audioHours: Int = 0,
+    val audioDurationMs: Long = 0,
     val tellSpeakersApart: Boolean = true,
     val recogniseVoices: Boolean = true,
     val speakerSaving: Boolean = false,
