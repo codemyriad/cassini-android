@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.banner.BannerAction
+import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.components.Banner
 import io.codemyriad.cassini.ui.components.FormatBadge
 import io.codemyriad.cassini.ui.components.IconButton44
@@ -56,14 +57,17 @@ import io.codemyriad.cassini.ui.components.rememberSyncedText
 import io.codemyriad.cassini.ui.components.screenContentWidth
 import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Durations
+import io.codemyriad.cassini.ui.theme.CassiniColors
 import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
+import io.codemyriad.cassini.ui.theme.DarkColors
 import io.codemyriad.cassini.ui.theme.Glyph
 import io.codemyriad.cassini.ui.theme.LightColors
 
 /**
  * The Recording screen (board 01, features.md section 2; ui.md section 8). It is dark in both app themes: every
- * colour comes from `CassiniTheme.recording`, and the banner keeps its light tones.
+ * colour comes from `CassiniTheme.recording`. Banners keep their light tones, except "Microphone access is off",
+ * which uses its dark tones (D104 §3, see [recordingBannerColors]).
  *
  * The editable title follows the status/format header inside the scrolling middle viewport. Title, banners,
  * timer, waveform and space hint scroll together so the pinned header and capture controls remain visible. Stop is the centre action,
@@ -74,9 +78,9 @@ import io.codemyriad.cassini.ui.theme.LightColors
  * The banner's "Open settings" sends [RecordingEvent.OpenSettings]; its other actions send
  * [RecordingEvent.BannerAction].
  *
- * The status shows only while the capture runs or is paused. Before the capture starts and while it is saved, the
- * caption tells why ("Cassini needs the microphone to record.", "Starting the microphone…", "Saving the
- * recording…") and Pause and Stop are disabled.
+ * The status shows only while the capture runs or is paused. While the capture starts and while it is saved, the
+ * caption tells why ("Starting the microphone…", "Saving the recording…") and Pause and Stop are disabled. While the
+ * microphone is refused or asked for there is no caption: the "Microphone access is off" notice says it (D104 §3).
  */
 @Composable
 fun RecordingScreen(
@@ -139,7 +143,7 @@ private fun RecordingTitleAndBanner(state: RecordingUiState, onEvent: (Recording
                     )
                 },
                 modifier = Modifier.padding(top = 8.dp),
-                colors = LightColors,
+                colors = recordingBannerColors(spec.kind),
             )
         }
     }
@@ -156,15 +160,25 @@ private fun RecordingMeter(state: RecordingUiState) {
     ) {
         RecordingTimer(state.elapsedMs)
         Waveform(state.levels, running = state.phase == RecordingPhase.Recording)
-        Text(
-            text = caption(state),
-            modifier = Modifier.widthIn(max = 280.dp),
-            style = CassiniTheme.type.body14,
-            color = rec.text2,
-            textAlign = TextAlign.Center,
-        )
+        caption(state)?.let { text ->
+            Text(
+                text = text,
+                modifier = Modifier.widthIn(max = 280.dp),
+                style = CassiniTheme.type.body14,
+                color = rec.text2,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
+
+/**
+ * The palette a banner on the always-dark Recording screen is drawn with. "Microphone access is off" uses its dark
+ * tones (D104 §3, strip 7: dark red wash, red title, light body, light Open settings pill); the other banners keep
+ * their light tones.
+ */
+internal fun recordingBannerColors(kind: BannerKind): CassiniColors =
+    if (kind == BannerKind.REC_MIC_OFF) DarkColors else LightColors
 
 /**
  * The header row, 48 dp: Minimise (a 44 dp visual; the 48 dp layout overlaps 2 dp on each side, so the space
@@ -251,10 +265,13 @@ private fun TitleField(title: String, onTitle: (String) -> Unit) {
     )
 }
 
-/** The caption under the waveform: the hint while capturing, else why nothing is captured yet. */
+/**
+ * The caption under the waveform: the hint while capturing, else why nothing is captured yet. None while the
+ * microphone is refused or asked for: the "Microphone access is off" notice already says it (D104 §3).
+ */
 @Composable
-private fun caption(state: RecordingUiState): String = when (state.phase) {
-    RecordingPhase.NeedsPermission -> stringResource(R.string.ui_recording_needs_permission)
+private fun caption(state: RecordingUiState): String? = when (state.phase) {
+    RecordingPhase.NeedsPermission -> null
     RecordingPhase.Starting -> stringResource(R.string.ui_recording_starting)
     RecordingPhase.Stopping -> stringResource(R.string.ui_recording_stopping)
     RecordingPhase.Recording, RecordingPhase.Paused -> when (val hint = state.hint) {

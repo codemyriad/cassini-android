@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -34,13 +36,16 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.codemyriad.cassini.ui.banner.BannerAction
+import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.fixtures.VariantFixtures
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.CassiniTypography
 import io.codemyriad.cassini.ui.theme.DarkColors
+import io.codemyriad.cassini.ui.theme.LightColors
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -185,9 +190,23 @@ class Phase1RecordingTest {
         assertControlTargets()
         rule.onNodeWithText("Open settings").performScrollTo().assertIsDisplayed().performClick()
         rule.onNodeWithContentDescription("0 seconds").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Cassini needs the microphone to record.").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Microphone access is off").performScrollTo().assertIsDisplayed()
         assertControlTargets()
         rule.runOnIdle { assertEquals(listOf(RecordingEvent.OpenSettings), events) }
+    }
+
+    @Test
+    fun theRefusedMicrophoneShowsOneDarkNoticeAndNoLineUnderTheTimer() {
+        val state = VariantFixtures.recording.getValue("recording-permission-off")
+        rule.setContent {
+            CassiniTheme {
+                ProvideFixedFormat(locale = Locale.ENGLISH) { RecordingScreen(state, onEvent = {}) }
+            }
+        }
+        rule.onNodeWithText("Microphone access is off").assertIsDisplayed()
+        rule.onAllNodesWithText("Cassini needs the microphone to record.").assertCountEquals(0)
+        assertSame(DarkColors, recordingBannerColors(BannerKind.REC_MIC_OFF))
+        assertSame(LightColors, recordingBannerColors(BannerKind.REC_STORAGE_LOW))
     }
 
     @Test fun largeTextKeepsSeparateControlTargets() {
