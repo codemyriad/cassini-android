@@ -1,8 +1,9 @@
 # Shared Phase 1 contract
 
 The catalog, tokens, Saturn marks (nav, mid), contracts and vectors come from
-cassini-ux commit `5e4f0bff95300f2ef795fe71244b22644cad5c25` (bumped from `5e0c34e` for L-10,
-`docs/design/phase2-d1035.md`). `UPSTREAM.json`
+cassini-ux commit `c28b72461c7317ea0a4684183cb9103626aabf17` (bumped from `5e0c34e` to `5e4f0bf` for L-10,
+`docs/design/phase2-d1035.md`, then to the reviewed catalog `c28b724` for D-1075; only the catalog and
+`contract/HARMONY.md` changed bytes). `UPSTREAM.json`
 records source paths and SHA-256 values. `scripts/check-ux-pin.py` verifies every
 input, requires the Phase 1 inputs and rejects per-file commit drift.
 
@@ -24,11 +25,12 @@ cassini-ux commit, recorded in its `UPSTREAM.json` entry; `ImportTypesTest` and
 The older Markdown, search and interjection conformance fixtures retain their
 independent reference pins; this UI catalog update does not change those formats.
 
-`wave5/strings.json` (D-975) is the catalog at cassini-ux `31973ff9784fcc66c1c7993b903a336e8f2c1432`, pinned
-at that commit in its own `UPSTREAM.json` entry. It supplies only the first-run hero and privacy-line resources
+`wave5/strings.json` (D-975) was first the catalog at cassini-ux `31973ff9784fcc66c1c7993b903a336e8f2c1432`; D-1075
+re-pinned it to `c28b724` in its own `UPSTREAM.json` entry. It supplies only the first-run hero and privacy-line resources
 (`scripts/generate-wave5-strings.py`, `docs/design/phase2-d975.md`).
 
 `phase2/strings.json` (L-67, D-1048) is the complete catalog pinned independently for phone meeting nouns.
 `scripts/generate-phase2-strings.py` generates the affected Settings, Saved voices, transcription and shared-path
 resources in all six languages. See `docs/design/phase2-d1048.md` and, for the D103 second pass (re-pinned at
-`c28b724`), `docs/design/phase2-d1086.md`; the original Phase 1 and Wave 5 pins stay fixed.
+`c28b724`), `docs/design/phase2-d1086.md`. D-1075 moved the Phase 1 and Wave 5 catalog pins to the same reviewed
+`c28b724` catalog, so every generated string resource now comes from one catalog revision.

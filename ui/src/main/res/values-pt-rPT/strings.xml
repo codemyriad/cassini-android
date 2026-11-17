@@ -130,14 +130,14 @@
     <!-- Library row status chips and suffixes (features.md section 1). -->
     <string name="ui_status_recording">A gravar</string>
     <string name="ui_status_transcribing">A transcrever</string>
-    <string name="ui_status_queued">Na fila</string>
-    <string name="ui_status_paused_at">Pausada em %1$s</string>
+    <string name="ui_status_queued">Em fila</string>
+    <string name="ui_status_paused_at">Em pausa aos %1$s</string>
     <string name="ui_status_failed">Falha na transcrição</string>
-    <string name="ui_status_unplayable">Não reproduzível</string>
+    <string name="ui_status_unplayable">Não é possível reproduzir</string>
     <string name="ui_status_unreadable">Transcrição ilegível</string>
     <string name="ui_status_newer_format">Formato mais recente</string>
     <string name="ui_status_transcribed">Transcrita</string>
-    <string name="ui_status_audio_only">Só áudio</string>
+    <string name="ui_status_audio_only">Apenas áudio</string>
     <string name="ui_status_suffix_resume">· Retomar</string>
     <string name="ui_status_suffix_try_again">· Tentar novamente</string>
     <string name="ui_status_suffix_no_speech">· Sem fala</string>
@@ -161,21 +161,21 @@
     <string name="ui_recording_needs_permission">O Cassini precisa do microfone para gravar.</string>
     <string name="ui_recording_waveform">Nível do microfone, últimos 7 segundos</string>
     <string name="ui_recording_hint">Continua a gravar com o ecrã desligado ou noutra aplicação.</string>
-    <string name="ui_recording_hint_space">Espaço para cerca de mais %1$s.</string>
+    <string name="ui_recording_hint_space">Espaço para mais cerca de %1$s.</string>
     <string name="ui_recording_pause">Pausar a gravação</string>
     <string name="ui_recording_resume">Retomar a gravação</string>
 
     <!-- Note screen header and modes (features.md section 3). -->
     <string name="ui_note_search">Pesquisar na transcrição</string>
-    <string name="ui_note_share_more">Partilhar e mais</string>
+    <string name="ui_note_share_more">Partilhar e mais opções</string>
     <string name="ui_note_more_actions">Mais ações</string>
     <string name="ui_note_wait_for_transcription">Aguarde o fim da transcrição</string>
     <string name="ui_note_naming_closed">A guardar — poderá mudar o nome quando terminar</string>
     <string name="ui_note_fix_transcript_first">Corrija primeiro a transcrição: Transcrever novamente</string>
-    <string name="ui_note_queued">Na fila</string>
+    <string name="ui_note_queued">Em fila</string>
     <string name="ui_note_queued_after_current">Começa após a transcrição atual.</string>
     <string name="ui_note_start_over_title">Recomeçar?</string>
-    <string name="ui_note_start_over_body">O rascunho até agora é descartado. A sua gravação é mantida.</string>
+    <string name="ui_note_start_over_body">O rascunho criado até agora é descartado. A sua gravação é mantida.</string>
 
     <!-- Progress card (board 02, features.md section 3.1). -->
     <string name="ui_headline_starting">A iniciar…</string>
@@ -191,7 +191,7 @@
     <string name="ui_stage_words_and_voices">Palavras e vozes</string>
     <string name="ui_stage_words_and_voices_spoken">Palavras e vozes</string>
     <string name="ui_stage_matching">Comparação</string>
-    <string name="ui_stage_saving">Armazenamento</string>
+    <string name="ui_stage_saving">A guardar</string>
     <string name="ui_stage_description">Etapa %1$d de %2$d: %3$s</string>
     <string name="ui_stage_done">concluída</string>
     <string name="ui_stage_in_progress">em curso</string>
@@ -199,7 +199,7 @@
     <string name="ui_stage_skipped">ignorada</string>
     <string name="ui_stat_time_left">Tempo restante</string>
     <string name="ui_stat_processed">Processado</string>
-    <string name="ui_stat_battery">Bateria no fim</string>
+    <string name="ui_stat_battery">Bateria no final</string>
     <string name="ui_stat_words">Palavras até agora</string>
     <string name="ui_time_left_minutes_range">%1$d–%2$d min</string>
     <string name="ui_time_left_about">Cerca de %1$s</string>
@@ -214,7 +214,7 @@
     <string name="ui_battery_measuring">A medir…</string>
     <string name="ui_progress_footnote">Continua se sair da aplicação. Uma notificação mostra o progresso e permite parar.</string>
     <string name="ui_progress_footnote_no_notifications">As notificações estão desativadas, por isso o progresso só aparece aqui.</string>
-    <string name="ui_progress_low_memory">Este telemóvel tem pouca memória. Feche outras apps se a transcrição parar.</string>
+    <string name="ui_progress_low_memory">Este telemóvel tem pouca memória. Feche outras aplicações se a transcrição parar.</string>
 
     <!-- Draft transcript and suggestions (board 02). -->
     <string name="ui_suggestion_question">É %1$s?</string>
@@ -222,11 +222,11 @@
     <string name="ui_suggestion_no">Não é %1$s</string>
 
     <!-- Transcript turns, words and player (board 03, features.md section 3.3). -->
-    <string name="ui_turn_description">%1$s, em %2$s</string>
+    <string name="ui_turn_description">%1$s, aos %2$s</string>
     <string name="ui_turn_description_auto">%1$s, nome atribuído automaticamente, em %2$s</string>
     <string name="ui_turn_name_action">Dar nome a este orador</string>
     <string name="ui_turn_auto">auto</string>
-    <string name="ui_turn_play_from_start">Reproduzir do início do turno</string>
+    <string name="ui_turn_play_from_start">Reproduzir a partir do início da intervenção</string>
     <string name="ui_follow_playback">Seguir a reprodução</string>
     <string name="ui_player_group">Reprodução</string>
     <string name="ui_player_position">Posição</string>
@@ -246,7 +246,7 @@
     <string name="ui_trust_unreadable">Transcrição ilegível</string>
     <string name="ui_trust_newer_format">Formato mais recente</string>
     <string name="ui_version_chip">Versão %1$d de %2$d</string>
-    <string name="ui_version_suffix_merged">· oradores juntos</string>
+    <string name="ui_version_suffix_merged">· junção de oradores</string>
     <string name="ui_version_suffix_again">· transcrita novamente</string>
 
     <!-- In-note search (no board; ui.md section 8). -->
@@ -260,7 +260,7 @@
     <string name="ui_versions_title">Versões</string>
     <string name="ui_versions_row">Versão %1$d</string>
     <string name="ui_versions_transcribed">Transcrita a %1$s · %2$s</string>
-    <string name="ui_versions_merged">Oradores juntos · da versão %1$d · %2$s</string>
+    <string name="ui_versions_merged">Junção de oradores · da versão %1$d · %2$s</string>
     <string name="ui_versions_unreadable">Ilegível</string>
 
     <!-- Name a speaker (board 04, features.md section 4). -->
@@ -320,7 +320,7 @@
     <string name="ui_info_model">Modelo</string>
     <string name="ui_info_speakers">Oradores</string>
     <string name="ui_info_speakers_apart">Oradores distinguidos neste telemóvel</string>
-    <string name="ui_info_one_voice">Todas as palavras como uma só voz</string>
+    <string name="ui_info_one_voice">Todas as palavras atribuídas a uma só voz</string>
     <string name="ui_info_resumed_from">Retomada a partir de %1$s</string>
     <string name="ui_info_file_size">Tamanho do ficheiro</string>
     <string name="ui_info_meeting_id">ID da reunião</string>
@@ -402,7 +402,7 @@
     <string name="ui_banner_rec_mic_off_title">O acesso ao microfone está desativado</string>
     <string name="ui_banner_rec_mic_off_body">Ative-o nas definições do sistema. A gravação começa quando voltar.</string>
     <string name="ui_banner_rec_mic_failed_title">O microfone deixou de funcionar</string>
-    <string name="ui_banner_rec_mic_failed_body">A gravação terminou. O áudio até agora está na sua biblioteca.</string>
+    <string name="ui_banner_rec_mic_failed_body">A gravação terminou. O áudio gravado até agora está na sua Biblioteca.</string>
     <string name="ui_banner_rec_could_not_start_title">Não foi possível iniciar o microfone</string>
     <string name="ui_banner_rec_could_not_start_body">Outra aplicação pode estar a usar o microfone. Tente novamente.</string>
     <plurals name="ui_banner_recovered_title">
@@ -412,9 +412,9 @@
     </plurals>
     <string name="ui_banner_recovered_body">O Cassini fechou inesperadamente. Guardámos o que foi captado (%1$s).</string>
 
-    <string name="ui_banner_tx_paused_title">Pausada em %1$s de %2$s</string>
+    <string name="ui_banner_tx_paused_title">Em pausa aos %1$s de %2$s</string>
     <string name="ui_banner_tx_paused_body">Continue de onde parou. O rascunho até agora é mantido.</string>
-    <string name="ui_banner_tx_paused_early_title">Pausada antes de encontrar palavras</string>
+    <string name="ui_banner_tx_paused_early_title">Em pausa antes de encontrar palavras</string>
     <string name="ui_banner_tx_paused_early_body">Retome para começar a transcrever.</string>
     <string name="ui_banner_tx_paused_system_body">O Android colocou a transcrição em pausa: o trabalho em segundo plano está limitado a cerca de 6 horas por dia. Retome para continuar de onde parou.</string>
     <plurals name="ui_banner_tx_queue_held_title">
@@ -426,13 +426,13 @@
     <string name="ui_banner_tx_calculating_title">A calcular o tempo restante…</string>
     <string name="ui_banner_tx_calculating_body">Uma estimativa aparece após os primeiros minutos de áudio.</string>
     <string name="ui_banner_tx_battery_title">A medir o consumo de bateria…</string>
-    <string name="ui_banner_tx_battery_body">Ligado à corrente — não é preciso estimar a bateria.</string>
-    <string name="ui_banner_tx_one_voice_title">Todas as palavras como uma só voz</string>
+    <string name="ui_banner_tx_battery_body">Ligado à corrente — não é preciso estimar o consumo de bateria.</string>
+    <string name="ui_banner_tx_one_voice_title">Todas as palavras atribuídas a uma só voz</string>
     <string name="ui_banner_tx_one_voice_body">Não foi possível distinguir os oradores nesta gravação.</string>
     <string name="ui_banner_tx_checkpoint_mismatch_title">O progresso guardado já não corresponde</string>
     <string name="ui_banner_tx_checkpoint_mismatch_body">A gravação ou os modelos foram alterados. A sua gravação é mantida.</string>
     <string name="ui_banner_tx_memory_title">Memória insuficiente</string>
-    <string name="ui_banner_tx_memory_body">Feche outras apps ou experimente um excerto mais curto.</string>
+    <string name="ui_banner_tx_memory_body">Feche outras aplicações ou experimente um excerto mais curto.</string>
     <string name="ui_banner_tx_failed_title">Não foi possível transcrever</string>
     <string name="ui_banner_tx_failed_body">%1$s A sua gravação é mantida.</string>
     <string name="ui_banner_tx_failed_body_plain">A sua gravação é mantida.</string>
@@ -487,7 +487,7 @@
     <string name="ui_parakeet_suggestion_title">Transcrições melhores com o Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">O Whistle vem incluído para começar de imediato. O Parakeet Ultra é mais preciso. A transferência tem %1$s.</string>
     <string name="ui_parakeet_now_default">As novas reuniões passam a usar o Parakeet Ultra.</string>
-    <string name="ui_turn_crosstalk">Provável diafonia</string>
+    <string name="ui_turn_crosstalk">Provável sobreposição de vozes</string>
     <!-- cassini-ux b86b7b0: Markdown export, D50.2/D50.3. -->
     <string name="ui_actions_markdown" formatted="false">Markdown</string>
     <string name="ui_markdown_description" formatted="false">A transcrição como ficheiro de texto, com oradores e tempos.</string>

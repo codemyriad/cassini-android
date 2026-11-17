@@ -28,7 +28,7 @@
     <string name="ui_action_download">Télécharger</string>
     <string name="ui_action_download_again">Télécharger à nouveau</string>
     <string name="ui_action_retry">Réessayer</string>
-    <string name="ui_action_choose_another">Choisir un autre</string>
+    <string name="ui_action_choose_another">En choisir un autre</string>
     <string name="ui_action_record">Enregistrer</string>
     <string name="ui_action_import">Importer</string>
     <string name="ui_action_continue">Continuer</string>
@@ -49,7 +49,7 @@
     <string name="ui_duration_min_s">%1$d min %2$d s</string>
     <string name="ui_duration_h">%1$d h</string>
     <string name="ui_duration_h_min">%1$d h %2$d min</string>
-    <string name="ui_duration_under_minute">moins d’1 min</string>
+    <string name="ui_duration_under_minute">moins de 1 min</string>
     <string name="ui_duration_spoken_pair">%1$s et %2$s</string>
     <string name="ui_duration_spoken_triple">%1$s, %2$s et %3$s</string>
     <plurals name="ui_duration_spoken_hours">
@@ -167,7 +167,7 @@
 
     <!-- Note screen header and modes (features.md section 3). -->
     <string name="ui_note_search">Rechercher dans la transcription</string>
-    <string name="ui_note_share_more">Partager et plus</string>
+    <string name="ui_note_share_more">Partager et autres actions</string>
     <string name="ui_note_more_actions">Plus d’actions</string>
     <string name="ui_note_wait_for_transcription">Attendez la fin de la transcription</string>
     <string name="ui_note_naming_closed">Sauvegarde — vous pourrez renommer ensuite</string>
@@ -200,17 +200,17 @@
     <string name="ui_stat_time_left">Temps restant</string>
     <string name="ui_stat_processed">Traité</string>
     <string name="ui_stat_battery">Batterie à la fin</string>
-    <string name="ui_stat_words">Mots jusqu’ici</string>
+    <string name="ui_stat_words">Mots transcrits</string>
     <string name="ui_time_left_minutes_range">%1$d–%2$d min</string>
     <string name="ui_time_left_about">Environ %1$s</string>
-    <string name="ui_time_left_under_minute">Moins d’1 min</string>
+    <string name="ui_time_left_under_minute">Moins de 1 min</string>
     <string name="ui_time_left_calculating">Calcul…</string>
     <string name="ui_time_left_finishing">Finalisation…</string>
     <string name="ui_time_left_line_about">Il reste environ %1$s</string>
-    <string name="ui_time_left_line_under_minute">Il reste moins d’1 min</string>
+    <string name="ui_time_left_line_under_minute">Il reste moins de 1 min</string>
     <string name="ui_time_left_line_calculating">Calcul du temps restant…</string>
     <string name="ui_battery_projected">%1$d\u202F%% → environ %2$d\u202F%%</string>
-    <string name="ui_battery_plugged_in">En charge</string>
+    <string name="ui_battery_plugged_in">Branché</string>
     <string name="ui_battery_measuring">Mesure…</string>
     <string name="ui_progress_footnote">Continue si vous quittez l’application. Une notification affiche la progression et permet d’arrêter.</string>
     <string name="ui_progress_footnote_no_notifications">Les notifications sont désactivées, la progression ne s’affiche donc qu’ici.</string>
@@ -377,7 +377,7 @@
     <string name="ui_banner_trust_verified_title">Vérifiée</string>
     <string name="ui_banner_trust_verified_body">L’audio correspond exactement à la transcription. Tout fonctionne.</string>
     <string name="ui_banner_trust_not_verified_title">Non vérifiée</string>
-    <string name="ui_banner_trust_not_verified_body">L’audio n’a pas pu être vérifié, le minutage des mots peut donc être décalé.</string>
+    <string name="ui_banner_trust_not_verified_body">Impossible de vérifier l’audio, le minutage des mots peut donc être décalé.</string>
     <string name="ui_banner_trust_audio_changed_title">Audio modifié depuis la transcription</string>
     <string name="ui_banner_trust_audio_changed_body">Le minutage des mots peut ne pas correspondre à ce que vous entendez.</string>
     <string name="ui_banner_trust_unreadable_title">Transcription illisible</string>
@@ -426,9 +426,9 @@
     <string name="ui_banner_tx_calculating_title">Calcul du temps restant…</string>
     <string name="ui_banner_tx_calculating_body">Une estimation apparaît après les premières minutes d’audio.</string>
     <string name="ui_banner_tx_battery_title">Mesure de la consommation de batterie…</string>
-    <string name="ui_banner_tx_battery_body">En charge — pas besoin d’estimer la batterie.</string>
+    <string name="ui_banner_tx_battery_body">Branché — pas besoin d’estimer la consommation de batterie.</string>
     <string name="ui_banner_tx_one_voice_title">Tous les mots attribués à une seule voix</string>
-    <string name="ui_banner_tx_one_voice_body">Les intervenants n’ont pas pu être distingués dans cet enregistrement.</string>
+    <string name="ui_banner_tx_one_voice_body">Impossible de distinguer les intervenants dans cet enregistrement.</string>
     <string name="ui_banner_tx_checkpoint_mismatch_title">La progression sauvegardée ne correspond plus</string>
     <string name="ui_banner_tx_checkpoint_mismatch_body">L’enregistrement ou les modèles ont changé. Votre enregistrement est conservé.</string>
     <string name="ui_banner_tx_memory_title">Mémoire insuffisante</string>
@@ -443,7 +443,7 @@
     <string name="ui_banner_dl_no_connection_title">Aucune connexion</string>
     <string name="ui_banner_dl_no_connection_body">Connectez-vous à Internet et réessayez. L’enregistrement fonctionne toujours.</string>
     <string name="ui_banner_dl_stopped_title">Téléchargement interrompu</string>
-    <string name="ui_banner_dl_stopped_body">La connexion a été coupée. Réessayez pour reprendre là où il s’est arrêté.</string>
+    <string name="ui_banner_dl_stopped_body">La connexion a été coupée. Réessayez pour reprendre là où le téléchargement s’est arrêté.</string>
     <string name="ui_banner_dl_stopped_system_body">Android a interrompu le téléchargement. Réessayez pour reprendre là où il s’est arrêté.</string>
     <string name="ui_banner_dl_no_space_title">Stockage insuffisant</string>
     <string name="ui_banner_dl_no_space_body">Libérez environ %1$s et réessayez.</string>
@@ -487,7 +487,7 @@
     <string name="ui_parakeet_suggestion_title">De meilleures transcriptions avec Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">Whistle est inclus pour commencer tout de suite. Parakeet Ultra est plus précis. Le téléchargement fait %1$s.</string>
     <string name="ui_parakeet_now_default">Les nouvelles réunions utilisent désormais Parakeet Ultra.</string>
-    <string name="ui_turn_crosstalk">Diaphonie probable</string>
+    <string name="ui_turn_crosstalk">Chevauchement de voix probable</string>
     <!-- cassini-ux b86b7b0: Markdown export, D50.2/D50.3. -->
     <string name="ui_actions_markdown" formatted="false">Markdown</string>
     <string name="ui_markdown_description" formatted="false">La transcription en fichier texte, avec les intervenants et les horodatages.</string>

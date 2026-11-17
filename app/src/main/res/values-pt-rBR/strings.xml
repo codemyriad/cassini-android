@@ -34,8 +34,8 @@
     <!-- Processing notifications (features.md section 12). -->
     <string name="notif_processing_title">Transcrevendo “%1$s”</string>
     <string name="notif_processing_idle">Preparando a transcrição…</string>
-    <string name="notif_processing_progress">%1$d%% · faltam %2$s</string>
-    <string name="notif_processing_left">Faltam %1$s</string>
+    <string name="notif_processing_progress">%1$d%% · tempo restante: %2$s</string>
+    <string name="notif_processing_left">Tempo restante: %1$s</string>
     <string name="notif_processing_finishing">%1$d%% · finalizando</string>
     <string name="notif_processing_calculating">Calculando o tempo restante…</string>
     <string name="notif_processing_starting">Iniciando…</string>
@@ -92,12 +92,12 @@
     <string name="rec_default_title">Reunião %1$s</string>
     <string name="notif_rec_title">Gravando</string>
     <string name="notif_rec_paused_title">Gravação pausada</string>
-    <string name="notif_rec_paused_at">Pausada em %1$s</string>
+    <string name="notif_rec_paused_at">Em pausa em %1$s</string>
     <string name="notif_rec_starting">Iniciando o microfone…</string>
     <string name="notif_rec_saving">Salvando a gravação…</string>
     <string name="notif_rec_other_app">Em pausa — outro app está usando o áudio</string>
-    <string name="notif_rec_storage_low">Armazenamento quase cheio — restam cerca de %1$d min</string>
-    <string name="notif_rec_file_low">Arquivo de gravação quase cheio — restam cerca de %1$d min</string>
+    <string name="notif_rec_storage_low">Armazenamento quase cheio — tempo restante: cerca de %1$d min</string>
+    <string name="notif_rec_file_low">Arquivo de gravação quase cheio — tempo restante: cerca de %1$d min</string>
     <string name="notif_rec_stopped_title">Gravação interrompida</string>
     <string name="notif_rec_stopped_text">Menos de 200 MB livres. A gravação até agora está salva.</string>
     <string name="notif_rec_file_full_text">O Cassini encerra gravações M4A ao atingir 1 GB, cerca de 74 horas. A gravação até agora está salva. Inicie uma nova gravação para continuar.</string>

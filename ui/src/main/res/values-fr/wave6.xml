@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 31973ff9784fcc66c1c7993b903a336e8f2c1432; do not edit. -->
+<!-- Generated from cassini-ux c28b72461c7317ea0a4684183cb9103626aabf17; do not edit. -->
 <resources>
     <string name="ui_voices_privacy_phone">Les empreintes vocales sont créées sur ce téléphone et ne sont jamais écrites dans les fichiers exportés ou partagés. Seuls les noms que vous choisissez y figurent.</string>
 </resources>

@@ -23,7 +23,7 @@
     <string name="error_playback">La lecture n’est pas disponible pour ce fichier.</string>
     <string name="error_opus_encoder">Cet appareil n’a pas d’encodeur Opus. Il peut ouvrir les documents existants, mais pas créer de nouveaux fichiers Cassini.</string>
     <string name="error_speakers">Aucun tour de parole n’a été trouvé. La transcription d’origine est inchangée.</string>
-    <string name="error_document_unverified">L’audio de ce document n’a pas pu être vérifié, il est donc impossible d’ajouter une nouvelle version.</string>
+    <string name="error_document_unverified">Impossible de vérifier l’audio de ce document, aucune nouvelle version ne peut donc être ajoutée.</string>
     <string name="error_document_unknown_format">Ce document utilise un format Cassini plus récent, il est donc impossible d’ajouter une nouvelle version ici.</string>
     <string name="recording_channel">Enregistrement</string>
     <string name="import_fallback_title">Audio importé</string>
@@ -39,7 +39,7 @@
     <string name="notif_processing_finishing">%1$d\u202F%% · finalisation</string>
     <string name="notif_processing_calculating">Calcul du temps restant…</string>
     <string name="notif_processing_starting">Démarrage…</string>
-    <string name="notif_processing_waiting">Fin de la réunion précédente…</string>
+    <string name="notif_processing_waiting">Finalisation de la réunion précédente…</string>
     <string name="notif_processing_stopping">Arrêt en gardant la progression…</string>
     <string name="notif_processing_matching">Comparaison des voix…</string>
     <string name="notif_processing_saving">Sauvegarde…</string>
@@ -56,7 +56,7 @@
         <item quantity="many">%d autres en attente</item>
         <item quantity="other">%d autres en attente</item>
     </plurals>
-    <string name="notif_time_under_minute">moins d’1 min</string>
+    <string name="notif_time_under_minute">moins de 1 min</string>
     <string name="notif_time_about">environ %1$s</string>
     <string name="notif_time_range">%1$s–%2$s</string>
     <string name="notif_time_minutes">%1$d min</string>

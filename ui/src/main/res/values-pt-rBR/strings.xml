@@ -131,13 +131,13 @@
     <string name="ui_status_recording">Gravando</string>
     <string name="ui_status_transcribing">Transcrevendo</string>
     <string name="ui_status_queued">Na fila</string>
-    <string name="ui_status_paused_at">Pausada em %1$s</string>
+    <string name="ui_status_paused_at">Em pausa em %1$s</string>
     <string name="ui_status_failed">Falha na transcrição</string>
-    <string name="ui_status_unplayable">Não reproduzível</string>
+    <string name="ui_status_unplayable">Não é possível reproduzir</string>
     <string name="ui_status_unreadable">Transcrição ilegível</string>
     <string name="ui_status_newer_format">Formato mais recente</string>
     <string name="ui_status_transcribed">Transcrita</string>
-    <string name="ui_status_audio_only">Só áudio</string>
+    <string name="ui_status_audio_only">Somente áudio</string>
     <string name="ui_status_suffix_resume">· Retomar</string>
     <string name="ui_status_suffix_try_again">· Tentar novamente</string>
     <string name="ui_status_suffix_no_speech">· Sem fala</string>
@@ -199,14 +199,14 @@
     <string name="ui_stage_skipped">pulada</string>
     <string name="ui_stat_time_left">Tempo restante</string>
     <string name="ui_stat_processed">Processado</string>
-    <string name="ui_stat_battery">Bateria ao final</string>
+    <string name="ui_stat_battery">Bateria ao terminar</string>
     <string name="ui_stat_words">Palavras até agora</string>
     <string name="ui_time_left_minutes_range">%1$d–%2$d min</string>
     <string name="ui_time_left_about">Cerca de %1$s</string>
     <string name="ui_time_left_under_minute">Menos de 1 min</string>
     <string name="ui_time_left_calculating">Calculando…</string>
     <string name="ui_time_left_finishing">Concluindo…</string>
-    <string name="ui_time_left_line_about">Faltam cerca de %1$s</string>
+    <string name="ui_time_left_line_about">Tempo restante: cerca de %1$s</string>
     <string name="ui_time_left_line_under_minute">Falta menos de 1 min</string>
     <string name="ui_time_left_line_calculating">Calculando o tempo restante…</string>
     <string name="ui_battery_projected">%1$d%% → cerca de %2$d%%</string>
@@ -226,7 +226,7 @@
     <string name="ui_turn_description_auto">%1$s, nome atribuído automaticamente, em %2$s</string>
     <string name="ui_turn_name_action">Nomear este locutor</string>
     <string name="ui_turn_auto">auto</string>
-    <string name="ui_turn_play_from_start">Reproduzir do início do turno</string>
+    <string name="ui_turn_play_from_start">Reproduzir do início da fala</string>
     <string name="ui_follow_playback">Acompanhar a reprodução</string>
     <string name="ui_player_group">Reprodução</string>
     <string name="ui_player_position">Posição</string>
@@ -320,7 +320,7 @@
     <string name="ui_info_model">Modelo</string>
     <string name="ui_info_speakers">Locutores</string>
     <string name="ui_info_speakers_apart">Locutores distinguidos neste celular</string>
-    <string name="ui_info_one_voice">Todas as palavras como uma só voz</string>
+    <string name="ui_info_one_voice">Todas as palavras atribuídas a uma só voz</string>
     <string name="ui_info_resumed_from">Retomada a partir de %1$s</string>
     <string name="ui_info_file_size">Tamanho do arquivo</string>
     <string name="ui_info_meeting_id">ID da reunião</string>
@@ -427,7 +427,7 @@
     <string name="ui_banner_tx_calculating_body">Uma estimativa aparece após os primeiros minutos de áudio.</string>
     <string name="ui_banner_tx_battery_title">Medindo o uso da bateria…</string>
     <string name="ui_banner_tx_battery_body">Na tomada — não é preciso estimar a bateria.</string>
-    <string name="ui_banner_tx_one_voice_title">Todas as palavras como uma só voz</string>
+    <string name="ui_banner_tx_one_voice_title">Todas as palavras atribuídas a uma só voz</string>
     <string name="ui_banner_tx_one_voice_body">Não foi possível distinguir os locutores nesta gravação.</string>
     <string name="ui_banner_tx_checkpoint_mismatch_title">O progresso salvo não corresponde mais</string>
     <string name="ui_banner_tx_checkpoint_mismatch_body">A gravação ou os modelos mudaram. Sua gravação é mantida.</string>
@@ -487,10 +487,10 @@
     <string name="ui_parakeet_suggestion_title">Transcrições melhores com o Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">O Whistle vem incluído para você começar na hora. O Parakeet Ultra é mais preciso. O download tem %1$s.</string>
     <string name="ui_parakeet_now_default">As novas reuniões agora usam o Parakeet Ultra.</string>
-    <string name="ui_turn_crosstalk">Provável diafonia</string>
+    <string name="ui_turn_crosstalk">Provável sobreposição de vozes</string>
     <!-- cassini-ux b86b7b0: Markdown export, D50.2/D50.3. -->
     <string name="ui_actions_markdown" formatted="false">Markdown</string>
-    <string name="ui_markdown_description" formatted="false">A transcrição como arquivo de texto, com locutores e horários.</string>
+    <string name="ui_markdown_description" formatted="false">A transcrição como arquivo de texto, com locutores e tempos.</string>
     <string name="ui_markdown_speakers" formatted="false">Locutores: {names}</string>
     <string name="ui_markdown_transcript" formatted="false">Transcrição</string>
     <string name="ui_markdown_notes" formatted="false">Notas</string>
