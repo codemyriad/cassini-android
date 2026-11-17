@@ -53,6 +53,7 @@ import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.format.FormatSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
@@ -260,7 +261,10 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
         get() = graph.models.status.map { it[ModelPart.VOICES] == ModelStatus.Ready }.distinctUntilChanged()
     override val processing: Flow<ProcessingState> get() = graph.processing.state
     override val recording: StateFlow<RecordingState> get() = graph.recording.state
-    override val notices: Flow<NoticeFacts> get() = graph.notices.facts
+    override val notices: Flow<NoticeFacts>
+        get() = graph.notices.facts.combine(graph.settings.speakerChoices) { facts, choices ->
+            facts.copy(speakerSeparationEnabled = choices.tellApart)
+        }
 
     override fun draftNames(id: String): Flow<CheckpointNames> =
         flow { emitAll(graph.awaitCatalogue().checkpoints.names.observe(id)) }

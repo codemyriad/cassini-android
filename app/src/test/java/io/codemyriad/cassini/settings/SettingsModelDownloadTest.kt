@@ -160,7 +160,7 @@ class SettingsModelDownloadTest {
     }
 
     private fun downloadAndRetry(part: ModelPart, title: String) {
-        openSettings()
+        openSettings(part)
         repeat(2) { attempt ->
             tapRow(title)
             waitFor("Download")
@@ -188,9 +188,12 @@ class SettingsModelDownloadTest {
         }
     }
 
-    private fun openSettings() {
+    private fun openSettings(part: ModelPart = ModelPart.SPEAKERS) {
         rule.onNodeWithContentDescription("Settings").performClick()
-        waitFor("ON-DEVICE MODELS")
+        val page = if (part == ModelPart.SPEECH) "Transcription" else "Speakers"
+        waitFor(page)
+        rule.onNodeWithText(page).performClick()
+        waitFor(if (part == ModelPart.SPEECH) "FOR NEW MEETINGS" else "ON-DEVICE MODELS")
     }
 
     private fun tapRow(title: String) {

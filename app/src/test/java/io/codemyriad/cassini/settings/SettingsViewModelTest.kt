@@ -8,6 +8,7 @@ import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.models.ModelStatus.Missing
+import io.codemyriad.cassini.data.settings.SpeakerChoices
 import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.nav.LicensesKey
 import io.codemyriad.cassini.nav.ModelDownloadKey
@@ -23,8 +24,10 @@ import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -66,6 +69,64 @@ class SettingsViewModelTest {
     }
 
     private fun SettingsViewModel.now(): SettingsUiState = state.value
+
+    @Test fun speakerChoicesPersistBeforeOpeningOnlyTheMissingPart() = runTest(dispatcher) {
+        ports.models.value = mapOf(ModelPart.SPEAKERS to Missing(false), ModelPart.VOICES to ModelStatus.Ready)
+        val vm = viewModel()
+        vm.onEvent(SettingsEvent.SpeakerChoice(ModelPartUi.SPEAKERS, false))
+        advanceUntilIdle()
+        assertEquals(false, vm.now().tellSpeakersApart)
+        assertTrue(effects.isEmpty())
+        vm.onEvent(SettingsEvent.SpeakerChoice(ModelPartUi.SPEAKERS, true))
+        advanceUntilIdle()
+        assertEquals(listOf(SettingsEffect.Open(ModelDownloadKey(part = ModelPart.SPEAKERS))), effects)
+        effects.clear()
+        vm.onEvent(SettingsEvent.SpeakerChoice(ModelPartUi.VOICES, true))
+        advanceUntilIdle()
+        assertTrue(effects.isEmpty())
+    }
+
+    @Test fun failedSpeakerWriteKeepsTheStoredAnswerAndDoesNotDownload() = runTest(dispatcher) {
+        ports.speakerFailure = true
+        val vm = viewModel()
+        vm.onEvent(SettingsEvent.SpeakerChoice(ModelPartUi.SPEAKERS, false))
+        advanceUntilIdle()
+        assertTrue(vm.now().tellSpeakersApart)
+        assertTrue(vm.now().speakerError)
+        assertTrue(effects.isEmpty())
+    }
+
+    @Test fun libraryTotalsPreserveShortAndLongDurations() = runTest(dispatcher) {
+        val vm = viewModel()
+        ports.meetingCount.value = 38
+        ports.duration.value = 41L * 3_600_000 + 3_599_999
+        advanceUntilIdle()
+        assertEquals(38, vm.now().meetings)
+        assertEquals(41L * 3_600_000 + 3_599_999, vm.now().audioDurationMs)
+        ports.meetingCount.value = 0
+        ports.duration.value = 40L * 60_000
+        advanceUntilIdle()
+        assertEquals(0, vm.now().meetings)
+        assertEquals(40L * 60_000, vm.now().audioDurationMs)
+    }
+
+    @Test fun settingsStillUpdateWhileAudioDurationHasNotEmitted() = runTest(dispatcher) {
+        ports.durationPending = true
+        ports.speakers.value = SpeakerChoices(tellApart = false, recognise = false)
+        ports.backup.value = BackupChoices(cloud = false)
+        ports.models.value = mapOf(ModelPart.SPEECH to ModelStatus.Ready)
+        val vm = viewModel()
+        assertEquals(false, vm.now().tellSpeakersApart)
+        assertEquals(false, vm.now().recogniseVoices)
+        assertEquals(false, vm.now().backup?.cloudOn)
+        assertEquals(false, vm.now().speechChecking)
+        assertEquals(0L, vm.now().audioDurationMs)
+        ports.speakers.value = SpeakerChoices()
+        ports.meetingCount.value = 3
+        advanceUntilIdle()
+        assertTrue(vm.now().tellSpeakersApart)
+        assertEquals(3, vm.now().meetings)
+    }
 
     @Test fun optionalRowsStayActionableWhileParakeetStillNeedsConsent() = runTest(dispatcher) {
         ports.models.value = mapOf(
@@ -456,6 +517,22 @@ class SettingsViewModelTest {
     }
 
     private class FakeSettingsPorts : SettingsPorts {
+        override val speakers = MutableStateFlow(SpeakerChoices())
+        var speakerFailure = false
+        override suspend fun setSpeakerChoice(part: ModelPart, enabled: Boolean) {
+            if (speakerFailure) throw IOException("write failed")
+            speakers.value = when (part) {
+                ModelPart.SPEAKERS -> speakers.value.copy(tellApart = enabled)
+                ModelPart.VOICES -> speakers.value.copy(recognise = enabled)
+                else -> error("not optional")
+            }
+        }
+        val meetingCount = MutableStateFlow(0)
+        val duration = MutableStateFlow(0L)
+        override fun meetings(): Flow<Int> = meetingCount
+        var durationPending = false
+        override fun audioDuration(): Flow<Long> = if (durationPending) flow { awaitCancellation() } else duration
+
         override val backup = MutableStateFlow<BackupChoices?>(null)
         override var transferAvailable = true
         var backupWrite: CompletableDeferred<Unit>? = null

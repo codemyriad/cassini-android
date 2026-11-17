@@ -513,7 +513,7 @@ class NoteViewModel(
         val refused = LibraryMapping.transcribeAgainRefused(details) ||
             (NoteMapping.oneVoice(details) && note.documentState != DocumentState.OK)
         list += Notices.job(
-            details.job, phase, NoteMapping.oneVoice(details), failure, freeBytes, refused,
+            details.job, phase, NoteMapping.oneVoice(details) && facts.speakerSeparationEnabled, failure, freeBytes, refused,
             speakerModel = facts.speakerModel,
         )
         if (overDocument && facts.parakeet.firstWhistleNote == note.id) {

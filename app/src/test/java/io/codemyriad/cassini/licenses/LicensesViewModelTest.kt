@@ -54,10 +54,26 @@ class LicensesViewModelTest {
         return viewModel
     }
 
+    @Test fun directDetailsLoadAndBackClosesTheDestination() = runTest(dispatcher) {
+        for (entry in listOf(LicenseEntry.PRIVACY, LicenseEntry.MODEL_SOURCES)) {
+            val vm = LicensesViewModel(SavedStateHandle(), ports, LicensesBackTo.SETTINGS, entry)
+            backgroundScope.launch { vm.state.collect {} }
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.effects.collect { effects += it } }
+            advanceUntilIdle()
+            assertEquals(LicenseText(entry, "text of $entry"), vm.state.value.open)
+            vm.onEvent(LicensesEvent.CloseText)
+            advanceUntilIdle()
+        }
+        assertEquals(listOf(LicensesEffect.Close, LicensesEffect.Close), effects)
+    }
+
     @Test
     fun listsEveryRowAndOpensATextPane() = runTest(dispatcher) {
         val viewModel = viewModel()
-        assertEquals(LicenseEntry.entries, viewModel.state.value.entries)
+        assertEquals(
+            LicenseEntry.entries.filterNot { it == LicenseEntry.PRIVACY || it == LicenseEntry.SOURCE_CODE },
+            viewModel.state.value.entries,
+        )
         assertEquals(LicensesBackTo.MODEL_DOWNLOAD, viewModel.state.value.backTo)
         viewModel.onEvent(LicensesEvent.Open(LicenseEntry.PRIVACY))
         advanceUntilIdle()

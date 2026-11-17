@@ -30,6 +30,16 @@ sealed interface SettingsEvent {
     @Immutable
     data class OpenModel(val part: ModelPartUi) : SettingsEvent
 
+    data class SpeakerChoice(val part: ModelPartUi, val enabled: Boolean) : SettingsEvent
+
+    data object OpenPrivacy : SettingsEvent
+
+    data object OpenSources : SettingsEvent
+
+    data object OpenHelp : SettingsEvent
+
+    data object OpenSourceCode : SettingsEvent
+
     data object OpenVoices : SettingsEvent
 
     data object OpenTrash : SettingsEvent

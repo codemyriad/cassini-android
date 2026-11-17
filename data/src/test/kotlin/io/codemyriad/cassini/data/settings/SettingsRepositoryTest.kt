@@ -42,6 +42,20 @@ class SettingsRepositoryTest {
         }
     }
 
+    @Test fun speakerSwitchesSurviveReopenAndDoNotGrantDownloadConsent() = runTest {
+        withStore { store ->
+            assertEquals(SpeakerChoices(), store.speakerChoices.first())
+            store.setSpeakerChoice(ModelPart.SPEAKERS, false)
+            store.setSpeakerChoice(ModelPart.VOICES, false)
+        }
+        withStore { store ->
+            assertEquals(SpeakerChoices(false, false), store.speakerChoices.first())
+            store.setSpeakerChoice(ModelPart.SPEAKERS, true)
+            assertEquals(SpeakerChoices(true, false), store.speakerChoices.first())
+            assertTrue(store.consentedParts.first().isEmpty())
+        }
+    }
+
     @Test fun singlePartConsentSurvivesReopenWithoutAuthorizingAnyOtherPart() = runTest {
         withStore { store -> store.recordConsent(100, setOf(ModelPart.VOICES)) }
         withStore { store ->

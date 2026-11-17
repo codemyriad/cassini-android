@@ -59,3 +59,7 @@ data object TrashKey : NavKey
 
 @Serializable
 data object LicensesKey : NavKey
+
+/** A third-layer text reached directly from Settings. */
+@Serializable
+data class LicenseDetailKey(val entry: String) : NavKey

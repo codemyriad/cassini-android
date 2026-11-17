@@ -147,6 +147,8 @@ class NoteRepository(
 
     fun counts(): Flow<Counts> = notes.counts()
 
+    fun audioDuration(): Flow<Long> = notes.audioDuration()
+
     // Recording.
 
     /**

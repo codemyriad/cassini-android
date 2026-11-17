@@ -72,7 +72,7 @@ fun LicensesScreen(
             .padding(bottom = 24.dp),
     ) {
         CassiniTopBar(
-            title = stringResource(R.string.ui_licenses_title),
+            title = stringResource(R.string.ui_about_licences),
             onBack = { onEvent(LicensesEvent.Back) },
             backLabel = stringResource(
                 if (state.backTo == LicensesBackTo.SETTINGS) R.string.ui_back_to_settings else R.string.ui_back,

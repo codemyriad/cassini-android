@@ -141,6 +141,29 @@ class NoteViewModelTest {
         assertTrue("opening consent does not queue or download", ports.calls.none { it.startsWith("transcribe:") })
     }
 
+    @Test fun speakerOptOutHidesFailureAndDownloadOffersUntilReenabled() = runTest(dispatcher) {
+        val initial = documentNote()
+        ports.details.value = initial.copy(
+            variants = initial.variants.map { it.copy(speakerCount = 1, speakersToldApart = false) },
+            speakers = initial.speakers.take(1),
+        )
+        ports.wordRows.value = WORDS.map { it.copy(speaker = "a") }
+        ports.notices.value = ports.notices.value.copy(speakerSeparationEnabled = false)
+        val vm = viewModel()
+        for (model in listOf(ModelStatus.Ready, ModelStatus.Missing(false))) {
+            ports.notices.value = ports.notices.value.copy(speakerModel = model)
+            advanceUntilIdle()
+            assertTrue(
+                vm.now().banners.none {
+                    it.kind == BannerKind.TX_ONE_VOICE || it.kind == BannerKind.TX_SPEAKERS_MISSING
+                },
+            )
+        }
+        ports.notices.value = ports.notices.value.copy(speakerSeparationEnabled = true)
+        advanceUntilIdle()
+        assertEquals(BannerKind.TX_SPEAKERS_MISSING, vm.now().banners.single().kind)
+    }
+
     @Test fun aSuccessfulSingleSpeakerPassDoesNotOfferAModelOrRetry() = runTest(dispatcher) {
         val initial = documentNote()
         ports.details.value = initial.copy(

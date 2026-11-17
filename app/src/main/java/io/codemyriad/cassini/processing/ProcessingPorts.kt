@@ -10,6 +10,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.adapters.SelectedModelAccess
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.library.PauseReason
@@ -21,6 +22,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 
 // The seams of ProcessingCoordinator: the job it runs, how it starts the service, the notifications it posts and
 // whether the app is visible. The app uses the implementations below; JVM tests pass fakes.
@@ -60,7 +62,7 @@ class TranscriptionJobFactory(private val graph: AppGraph) : ProcessingJobFactor
             noteId,
             catalogue.jobStorage,
             catalogue.jobVoices,
-            graph.modelAccess,
+            SelectedModelAccess(graph.modelAccess, graph.settings.speakerChoices.first()),
             engines,
             graph.jobEnvironment,
             model,

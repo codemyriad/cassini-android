@@ -75,7 +75,16 @@ class GlyphMarkupTest {
         val noBoard = Glyph.entries.filter { glyph -> icons.none { it.parts == glyph.parts } }
         assertEquals(
             "glyphs without a board",
-            listOf(Glyph.ChevronUp, Glyph.Share, Glyph.Warn, Glyph.Star, Glyph.StarFilled),
+            listOf(
+                Glyph.Wave,
+                Glyph.People,
+                Glyph.Language,
+                Glyph.ChevronUp,
+                Glyph.Share,
+                Glyph.Warn,
+                Glyph.Star,
+                Glyph.StarFilled,
+            ),
             noBoard,
         )
     }

@@ -192,6 +192,17 @@ private fun EntryProviderScope<NavKey>.screenEntries(
         }
         TrashRoute(viewModel, screenNavigator(backStack, TrashKey))
     }
+    entry<LicenseDetailKey> { key ->
+        val viewModel = viewModel {
+            LicensesViewModel(
+                createSavedStateHandle(),
+                AssetLicensesPorts(context),
+                LicensesBackTo.SETTINGS,
+                io.codemyriad.cassini.ui.licenses.LicenseEntry.valueOf(key.entry),
+            )
+        }
+        LicensesRoute(viewModel, screenNavigator(backStack, key))
+    }
     entry<LicensesKey> {
         val below = backStack.below(LicensesKey)
         val backTo = if (below is ModelDownloadKey) LicensesBackTo.MODEL_DOWNLOAD else LicensesBackTo.SETTINGS

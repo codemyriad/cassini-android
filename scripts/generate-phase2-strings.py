@@ -13,6 +13,9 @@ spec = importlib.util.spec_from_file_location('phase1_strings', ROOT / 'scripts/
 phase1 = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(phase1)
 LABELS = {
+    'settings_voices': ('common.savedVoices', None),
+    'settings_trash': ('settings.phone.trash', None),
+    'settings_language_phone': ('settings.phone.language.system', None),
     'headline_waiting': ('android.transcribing.waitingForPrevious', None),
     'count_ahead_of_note': ('android.transcribing.aheadCount', 'n'),
     'action_open_note': ('android.meeting.open', None),
@@ -28,6 +31,50 @@ LABELS = {
     'trash_delete_body': ('android.trash.delete.body', None),
     'trash_delete_all_title': ('android.trash.deleteAll.title', 'n'),
     'trash_is_empty_body': ('android.trash.empty.body', None),
+    'settings_transcripts': ('settings.phone.group.transcripts', None),
+    'settings_meetings': ('settings.phone.group.meetings', None),
+    'settings_app': ('settings.phone.group.app', None),
+    'transcription_title': ('settings.tab.transcription', None),
+    'speakers_title': ('common.speakers', None),
+    'speaker_on': ('models.status.on', None),
+    'setting_off': ('settings.answer.off', None),
+    'settings_backup': ('settings.phone.backup', None),
+    'backup_answer_transfer': ('settings.phone.backup.answer.transfer', None),
+    'settings_language_label': ('settings.phone.language', None),
+    'settings_about_subtitle': ('settings.phone.aboutRow.subtitle', None),
+    'transcription_for_new': ('settings.phone.transcription.forNew', None),
+    'model_whistle': ('models.whistle.name', None),
+    'model_whistle_short': ('models.whistle.description.short', None),
+    'model_parakeet': ('models.parakeetUltra.name', None),
+    'model_parakeet_short': ('models.parakeetUltra.description.short', None),
+    'model_built_in': ('models.builtIn', None),
+    'model_download': ('models.download', None),
+    'models_keep_transcript': ('models.keepTranscript', None),
+    'transcription_online_heading': ('settings.phone.transcription.goingOnline', None),
+    'models_where_from': ('models.whereFrom', None),
+    'transcription_online': ('settings.phone.transcription.online', None),
+    'speakers_who': ('settings.phone.speakers.whoIsSpeaking', None),
+    'speakers_tell_apart': ('models.tellSpeakersApart.name', None),
+    'speakers_tell_apart_short': ('models.tellSpeakersApart.description.short', None),
+    'speakers_recognise': ('models.recogniseVoices.name', None),
+    'speakers_recognise_short': ('models.recogniseVoices.description.short', None),
+    'speakers_on_device': ('settings.phone.speakers.runsOnDevice.phone', None),
+    'about_title': ('about.title', None),
+    'about_tagline': ('about.tagline.phone', None),
+    'about_help': ('about.help', None),
+    'about_help_subtitle': ('about.help.subtitle', None),
+    'about_privacy': ('about.privacy', None),
+    'about_privacy_subtitle': ('about.privacy.subtitle.phone', None),
+    'about_licences': ('about.licencesNotices', None),
+    'about_licences_subtitle': ('about.licencesNotices.subtitle', None),
+    'about_source': ('about.sourceCode', None),
+    'settings_people': ('savedVoices.peopleCount', 'n'),
+    'settings_meeting_count': ('library.meetingCount', 'n'),
+    'settings_audio_hours': ('settings.phone.audioHours', 'n'),
+    'settings_library_stats': ('settings.phone.libraryStats', ('meetings', 'hours')),
+    'about_name_version': ('about.nameVersion', 'version'),
+    'about_version': ('about.version', 'version'),
+    'about_licence_line': ('about.licenceLine.phone', 'year'),
 }
 
 
@@ -42,7 +89,7 @@ def generated(root):
                  f"<!-- Generated from cassini-ux {pin['commit']}; do not edit. -->", '<resources>']
         for name, (identifier, argument) in LABELS.items():
             entry = entries[identifier]
-            expected = {argument} if argument else set()
+            expected = {argument} if isinstance(argument, str) else set(argument or ())
             if set(entry.get('placeholders', {})) != expected:
                 raise ValueError(f'Shared placeholder declaration changed: {identifier}')
             if 'android' not in entry['platforms']:

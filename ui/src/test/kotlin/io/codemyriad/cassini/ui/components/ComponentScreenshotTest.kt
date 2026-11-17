@@ -17,6 +17,7 @@ import io.codemyriad.cassini.ui.banner.BannerSpec
 import io.codemyriad.cassini.ui.banner.boardArgs
 import io.codemyriad.cassini.ui.format.DayLabel
 import io.codemyriad.cassini.ui.format.ModelPartUi
+import io.codemyriad.cassini.ui.settings.AboutRow
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 import io.codemyriad.cassini.ui.theme.LightColors
@@ -340,7 +341,7 @@ class ComponentScreenshotTest : BoardTest() {
             SettingsRow("Trash", subtitle = "2 meetings", trailing = SettingsTrailing.Chevron, onClick = {})
         }
         SectionHeader("About")
-        AboutCard(version = "0.1.0", onSourceClick = {}, modifier = Modifier.padding(horizontal = 16.dp))
+        AboutRow(version = "0.1.0", onClick = {})
         SectionHeader("Bordered group (board 05) and a single row")
         GroupCard(Modifier.padding(horizontal = 16.dp), bordered = true) {
             SettingsRow("Speech recognition", trailing = SettingsTrailing.Status("640 MB", Tone.Plain))

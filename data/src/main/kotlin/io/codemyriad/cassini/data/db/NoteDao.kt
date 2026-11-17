@@ -131,6 +131,10 @@ abstract class NoteDao {
     )
     abstract fun counts(): Flow<Counts>
 
+    /** Room computes the live Library duration off the UI thread, without loading meeting rows. */
+    @Query("SELECT COALESCE(SUM(duration_ms), 0) FROM notes WHERE trashed_at IS NULL")
+    abstract fun audioDuration(): Flow<Long>
+
     /** Per voice, the live notes whose selected variant links a speaker to it as AUTO or CONFIRMED. */
     @Query(
         "SELECT l.voice_id, COUNT(DISTINCT l.note_id) AS notes FROM note_voice_links l JOIN notes n ON n.id = l.note_id " +

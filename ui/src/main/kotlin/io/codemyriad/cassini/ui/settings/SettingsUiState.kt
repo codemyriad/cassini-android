@@ -6,9 +6,8 @@ import io.codemyriad.cassini.ui.format.ModelPartUi
 import kotlinx.collections.immutable.ImmutableList
 
 /**
- * Settings (board 08, features.md section 11; ui.md section 7). [voices] and [trash] are the counts of the Privacy
- * rows ("4 people", "2 meetings"; 0 reads "None yet" and "Empty"). [version] is the `versionName` of the About card.
- * [notificationsOff] shows the notifications banner.
+ * D103 Settings map and deeper choices. Counts and duration come from the live Library; [version] is the installed
+ * version name. Speaker processing choices are independent of download permission and apply to new job runs.
  */
 @Immutable
 data class SettingsUiState(
@@ -17,6 +16,13 @@ data class SettingsUiState(
     val voices: Int,
     val trash: Int,
     val version: String,
+    val meetings: Int = 0,
+    val audioDurationMs: Long = 0,
+    val tellSpeakersApart: Boolean = true,
+    val recogniseVoices: Boolean = true,
+    val speakerSaving: Boolean = false,
+    val speakerError: Boolean = false,
+    val copyrightYear: String = "2026",
     val notificationsOff: Boolean = false,
     val speechModel: SpeechModelUi = SpeechModelUi.PARAKEET,
     val includedAvailable: Boolean = false,
@@ -111,3 +117,6 @@ data class BackupSettingsUi(
     /** No automatic copy leaves the phone: only now may the copy say "this phone only". */
     val phoneOnly: Boolean get() = !cloudOn && !transferOn
 }
+
+/** Second-layer Settings destinations. */
+enum class SettingsPage { MAP, TRANSCRIPTION, SPEAKERS, BACKUP, ABOUT }

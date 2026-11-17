@@ -27,7 +27,6 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.getFirstLinkBounds
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -47,6 +46,7 @@ import io.codemyriad.cassini.ui.banner.BannerSpec
 import io.codemyriad.cassini.ui.format.DayLabel
 import io.codemyriad.cassini.ui.format.FIXED_ZONE
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
+import io.codemyriad.cassini.ui.settings.AboutRow
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 import io.codemyriad.cassini.ui.theme.SpeakerTone
@@ -362,16 +362,14 @@ class ComponentSemanticsTest {
     }
 
     @Test fun aboutCardNamesTheProductAndItsVersion() {
-        setThemed { AboutCard(version = "0.2.0", onSourceClick = {}) }
-        rule.onNodeWithText("Cassini talk 0.2.0 ", substring = true).assertExists()
+        setThemed { AboutRow(version = "0.2.0", onClick = {}) }
+        rule.onNodeWithText("Cassini talk 0.2.0", substring = true).assertExists()
     }
 
     @Test fun aboutCardLinkOpensTheSource() {
         var opened = 0
-        setThemed { AboutCard(version = "0.2.0", onSourceClick = { opened++ }) }
-        val paragraph = rule.onNodeWithText("Source code and notices", substring = true)
-        val link = checkNotNull(paragraph.getFirstLinkBounds()) { "no link in the About card" }
-        paragraph.performTouchInput { click(link.center) }
+        setThemed { AboutRow(version = "0.2.0", onClick = { opened++ }) }
+        rule.onNodeWithText("About, privacy and help").performClick()
         rule.runOnIdle { assertEquals(1, opened) }
     }
 

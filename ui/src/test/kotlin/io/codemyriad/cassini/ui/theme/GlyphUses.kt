@@ -56,6 +56,10 @@ private fun use(size: Int, stroke: Float, tint: IconTint = IconTint.Ink, onBoard
  * markup test checks the on-board ones against design/reference/markup in both directions.
  */
 internal val GlyphUses: Map<Glyph, List<GlyphUse>> = mapOf(
+    // Phase 2 board geometry; the legacy markup parser covers Phase 1 only.
+    Glyph.Wave to listOf(use(18, 1.9f, IconTint.Accent, onBoard = false)),
+    Glyph.People to listOf(use(18, 1.9f, IconTint.Accent, onBoard = false)),
+    Glyph.Language to listOf(use(18, 1.9f, IconTint.Accent, onBoard = false)),
     Glyph.Trash to listOf(use(22, 1.7f), use(24, 1.7f, IconTint.RedInk)),
     Glyph.Settings to listOf(use(22, 1.7f)),
     Glyph.Search to listOf(use(20, 1.8f, IconTint.Text2), use(21, 1.8f)),

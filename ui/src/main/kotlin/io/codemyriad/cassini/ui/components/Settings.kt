@@ -7,9 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,23 +23,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withLink
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.format.LocalFormat
 import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
@@ -217,50 +205,6 @@ fun HelperText(text: String, modifier: Modifier = Modifier, normalLineHeight: Bo
     )
 }
 
-/**
- * The About card (board 08): surface, radius 16, padding 14/16, `about` in text3. "Cassini [version]" in bold ink,
- * the tagline, then "Free software under GPLv3." and the "Source code and notices" link, a [LinkAnnotation.Clickable]
- * that calls [onSourceClick].
- */
-@Composable
-fun AboutCard(version: String, onSourceClick: () -> Unit, modifier: Modifier = Modifier) {
-    val c = CassiniTheme.colors
-    val brand = stringResource(R.string.ui_brand_version, version)
-    val tagline = stringResource(R.string.ui_settings_about_body)
-    val free = stringResource(R.string.ui_settings_free_software)
-    val source = stringResource(R.string.ui_settings_source_and_notices)
-    val linkStyle = TextLinkStyles(style = SpanStyle(color = c.link, textDecoration = TextDecoration.Underline))
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(CassiniTheme.shapes.card)
-            .background(c.surface)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-    ) {
-        Text(
-            text = buildAnnotatedString {
-                withStyle(SpanStyle(fontWeight = FontWeight.W700, color = c.ink)) { append(brand) }
-                append(' ')
-                append(tagline)
-            },
-            style = CassiniTheme.type.about,
-            color = c.text3,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = buildAnnotatedString {
-                append(free)
-                append(' ')
-                withLink(LinkAnnotation.Clickable(tag = "source", styles = linkStyle) { onSourceClick() }) {
-                    append(source)
-                }
-            },
-            style = CassiniTheme.type.about,
-            color = c.text3,
-        )
-    }
-}
-
 @Preview
 @Composable
 internal fun SettingsPreview() {
@@ -281,7 +225,7 @@ internal fun SettingsPreview() {
             }
             HelperText("Transcription runs on this phone. Audio never leaves it.")
             SectionHeader("About")
-            AboutCard(version = "0.1.0", onSourceClick = {}, modifier = Modifier.padding(horizontal = 16.dp))
+            io.codemyriad.cassini.ui.settings.AboutRow(version = "0.1.0", onClick = {})
         }
     }
 }

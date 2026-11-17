@@ -203,10 +203,10 @@ class AppShellTest {
         rule.onNode(hasSetTextAction()).assertIsNotFocused()
         rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
         rule.onNodeWithContentDescription("Settings").assertIsDisplayed().performClick()
-        rule.onNode(hasText("App language", ignoreCase = true)).assertExists()
+        rule.onNode(hasText("Language", ignoreCase = true)).assertExists()
         rule.runOnIdle { assertTrue("NavDisplay takes back above the root", dispatcher.hasEnabledCallbacks()) }
         Espresso.pressBack()
-        rule.onNode(hasText("App language", ignoreCase = true)).assertDoesNotExist()
+        rule.onNode(hasText("Language", ignoreCase = true)).assertDoesNotExist()
         rule.runOnIdle { assertFalse(dispatcher.hasEnabledCallbacks()) }
     }
 
@@ -232,7 +232,7 @@ class AppShellTest {
     @Test fun eachScreenSetsItsSystemBarIcons() {
         assertEquals(true, darkIcons())
         rule.onNodeWithContentDescription("Settings").performClick()
-        rule.onNode(hasText("App language", ignoreCase = true)).assertExists()
+        rule.onNode(hasText("Language", ignoreCase = true)).assertExists()
         assertEquals(true, darkIcons())
         Espresso.pressBack()
 

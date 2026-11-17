@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 3b7c28231272e5f88de0b2a460346c46ebad7339; do not edit. -->
+<!-- Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702; do not edit. -->
 <resources>
+    <string name="ui_settings_voices">Voces guardadas</string>
+    <string name="ui_settings_trash">Papelera</string>
+    <string name="ui_settings_language_phone">Teléfono</string>
     <string name="ui_headline_waiting">Terminando la reunión anterior…</string>
     <plurals name="ui_count_ahead_of_note">
         <item quantity="one">%1$s reunión antes de esta.</item>
@@ -32,4 +35,60 @@
         <item quantity="other">¿Eliminar %1$s reuniones definitivamente?</item>
     </plurals>
     <string name="ui_trash_is_empty_body">Las reuniones que eliminas se quedan aquí 30 días.</string>
+    <string name="ui_settings_transcripts">Transcripciones</string>
+    <string name="ui_settings_meetings">Tus reuniones</string>
+    <string name="ui_settings_app">Aplicación</string>
+    <string name="ui_transcription_title">Transcripción</string>
+    <string name="ui_speakers_title">Hablantes</string>
+    <string name="ui_speaker_on">Activado</string>
+    <string name="ui_setting_off">Desactivado</string>
+    <string name="ui_settings_backup">Copia de seguridad</string>
+    <string name="ui_backup_answer_transfer">Teléfono nuevo</string>
+    <string name="ui_settings_language_label">Idioma</string>
+    <string name="ui_settings_about_subtitle">Información, privacidad y ayuda</string>
+    <string name="ui_transcription_for_new">Para reuniones nuevas</string>
+    <string name="ui_model_whistle">Whistle</string>
+    <string name="ui_model_whistle_short">Rápido. Inglés, alemán, francés, español, italiano, neerlandés y polaco.</string>
+    <string name="ui_model_parakeet">Parakeet Ultra</string>
+    <string name="ui_model_parakeet_short">Más preciso. 25 idiomas europeos.</string>
+    <string name="ui_model_built_in">Integrado</string>
+    <string name="ui_model_download">Descargar</string>
+    <string name="ui_models_keep_transcript">Las reuniones ya transcritas conservan su transcripción.</string>
+    <string name="ui_transcription_online_heading">Conexión a internet</string>
+    <string name="ui_models_where_from">De dónde vienen los modelos</string>
+    <string name="ui_transcription_online">Cassini solo se conecta a internet para descargar un modelo que hayas pedido. Cada archivo se comprueba antes de usarlo.</string>
+    <string name="ui_speakers_who">Quién habla</string>
+    <string name="ui_speakers_tell_apart">Distinguir hablantes</string>
+    <string name="ui_speakers_tell_apart_short">Hablante 1, Hablante 2, etc.</string>
+    <string name="ui_speakers_recognise">Reconocer voces guardadas</string>
+    <string name="ui_speakers_recognise_short">Pone nombre a las personas guardadas en cuanto hablan.</string>
+    <string name="ui_speakers_on_device">Ambos funcionan en este teléfono, después de la transcripción.</string>
+    <string name="ui_about_title">Información</string>
+    <string name="ui_about_tagline">Convierte la voz en texto con tiempos en el que puedes buscar, aquí mismo en tu teléfono.</string>
+    <string name="ui_about_help">Ayuda</string>
+    <string name="ui_about_help_subtitle">Respuestas en cassini.talk</string>
+    <string name="ui_about_privacy">Privacidad</string>
+    <string name="ui_about_privacy_subtitle">Qué se queda en este teléfono y qué se envía</string>
+    <string name="ui_about_licences">Licencias y avisos</string>
+    <string name="ui_about_licences_subtitle">Cassini, sus bibliotecas y sus modelos</string>
+    <string name="ui_about_source">Código fuente</string>
+    <plurals name="ui_settings_people">
+        <item quantity="one">%1$s persona</item>
+        <item quantity="many">%1$s personas</item>
+        <item quantity="other">%1$s personas</item>
+    </plurals>
+    <plurals name="ui_settings_meeting_count">
+        <item quantity="one">%1$s reunión</item>
+        <item quantity="many">%1$s reuniones</item>
+        <item quantity="other">%1$s reuniones</item>
+    </plurals>
+    <plurals name="ui_settings_audio_hours">
+        <item quantity="one">%1$s hora</item>
+        <item quantity="many">%1$s horas</item>
+        <item quantity="other">%1$s horas</item>
+    </plurals>
+    <string name="ui_settings_library_stats">%1$s, %2$s de audio.</string>
+    <string name="ui_about_name_version">Cassini talk %1$s</string>
+    <string name="ui_about_version">Versión %1$s</string>
+    <string name="ui_about_licence_line">Software libre bajo GPLv3. © %1$s Codemyriad y colaboradores.</string>
 </resources>
