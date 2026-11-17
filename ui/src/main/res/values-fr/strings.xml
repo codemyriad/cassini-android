@@ -158,7 +158,6 @@
     <string name="ui_recording_status_label">État de l’enregistrement</string>
     <string name="ui_recording_starting">Démarrage du microphone…</string>
     <string name="ui_recording_stopping">Sauvegarde de l’enregistrement…</string>
-    <string name="ui_recording_needs_permission">Cassini a besoin du microphone pour enregistrer.</string>
     <string name="ui_recording_waveform">Niveau du microphone, 7 dernières secondes</string>
     <string name="ui_recording_hint">Continue d’enregistrer écran éteint ou dans une autre application.</string>
     <string name="ui_recording_hint_space">Espace pour encore environ %1$s.</string>

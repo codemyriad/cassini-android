@@ -180,7 +180,6 @@
     <string name="ui_recording_status_label">Recording status</string>
     <string name="ui_recording_starting">Starting the microphone…</string>
     <string name="ui_recording_stopping">Saving the recording…</string>
-    <string name="ui_recording_needs_permission">Cassini needs the microphone to record.</string>
     <string name="ui_recording_waveform">Microphone level, last 7 seconds</string>
     <string name="ui_recording_hint">Keeps recording with the screen off or in another app.</string>
     <string name="ui_recording_hint_space">Space for about %1$s more.</string>
