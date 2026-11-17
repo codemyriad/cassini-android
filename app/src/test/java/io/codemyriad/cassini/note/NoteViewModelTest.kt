@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import io.codemyriad.cassini.core.checkpoint.CheckpointNames
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
@@ -868,7 +869,7 @@ class NoteViewModelTest {
     @Test fun theVoicesQuestionOpensOnceOverTheFirstMeetingWithTwoSpeakers() = runTest(dispatcher) {
         ports.voicesQuestionAsked.value = false
         val viewModel = viewModel()
-        assertEquals(NoteSheet.VoicesQuestion, viewModel.now().sheet)
+        assertEquals(NoteSheet.VoicesQuestion(), viewModel.now().sheet)
         send(viewModel, NoteEvent.VoicesAnswer(false))
         assertNull(viewModel.now().sheet)
         assertEquals("answerVoicesQuestion:false", ports.calls.last())
@@ -878,7 +879,38 @@ class NoteViewModelTest {
         assertFalse((viewModel.now().sheet as NoteSheet.NameSpeaker).ui.remember)
 
         val again = viewModel()
-        assertFalse(again.now().sheet == NoteSheet.VoicesQuestion)
+        assertFalse(again.now().sheet is NoteSheet.VoicesQuestion)
+    }
+
+    @Test fun voicesAnswerWaitsForStorageAndCoalescesRepeatedEvents() = runTest(dispatcher) {
+        ports.voicesQuestionAsked.value = false
+        val stored = CompletableDeferred<Unit>()
+        ports.beforeVoicesAnswer = { stored.await() }
+        val vm = viewModel()
+        send(vm, NoteEvent.VoicesAnswer(false), NoteEvent.VoicesAnswer(true), NoteEvent.DismissSheet)
+        assertEquals(NoteSheet.VoicesQuestion(saving = true), vm.now().sheet)
+        assertFalse(ports.voicesQuestionAsked.value)
+        assertEquals(listOf("answerVoicesQuestion:false"), ports.calls.filter { it.startsWith("answerVoicesQuestion") })
+        stored.complete(Unit)
+        advanceUntilIdle()
+        assertNull(vm.now().sheet)
+        assertFalse(ports.rememberVoices.value)
+        assertTrue(ports.voicesQuestionAsked.value)
+    }
+
+    @Test fun aFailedVoicesAnswerStaysOpenAndCanBeRetried() = runTest(dispatcher) {
+        ports.voicesQuestionAsked.value = false
+        ports.beforeVoicesAnswer = { throw java.io.IOException("disk unavailable") }
+        val vm = viewModel()
+        send(vm, NoteEvent.VoicesAnswer(false))
+        assertEquals(NoteSheet.VoicesQuestion(error = true), vm.now().sheet)
+        assertFalse(ports.voicesQuestionAsked.value)
+        assertTrue(ports.rememberVoices.value)
+        ports.beforeVoicesAnswer = {}
+        send(vm, NoteEvent.VoicesAnswer(false))
+        assertNull(vm.now().sheet)
+        assertFalse(ports.rememberVoices.value)
+        assertTrue(ports.voicesQuestionAsked.value)
     }
 
     @Test fun closingTheVoicesQuestionKeepsTheDefaultAndDoesNotAskAgain() = runTest(dispatcher) {
@@ -985,6 +1017,41 @@ class NoteViewModelTest {
         assertEquals(ReadOnlyReason.SAVING, viewModel.now().readOnlyReason)
         send(viewModel, NoteEvent.SpeakerTap("s1"))
         assertEquals(NoteDialog.ReadOnly(ReadOnlyReason.SAVING), viewModel.now().dialog)
+    }
+
+    @Test fun anExplicitDraftEnrollmentSurvivesReopeningAndCorrectingTheName() = runTest(dispatcher) {
+        ports.rememberVoices.value = false
+        val draft = DraftState(
+            words = listOf(Word("s1", 0, 5_000, "One"), Word("s2", 5_000, 12_000, "Two")),
+            labels = emptyMap(),
+            automatic = emptySet(),
+            suggestions = emptyList(),
+            tentativeFromMs = 12_000,
+            namingOpen = true,
+        )
+        ports.setJob(job(JobState.RUNNING), phase = JobPhase.Transcribing(progress(), draft))
+        val vm = viewModel()
+        send(
+            vm,
+            NoteEvent.SpeakerTap("s2"),
+            NoteEvent.NameSheet(NameSheetEvent.NameChanged("Luca")),
+            NoteEvent.NameSheet(NameSheetEvent.RememberChanged(true)),
+            NoteEvent.NameSheet(NameSheetEvent.Save),
+        )
+        assertEquals(listOf("draft.rename:s2:Luca", "draft.remember:s2:"), ports.calls.takeLast(2))
+        // Publish the stored draft, as the checkpoint observer and processing tracker do after these writes.
+        ports.names.value = CheckpointNames(mapOf("s2" to "Luca"), emptyMap(), remembered = mapOf("s2" to ""))
+        val named = draft.copy(labels = mapOf("s2" to "Luca"))
+        ports.setJob(job(JobState.RUNNING), phase = JobPhase.Transcribing(progress(), named))
+        advanceUntilIdle()
+        send(vm, NoteEvent.SpeakerTap("s2"))
+        assertTrue((vm.now().sheet as NoteSheet.NameSpeaker).ui.remember)
+        send(
+            vm,
+            NoteEvent.NameSheet(NameSheetEvent.NameChanged("Luca Bianchi")),
+            NoteEvent.NameSheet(NameSheetEvent.Save),
+        )
+        assertEquals(listOf("draft.rename:s2:Luca Bianchi", "draft.remember:s2:"), ports.calls.takeLast(2))
     }
 
     @Test fun anInlineOnlyDraftSpeakerCanBeNamedAndChosenAsAMergeTarget() = runTest(dispatcher) {

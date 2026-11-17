@@ -345,6 +345,8 @@ class NoteViewModel(
         val snackbar: SnackbarSpec? = null,
         val busyRow: NoteAction? = null,
         val seekingMs: Long? = null,
+        val voicesSaving: Boolean = false,
+        val voicesError: Boolean = false,
     )
 
     private enum class SheetKind { ACTIONS, VERSIONS, INFO, NAME, VOICES }
@@ -364,8 +366,16 @@ class NoteViewModel(
         val words: List<Word>,
         val scores: Map<String, Float>,
         val namingOpen: Boolean,
-        val live: Map<String, Match>,
-    )
+        val names: CheckpointNames,
+    ) {
+        val live: Map<String, Match> get() = names.live
+
+        fun rememberChoice(speakerId: String): Boolean? = when {
+            speakerId in names.remembered -> true
+            speakerId in names.labels && speakerId !in names.automatic -> false
+            else -> null
+        }
+    }
 
     private sealed interface DraftSource {
         data object None : DraftSource
@@ -553,7 +563,7 @@ class NoteViewModel(
             }
             SheetKind.VERSIONS -> NoteSheet.Versions(NoteMapping.versions(details, now, clock.zone))
             SheetKind.INFO -> NoteSheet.Info(info(details, ui.info))
-            SheetKind.VOICES -> NoteSheet.VoicesQuestion
+            SheetKind.VOICES -> NoteSheet.VoicesQuestion(ui.voicesSaving, ui.voicesError)
             SheetKind.NAME -> ui.naming?.let { naming ->
                 SpeakerNaming.mergeUi(naming)?.let { NoteSheet.Merge(it) }
                     ?: NoteSheet.NameSpeaker(SpeakerNaming.ui(naming, sampling = live.playback.sample))
@@ -870,10 +880,22 @@ class NoteViewModel(
 
     private suspend fun asked(): Boolean = runCatching { ports.voicesQuestionAsked.first() }.getOrDefault(true)
 
-    /** Stores the answer (null: closed without one, the default stays) and closes the sheet. */
+    /** Keeps the answer visible until it is stored; a failed write leaves both choices available for retry. */
     private fun answerVoicesQuestion(remember: Boolean?) {
-        if (local.value.sheet == SheetKind.VOICES) closeSheet()
-        launch { ports.answerVoicesQuestion(remember) }
+        if (local.value.sheet != SheetKind.VOICES || local.value.voicesSaving) return
+        local.update { it.copy(voicesSaving = true, voicesError = false) }
+        launch {
+            try {
+                ports.answerVoicesQuestion(remember)
+                closeSheet()
+                local.update { it.copy(voicesSaving = false) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                Log.w(TAG, "Cannot save the voices choice", error)
+                local.update { it.copy(voicesSaving = false, voicesError = true) }
+            }
+        }
     }
 
     private fun showReadOnly(reason: ReadOnlyReason) {
@@ -1266,6 +1288,7 @@ class NoteViewModel(
             voicesReadOnly = core.people.readOnly,
             voiceModelReady = modelReady,
             rememberDefault = ports.rememberVoices.first(),
+            remembered = draft.rememberChoice(speakerId),
             mergeTargets = targets,
             canSample = livePlayer() && core.mode !is NoteMode.Processing,
         )
@@ -1477,7 +1500,7 @@ class NoteViewModel(
             state.words,
             state.suggestions.associate { it.speakerId to it.score },
             state.namingOpen,
-            names.live,
+            names,
         )
     }
 
@@ -1506,7 +1529,7 @@ class NoteViewModel(
                 draft.words,
                 names.live.mapValues { it.value.score },
                 namingOpen = true,
-                live = names.live,
+                names = names,
             )
         }
 

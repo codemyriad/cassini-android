@@ -19,12 +19,14 @@ the hand-written copies they replace are deleted from `strings.xml`.
   process death: the next open asks again until it is answered.
 - "Yes, remember voices" / "Not now" store `voices.questionAsked` and `voices.rememberDefault` (DataStore,
   `SettingsRepository.answerVoicesQuestion`). Closing the sheet (swipe, scrim, back) marks the question asked and
-  leaves the default as it was (on), so it is asked once without a swipe turning remembering off.
+  leaves the default as it was (on), so it is asked once without a swipe turning remembering off. The sheet stays
+  open and both answers are disabled until the write succeeds. A failed write shows a retryable error.
 - The privacy line is `voices.setup.privacy.phone` (D98), not the drawn "It is never shared." (PARITY §3). The board's
   lock glyph is drawn with the app's privacy Shield, as on every other Android privacy line.
 - `NamingInput.rememberDefault` feeds Name a speaker: "Remember this voice" starts on only when the default is on, or
   when the speaker is already bound to a saved voice (a CONFIRMED voice stays remembered). The checkbox still turns
-  remembering on or off for one speaker. With the default off, a name is saved without enrolling a voiceprint.
+  remembering on or off for one speaker. A saved draft choice takes precedence over the global default, so a name
+  correction preserves an explicit enrollment or exclusion. With the default off, a new name alone does not enroll a voiceprint.
 - Settings › Speakers › Saved voices gains "Remember people I name" (`voices.rememberDefault.*`) before the Saved
   voices row. Changing it there also counts as answering the question.
 
@@ -46,5 +48,5 @@ button `savedVoices.row.options.a11y`. The privacy line stays `savedVoices.priva
 The how-to line under the wave is `firstRun.howTo`; the hero and the D98 privacy line are unchanged. The Library
 record button's accessible label and the empty and unavailable Library banner titles now say meeting in all six
 languages. They have no catalog id yet, so their translations are hand-written with the glossary's feminine meeting
-nouns. `ui_voice_note_title` / `rec_default_title` (the default title written into new recordings) and the processing
-notifications keep their wording: they are not on these screens.
+nouns. New recording titles (`ui_voice_note_title` / `rec_default_title`) and processing notifications also say
+meeting in all six languages. Existing user titles stay unchanged.

@@ -143,8 +143,11 @@ internal class FakeNotePorts : NotePorts {
     /** Asked by default, so that the voices question stays out of the tests that are not about it. */
     override val voicesQuestionAsked = MutableStateFlow(true)
 
+    var beforeVoicesAnswer: suspend () -> Unit = {}
+
     override suspend fun answerVoicesQuestion(remember: Boolean?) {
         calls += "answerVoicesQuestion:$remember"
+        beforeVoicesAnswer()
         voicesQuestionAsked.value = true
         if (remember != null) rememberVoices.value = remember
     }

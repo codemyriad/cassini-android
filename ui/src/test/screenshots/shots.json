@@ -1,4 +1,6 @@
 {"shots": [
+  {"screen": "phase2-voices-save-error", "label": "Voices choice — save failure", "scheme": "light", "lang": "en", "device": "phone", "path": "light/phase2-voices-save-error.png"},
+  {"screen": "phase2-voices-save-error", "label": "Voices choice — save failure", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-voices-save-error.png"},
   {"screen": "phase2-backup", "label": "Phase2 Backup", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-backup.png"},
   {"screen": "phase2-backup-end", "label": "Phase2 Backup End", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-backup-end.png"},
   {"screen": "phase2-backup-details", "label": "Phase2 Backup Details", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-backup-details.png"},

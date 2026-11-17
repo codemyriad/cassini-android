@@ -45,6 +45,6 @@ private fun NoteSheetContent(sheet: NoteSheet) {
         is NoteSheet.Merge -> MergeSheetContent(sheet.ui, onEvent = {})
         is NoteSheet.Versions -> VersionsSheetContent(sheet.ui, onPick = {})
         is NoteSheet.Info -> error("Document info is a dialog")
-        NoteSheet.VoicesQuestion -> VoicesQuestionContent(onAnswer = {})
+        is NoteSheet.VoicesQuestion -> VoicesQuestionContent(onAnswer = {}, ui = sheet)
     }
 }

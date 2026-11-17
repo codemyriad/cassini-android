@@ -18,7 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -42,9 +44,20 @@ import io.codemyriad.cassini.ui.theme.Glyph
  * [onDismiss]: the question is not asked again and the default stays as it is.
  */
 @Composable
-fun VoicesQuestionSheet(onAnswer: (Boolean) -> Unit, onDismiss: () -> Unit) {
-    CassiniSheet(onDismissRequest = onDismiss, containerColor = CassiniTheme.colors.raised) {
-        VoicesQuestionContent(onAnswer)
+fun VoicesQuestionSheet(
+    onAnswer: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    ui: NoteSheet.VoicesQuestion = NoteSheet.VoicesQuestion(),
+) {
+    CassiniSheet(
+        onDismissRequest = onDismiss,
+        containerColor = CassiniTheme.colors.raised,
+        confirmDismiss = {
+            onDismiss()
+            false
+        },
+    ) {
+        VoicesQuestionContent(onAnswer, ui = ui)
     }
 }
 
@@ -55,7 +68,11 @@ fun VoicesQuestionSheet(onAnswer: (Boolean) -> Unit, onDismiss: () -> Unit) {
  * change the answer (13 sp, centred). Padding 24 at the sides and 26 at the bottom; gap 14.
  */
 @Composable
-fun VoicesQuestionContent(onAnswer: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+fun VoicesQuestionContent(
+    onAnswer: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    ui: NoteSheet.VoicesQuestion = NoteSheet.VoicesQuestion(),
+) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
     Column(
@@ -83,20 +100,13 @@ fun VoicesQuestionContent(onAnswer: (Boolean) -> Unit, modifier: Modifier = Modi
             Spacer(Modifier.width(6.dp))
             Text(text = stringResource(R.string.ui_voices_setup_privacy), style = t.snippet, color = c.text2)
         }
-        Column(
-            Modifier.padding(top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            PrimaryButton(
-                text = stringResource(R.string.ui_voices_setup_enable),
-                onClick = { onAnswer(true) },
-                size = PrimaryButtonSize.Large,
-            )
-            SecondaryButton(
-                text = stringResource(R.string.ui_action_not_now),
-                onClick = { onAnswer(false) },
-                size = SecondaryButtonSize.Large,
-                fillWidth = true,
+        VoicesQuestionChoices(ui, onAnswer)
+        if (ui.error) {
+            Text(
+                stringResource(R.string.ui_settings_transfer_choice_failed),
+                Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                style = t.caption,
+                color = c.text2,
             )
         }
         Text(
@@ -106,6 +116,28 @@ fun VoicesQuestionContent(onAnswer: (Boolean) -> Unit, modifier: Modifier = Modi
             style = t.caption.copy(lineHeight = 18.2.sp),
             color = c.text2,
             textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun VoicesQuestionChoices(ui: NoteSheet.VoicesQuestion, onAnswer: (Boolean) -> Unit) {
+    Column(
+        Modifier.padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        PrimaryButton(
+            text = stringResource(R.string.ui_voices_setup_enable),
+            onClick = { onAnswer(true) },
+            size = PrimaryButtonSize.Large,
+            enabled = !ui.saving,
+        )
+        SecondaryButton(
+            text = stringResource(R.string.ui_action_not_now),
+            onClick = { onAnswer(false) },
+            size = SecondaryButtonSize.Large,
+            fillWidth = true,
+            enabled = !ui.saving,
         )
     }
 }

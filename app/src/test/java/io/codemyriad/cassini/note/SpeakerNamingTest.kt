@@ -337,6 +337,14 @@ class SpeakerNamingTest {
     }
 
     @Test
+    fun anExplicitDraftRememberChoiceWinsOverEitherGlobalDefault() {
+        val remembered = SpeakerNaming.open(input(draft = true).copy(rememberDefault = false, remembered = true))
+        assertTrue(remembered.remember)
+        val unremembered = SpeakerNaming.open(input(draft = true).copy(rememberDefault = true, remembered = false))
+        assertFalse(unremembered.remember)
+    }
+
+    @Test
     fun aDraftSaveRenamesAndRemembersANewOrBoundVoice() {
         val draft = SpeakerNaming.open(input(draft = true))
         assertTrue(SpeakerNaming.ui(draft).draft)

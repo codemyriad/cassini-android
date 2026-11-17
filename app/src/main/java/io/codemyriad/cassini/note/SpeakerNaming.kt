@@ -49,6 +49,8 @@ data class NamingInput(
     val voicesReadOnly: Boolean = false,
     val voiceModelReady: Boolean = true,
     val rememberDefault: Boolean = true,
+    /** An explicit draft choice, when this speaker was already named; it wins over the global default. */
+    val remembered: Boolean? = null,
     val mergeTargets: List<MergeTargetUi> = emptyList(),
     val sealedVersions: MergeVersionsUi? = null,
     val canSample: Boolean = true,
@@ -67,7 +69,7 @@ data class NamingInput(
         print contentEquals other.print && printSeconds == other.printSeconds &&
         willHavePrint == other.willHavePrint && match == other.match && voices == other.voices &&
         voicesReadOnly == other.voicesReadOnly && voiceModelReady == other.voiceModelReady &&
-        rememberDefault == other.rememberDefault &&
+        rememberDefault == other.rememberDefault && remembered == other.remembered &&
         mergeTargets == other.mergeTargets && sealedVersions == other.sealedVersions && canSample == other.canSample && quote == other.quote
 
     override fun hashCode(): Int = speakerId.hashCode() * HASH + label.hashCode()
@@ -233,7 +235,8 @@ object SpeakerNaming {
         // A CONFIRMED voice is this speaker even when the label was written differently; an AUTO one only by name.
         val bound = voice?.takeIf { linked?.state == Match.State.CONFIRMED || same(it.name, name) }?.id
         // "Remember people I name" (D103) is the default for a new voice; a voice already bound stays remembered.
-        val remember = rememberReason(input) == null && !input.voicesReadOnly && (input.rememberDefault || bound != null)
+        val chosen = input.remembered ?: (input.rememberDefault || bound != null)
+        val remember = rememberReason(input) == null && !input.voicesReadOnly && chosen
         return NamingState(input, name, bound, remember, name, bound, remember)
     }
 
