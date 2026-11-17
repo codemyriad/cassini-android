@@ -119,4 +119,4 @@ data class BackupSettingsUi(
 }
 
 /** Second-layer Settings destinations. */
-enum class SettingsPage { MAP, TRANSCRIPTION, SPEAKERS, BACKUP, ABOUT }
+enum class SettingsPage { MAP, TRANSCRIPTION, SPEAKERS, BACKUP, BACKUP_DETAILS, ABOUT }

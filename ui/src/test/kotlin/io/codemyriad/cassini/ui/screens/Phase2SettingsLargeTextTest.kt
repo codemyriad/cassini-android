@@ -21,6 +21,10 @@ class Phase2SettingsLargeTextTest : BoardTest() {
 
     @Test fun aboutWraps() = wraps(SettingsPage.ABOUT)
 
+    @Test fun backupWraps() = wraps(SettingsPage.BACKUP)
+
+    @Test fun backupDetailsWraps() = wraps(SettingsPage.BACKUP_DETAILS)
+
     private fun wraps(page: SettingsPage) {
         show { SettingsScreen(BoardFixtures.settings, {}, initialPage = page) }
         val cut = cutTexts()

@@ -513,8 +513,6 @@
     <string name="ui_meeting_duration_minutes">{m} min</string>
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Date inconnue</string>
-    <string name="ui_settings_transfer_title">Transférer vers un nouveau téléphone</string>
-    <string name="ui_settings_transfer_export_hint">Pour garder une copie en lieu sûr, utilisez « Tout exporter en ZIP ».</string>
     <string name="ui_settings_transfer_unavailable">Ce choix nécessite Android 9 ou une version ultérieure.</string>
     <string name="ui_settings_transfer_choice_failed">Impossible de sauvegarder ce choix. Réessayez.</string>
     <string name="ui_search_filter_any_date">Toutes les dates</string>

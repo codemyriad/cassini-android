@@ -39,14 +39,23 @@ import io.codemyriad.cassini.ui.theme.Glyph
 
 /** D103: a short map, the choices, then source and licence details. */
 @Composable
+@Suppress("LongParameterList") // The optional ZIP action is owned by the existing process-wide transfer controller.
 fun SettingsScreen(
     state: SettingsUiState,
     onEvent: (SettingsEvent) -> Unit,
     modifier: Modifier = Modifier,
     initialPage: SettingsPage = SettingsPage.MAP,
+    exportEnabled: Boolean = false,
+    onExport: () -> Unit = {},
 ) {
     var page by rememberSaveable { mutableStateOf(initialPage) }
-    val back = { if (page == SettingsPage.MAP) onEvent(SettingsEvent.Back) else page = SettingsPage.MAP }
+    val back = {
+        when (page) {
+            SettingsPage.MAP -> onEvent(SettingsEvent.Back)
+            SettingsPage.BACKUP_DETAILS -> page = SettingsPage.BACKUP
+            else -> page = SettingsPage.MAP
+        }
+    }
     BackHandler(page != SettingsPage.MAP, onBack = back)
     key(page) {
         Column(
@@ -57,26 +66,20 @@ fun SettingsScreen(
                 .screenContentWidth()
                 .navigationBarsPadding(),
         ) {
-            val title = when (page) {
-                SettingsPage.MAP -> R.string.ui_settings_title
-                SettingsPage.TRANSCRIPTION -> R.string.ui_transcription_title
-                SettingsPage.SPEAKERS -> R.string.ui_speakers_title
-                SettingsPage.BACKUP -> R.string.ui_settings_backup
-                SettingsPage.ABOUT -> R.string.ui_about_title
-            }
             SettingsTopBar(
-                stringResource(title),
+                stringResource(page.title),
                 onBack = back,
-                backLabel = stringResource(
-                    if (page == SettingsPage.MAP) R.string.ui_back_to_library else R.string.ui_back_to_settings,
-                ),
+                backLabel = stringResource(page.backLabel),
             )
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
                 when (page) {
                     SettingsPage.MAP -> SettingsMap(state, onEvent) { page = it }
                     SettingsPage.TRANSCRIPTION -> TranscriptionSettings(state, onEvent)
                     SettingsPage.SPEAKERS -> SpeakerSettings(state, onEvent)
-                    SettingsPage.BACKUP -> state.backup?.let { BackupSection(it, onEvent) }
+                    SettingsPage.BACKUP -> state.backup?.let {
+                        BackupSection(it, onEvent, { page = SettingsPage.BACKUP_DETAILS }, exportEnabled, onExport)
+                    }
+                    SettingsPage.BACKUP_DETAILS -> state.backup?.let { BackupDetails(it) }
                     SettingsPage.ABOUT -> AboutSettings(state, onEvent)
                 }
             }
@@ -184,3 +187,20 @@ private fun libraryAudioDuration(ms: Long): String = if (ms < 3_600_000L) {
 } else {
     Counts.plural(R.plurals.ui_settings_audio_hours, (ms / 3_600_000L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
 }
+
+private val SettingsPage.title: Int
+    get() = when (this) {
+        SettingsPage.MAP -> R.string.ui_settings_title
+        SettingsPage.TRANSCRIPTION -> R.string.ui_transcription_title
+        SettingsPage.SPEAKERS -> R.string.ui_speakers_title
+        SettingsPage.BACKUP -> R.string.ui_settings_backup
+        SettingsPage.BACKUP_DETAILS -> R.string.ui_backup_more_detail
+        SettingsPage.ABOUT -> R.string.ui_about_title
+    }
+
+private val SettingsPage.backLabel: Int
+    get() = when (this) {
+        SettingsPage.MAP -> R.string.ui_back_to_library
+        SettingsPage.BACKUP_DETAILS -> R.string.ui_back
+        else -> R.string.ui_back_to_settings
+    }

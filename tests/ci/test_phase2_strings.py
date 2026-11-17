@@ -33,6 +33,17 @@ class Phase2StringsTest(unittest.TestCase):
                         for text in entry.itertext():
                             self.assertIsNone(LEGACY_NOUN.search(text), (path, entry.get('name'), text))
 
+    def test_backup_notice_keeps_d98_copy_after_catalog_migration(self):
+        expected = {
+            'backup_card_title': 'backup.phoneOnlyCard.title',
+            'backup_card_body': 'backup.phoneOnlyCard.body',
+            'backup_card_action': 'backup.phoneOnlyCard.action',
+            'backup_card_dismiss': 'backup.phoneOnlyCard.dismiss',
+            'backup_card_close': 'backup.phoneOnlyCard.close.a11y',
+        }
+        for name, identifier in expected.items():
+            self.assertEqual(identifier, PHASE2.LABELS[name][0])
+
     def test_catalog_checksum_drift_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

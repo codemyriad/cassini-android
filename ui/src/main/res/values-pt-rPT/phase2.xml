@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702; do not edit. -->
+<!-- Generated from cassini-ux c28b72461c7317ea0a4684183cb9103626aabf17; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Vozes guardadas</string>
     <string name="ui_settings_trash">Lixo</string>
@@ -56,13 +56,53 @@
     <string name="ui_models_keep_transcript">As reuniões já transcritas mantêm a sua transcrição.</string>
     <string name="ui_transcription_online_heading">Ligação à internet</string>
     <string name="ui_models_where_from">De onde vêm os modelos</string>
-    <string name="ui_transcription_online">O Cassini só se liga à internet para descarregar um modelo que pedir. Cada ficheiro é verificado antes de ser usado.</string>
+    <string name="ui_transcription_online">O Cassini só se liga à internet para transferir um modelo que pedir. Cada ficheiro é verificado antes de ser usado.</string>
     <string name="ui_speakers_who">Quem está a falar</string>
     <string name="ui_speakers_tell_apart">Distinguir oradores</string>
     <string name="ui_speakers_tell_apart_short">Orador 1, Orador 2 e assim por diante.</string>
     <string name="ui_speakers_recognise">Reconhecer vozes guardadas</string>
-    <string name="ui_speakers_recognise_short">Dá nome às pessoas guardadas assim que falam.</string>
+    <string name="ui_speakers_recognise_short">Dá nome às pessoas que guardou assim que falam.</string>
     <string name="ui_speakers_on_device">Ambos funcionam neste telemóvel, depois da transcrição.</string>
+    <string name="ui_backup_cloud_title">Cópia de segurança encriptada na nuvem</string>
+    <string name="ui_backup_cloud_body_on">As reuniões são incluídas nas cópias de segurança do seu telemóvel e ao mudar para um telemóvel novo. Os modelos de voz transferidos não entram na cópia de segurança; o telemóvel novo volta a transferi-los.</string>
+    <string name="ui_backup_cloud_body_off">As reuniões não são adicionadas às cópias de segurança na nuvem. Desativar esta opção interrompe as próximas cópias de segurança, mas não elimina as que já estão guardadas na sua conta na nuvem.</string>
+    <string name="ui_backup_phone_only_body">As reuniões e as vozes guardadas ficam apenas neste telemóvel. Não entram em cópias de segurança nem são copiadas para um telemóvel novo; para guardar uma cópia, utilize «Exportar tudo como ZIP».</string>
+    <string name="ui_backup_voices_title">Fazer cópia de segurança das vozes guardadas</string>
+    <string name="ui_backup_voices_subtitle">As vozes guardadas são impressões vocais criadas no dispositivo para as pessoas a quem deu nome, para que um telemóvel novo ou restaurado continue a reconhecê-las automaticamente. Desative esta opção para manter as impressões vocais apenas neste telemóvel.</string>
+    <string name="ui_backup_voices_subtitle_off">As vozes guardadas ficam apenas neste telemóvel: não entram em cópias de segurança nem são copiadas para um telemóvel novo. Num telemóvel novo ou restaurado, terá de dar novamente nome aos oradores.</string>
+    <string name="ui_backup_info_android_heading">Cópia na nuvem do Android</string>
+    <string name="ui_backup_info_android_body">Quando a cópia de segurança do Android (Google ou Seedvault) está ativa, as cópias seguem a encriptação do seu telemóvel e as definições do fornecedor de cópias. O Android limita as cópias na nuvem de cada aplicação a 25 MB; para bibliotecas maiores, utilize «Exportar tudo como ZIP».</string>
+    <string name="ui_backup_info_over_quota">As suas reuniões ultrapassam o limite de 25 MB da cópia na nuvem do Android. Utilize «Exportar tudo como ZIP» para guardar uma cópia completa.</string>
+    <string name="ui_backup_card_title">Manter apenas neste telemóvel</string>
+    <string name="ui_backup_card_body">As suas reuniões e vozes guardadas são incluídas na cópia de segurança encriptada na nuvem e copiadas ao mudar para um telemóvel novo, para que não as perca se este telemóvel for perdido ou substituído.</string>
+    <string name="ui_backup_card_action">Manter apenas neste telemóvel</string>
+    <string name="ui_backup_card_dismiss">Manter a cópia ativa</string>
+    <string name="ui_backup_card_close">Fechar aviso de cópia de segurança</string>
+    <string name="ui_settings_transfer_body_off_backup_on">Nada é copiado diretamente para um telemóvel novo. As reuniões da sua cópia de segurança na nuvem voltam quando a restaurar num telemóvel novo.</string>
+    <string name="ui_backup_page_transfer">As suas reuniões vão consigo para um telemóvel novo</string>
+    <string name="ui_backup_meetings_subtitle">Áudio, transcrições e quem falou.</string>
+    <string name="ui_backup_voices_why">Uma voz pertence a outra pessoa, por isso é uma escolha à parte.</string>
+    <string name="ui_backup_more_detail">Com mais pormenor</string>
+    <string name="ui_backup_moves">O que é copiado</string>
+    <string name="ui_backup_who">Quem pode ler</string>
+    <string name="ui_backup_meetings">Reuniões</string>
+    <string name="ui_backup_meetings_detail">Áudio, transcrições e quem falou</string>
+    <string name="ui_backup_settings">Definições</string>
+    <string name="ui_backup_settings_detail">As suas escolhas nesta aplicação</string>
+    <string name="ui_backup_voices_with_meetings">Copiadas com as suas reuniões</string>
+    <string name="ui_backup_models">Modelos de voz</string>
+    <string name="ui_backup_models_detail">Transferidos novamente no telemóvel novo</string>
+    <string name="ui_backup_copied">Copiado</string>
+    <string name="ui_backup_not_copied">Não copiado</string>
+    <string name="ui_backup_new_phone">O telemóvel novo</string>
+    <string name="ui_backup_new_phone_detail">Copiado de telemóvel para telemóvel, por cabo ou Wi-Fi. Nada vai para uma conta na nuvem.</string>
+    <string name="ui_backup_zip">Um ZIP que exporta</string>
+    <string name="ui_backup_zip_detail">Quem tiver acesso ao local onde o guardar.</string>
+    <string name="ui_backup_never">O próprio Cassini nunca envia nem lê as suas reuniões.</string>
+    <string name="ui_backup_own_copy">A sua própria cópia</string>
+    <string name="ui_backup_zip_subtitle">Guarde todas as reuniões numa pasta, numa unidade ou noutra aplicação.</string>
+    <string name="ui_backup_export_all">Exportar tudo como ZIP…</string>
+    <string name="ui_settings_transfer_title">Passar para um telemóvel novo</string>
     <string name="ui_about_title">Acerca</string>
     <string name="ui_about_tagline">Transforma a fala em texto pesquisável e com marcação de tempo, aqui mesmo no seu telemóvel.</string>
     <string name="ui_about_help">Ajuda</string>

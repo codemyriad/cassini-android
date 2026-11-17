@@ -5,7 +5,7 @@ package io.codemyriad.cassini.ui.library
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
@@ -89,51 +90,32 @@ fun LibraryScreen(
 ) {
     val density = LocalDensity.current
     var barPx by remember { mutableIntStateOf(0) }
+    var noticePx by remember { mutableIntStateOf(0) }
+    val showBackup = state.backupCard && state.snackbar == null
     val bar: Dp = max(
         with(density) { barPx.toDp() },
         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BottomBarHeight,
     )
     // The keyboard covers the bottom bar: the results end above whichever is taller (ui.md section 9).
-    val listBottom = max(bar, WindowInsets.ime.asPaddingValues().calculateBottomPadding())
-    Box(
+    val noticeHeight = if (showBackup) with(density) { noticePx.toDp() } + 8.dp else 0.dp
+    val listBottom = max(bar + noticeHeight, WindowInsets.ime.asPaddingValues().calculateBottomPadding())
+    BoxWithConstraints(
         modifier.focusable()
             .fillMaxSize()
             .background(CassiniTheme.colors.bg)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .screenContentWidth(),
     ) {
-        Column(Modifier.fillMaxSize()) {
-            LibraryPinnedHeader(state, onEvent)
-            LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth().testTag("library-list"),
-                state = rememberLazyListState(),
-                contentPadding = PaddingValues(bottom = listBottom),
-            ) {
-                if (tools != null) item(key = "transfers", contentType = "transfers") { tools() }
-                if (state.query.isNotBlank()) {
-                    item(key = "filters", contentType = "filters") {
-                        Column(Modifier.padding(horizontal = 16.dp)) { SearchFiltersBar(state.searchFilters, onEvent) }
-                    }
-                } else if (state.libraryFilters) {
-                    item(key = "library-filters", contentType = "filters") {
-                        LibraryFilterRow(state.libraryFilter, onEvent, Modifier.padding(horizontal = 16.dp))
-                    }
-                }
-                activity(state, onEvent)
-                imports(state.imports, onEvent)
-                state.hero?.takeIf { !state.loading }?.let { hero ->
-                    item(key = "first-run-hero", contentType = "hero") { FirstRunHero(hero) }
-                }
-                if (!state.loading) {
-                    val results = state.results
-                    if (results != null) results(results, onEvent) else sections(state.sections, onEvent)
-                    if (state.starredEmpty && results == null) {
-                        item(key = "starred-empty", contentType = "starred-empty") { StarredEmpty() }
-                    }
-                }
-            }
-        }
+        LibraryList(state, onEvent, listBottom, tools)
         LibraryActions(state, onEvent) { barPx = it }
+        if (showBackup) {
+            BackupCard(
+                onEvent,
+                Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = bar + 8.dp)
+                    .heightIn(max = (maxHeight - bar - 80.dp).coerceAtLeast(48.dp))
+                    .onSizeChanged { noticePx = it.height },
+            )
+        }
         CassiniSnackbarHost(
             spec = state.snackbar,
             onTimeout = { onEvent(LibraryEvent.SnackbarTimeout(it.id)) },
@@ -147,8 +129,48 @@ fun LibraryScreen(
     state.dialog?.let { LibraryDialogWindow(it, onEvent) }
 }
 
+@Composable
+private fun LibraryList(
+    state: LibraryUiState,
+    onEvent: (LibraryEvent) -> Unit,
+    listBottom: Dp,
+    tools: (@Composable () -> Unit)?,
+) {
+    Column(Modifier.fillMaxSize()) {
+        LibraryPinnedHeader(state, onEvent)
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth().testTag("library-list"),
+            state = rememberLazyListState(),
+            contentPadding = PaddingValues(bottom = listBottom),
+        ) {
+            if (tools != null) item(key = "transfers", contentType = "transfers") { tools() }
+            if (state.query.isNotBlank()) {
+                item(key = "filters", contentType = "filters") {
+                    Column(Modifier.padding(horizontal = 16.dp)) { SearchFiltersBar(state.searchFilters, onEvent) }
+                }
+            } else if (state.libraryFilters) {
+                item(key = "library-filters", contentType = "filters") {
+                    LibraryFilterRow(state.libraryFilter, onEvent, Modifier.padding(horizontal = 16.dp))
+                }
+            }
+            activity(state, onEvent)
+            imports(state.imports, onEvent)
+            state.hero?.takeIf { !state.loading }?.let { hero ->
+                item(key = "first-run-hero", contentType = "hero") { FirstRunHero(hero) }
+            }
+            if (!state.loading) {
+                val results = state.results
+                if (results != null) results(results, onEvent) else sections(state.sections, onEvent)
+                if (state.starredEmpty && results == null) {
+                    item(key = "starred-empty", contentType = "starred-empty") { StarredEmpty() }
+                }
+            }
+        }
+    }
+}
+
 /**
- * The once-only backup card (D98), then existing recording feedback and import/problem banners; no separate
+ * Existing recording feedback and import/problem banners; no separate
  * transcription progress card.
  * The first item sits 14dp below the search/filter region, the next ones 8dp below the one before.
  */
@@ -158,10 +180,6 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
         val gap = if (first) 14.dp else 8.dp
         first = false
         return Modifier.padding(start = 16.dp, end = 16.dp, top = gap)
-    }
-    if (state.backupCard) {
-        val modifier = top()
-        item(key = "backup-card", contentType = "backup-card") { BackupCard(onEvent, modifier) }
     }
     state.recording?.let { recording ->
         val modifier = top()

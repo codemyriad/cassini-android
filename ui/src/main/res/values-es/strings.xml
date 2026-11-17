@@ -512,8 +512,6 @@
     <string name="ui_meeting_duration_minutes">{m} min</string>
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Fecha desconocida</string>
-    <string name="ui_settings_transfer_title">Transferir a un teléfono nuevo</string>
-    <string name="ui_settings_transfer_export_hint">Para guardar una copia en un lugar seguro, usa “Exportar todo como ZIP”.</string>
     <string name="ui_settings_transfer_unavailable">Esta opción necesita Android 9 o posterior.</string>
     <string name="ui_settings_transfer_choice_failed">No se pudo guardar esta opción. Inténtalo de nuevo.</string>
     <string name="ui_search_filter_any_date">Cualquier fecha</string>
