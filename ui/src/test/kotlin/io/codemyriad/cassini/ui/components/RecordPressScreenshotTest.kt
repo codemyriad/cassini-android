@@ -56,7 +56,7 @@ class RecordPressScreenshotTest : BoardTest() {
                 RecordFab(onClick = {})
             }
         }
-        val button = rule.onNodeWithContentDescription("Record a new note")
+        val button = rule.onNodeWithContentDescription("Record a new meeting")
         button.performTouchInput { down(center) }
         rule.mainClock.advanceTimeByFrame()
         rule.waitForIdle()

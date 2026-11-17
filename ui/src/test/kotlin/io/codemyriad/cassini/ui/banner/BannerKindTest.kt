@@ -173,7 +173,7 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
         listOf("Download"),
     ),
     BannerKind.LIB_EMPTY to
-        Triple("No notes yet", "Record something, or import an audio file.", listOf("Record", "Import")),
+        Triple("No meetings yet", "Record something, or import an audio file.", listOf("Record", "Import")),
     BannerKind.LIB_NO_MATCH to Triple("Nothing matches “invoice”", "Try another word or title.", listOf()),
     BannerKind.IMPORTING to Triple("Importing call.m4a…", null, listOf()),
     BannerKind.IMPORT_TOO_LARGE to Triple("File too large", "Choose a file under 4 GB.", listOf("Choose another")),
@@ -199,7 +199,7 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
         listOf(),
     ),
     BannerKind.LIB_UNAVAILABLE to Triple(
-        "Your notes can’t be opened",
+        "Your meetings can’t be opened",
         "Your files are kept. Free some storage, then open Cassini again.",
         listOf(),
     ),
