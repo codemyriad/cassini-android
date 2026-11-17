@@ -52,7 +52,7 @@ internal fun BackupSection(
             !state.saving && state.cloudAvailable,
         ) { onEvent(SettingsEvent.Cloud(it)) }
     }
-    HelperText(stringResource(cloudBody(state)))
+    if (!state.cloudOn) HelperText(stringResource(cloudBody(state)))
     SettingsGroup(Modifier.padding(top = 12.dp)) {
         BackupSwitch(
             stringResource(R.string.ui_settings_transfer_title),
@@ -95,17 +95,17 @@ internal fun BackupSection(
     HelperText(stringResource(R.string.ui_backup_zip_subtitle))
 }
 
-/** The transfer sentence belongs to this channel; the separate cloud choice directly follows it. */
+/** The answer follows the Settings map: cloud first, then transfer, then phone-only. */
 @Composable
 private fun BackupAnswer(state: BackupSettingsUi) {
     val title = when {
-        state.transferOn -> R.string.ui_backup_page_transfer
         state.cloudOn -> R.string.ui_backup_cloud_title
+        state.transferOn -> R.string.ui_backup_page_transfer
         else -> R.string.ui_setting_off
     }
     val body = when {
-        state.transferOn -> R.string.ui_settings_transfer_body
         state.cloudOn -> R.string.ui_backup_cloud_body_on
+        state.transferOn -> R.string.ui_settings_transfer_body
         else -> R.string.ui_backup_phone_only_body
     }
     Row(

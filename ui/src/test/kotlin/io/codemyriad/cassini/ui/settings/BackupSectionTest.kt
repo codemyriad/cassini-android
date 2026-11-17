@@ -4,6 +4,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -42,8 +44,8 @@ class BackupSectionTest {
 
     @Test fun defaultsShowThreeAccessibleSwitchesAllOn() {
         show(BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false))
-        rule.onNodeWithText("Your meetings move with you to a new phone").assertExists()
-        rule.onNodeWithText("Encrypted cloud backup").performScrollTo().assertIsOn().performClick()
+        assertCloudAnswer()
+        rule.onNode(hasText("Encrypted cloud backup") and isToggleable()).performScrollTo().assertIsOn().performClick()
         rule.onNodeWithText("Move to a new phone").performScrollTo().assertIsOn().performClick()
         rule.onNodeWithText("Back up saved voices").performScrollTo().assertIsOn().performClick()
         assertEquals(
@@ -51,13 +53,14 @@ class BackupSectionTest {
             events,
         )
         // A switch changes only when the stored choice does.
-        rule.onNodeWithText("Encrypted cloud backup").assertIsOn()
+        rule.onNode(hasText("Encrypted cloud backup") and isToggleable()).assertIsOn()
         rule.onNodeWithText(BODY_ON, substring = true).assertExists()
         rule.onAllNodesWithText(PHONE_ONLY).assertCountEquals(0)
     }
 
     @Test fun cloudOnTransferOffSaysCloudRestoreStillBringsMeetingsBack() {
         show(BackupSettingsUi(transfer = false, transferAvailable = true, quotaExceeded = false))
+        assertCloudAnswer()
         rule.onNodeWithText("Move to a new phone").assertIsOff()
         rule.onNodeWithText(
             "Nothing is copied directly to a new phone. Meetings in your cloud backup come back when you restore it on a new phone.",
@@ -67,7 +70,8 @@ class BackupSectionTest {
 
     @Test fun cloudOffTransferOnMakesNoPhoneOnlyClaim() {
         show(BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false, cloud = false))
-        rule.onNodeWithText("Encrypted cloud backup").assertIsOff()
+        rule.onNode(hasText("Encrypted cloud backup") and isToggleable()).assertIsOff()
+        rule.onNodeWithText("Your meetings move with you to a new phone").assertExists()
         rule.onNodeWithText(CLOUD_OFF).assertExists()
         rule.onAllNodesWithText(PHONE_ONLY).assertCountEquals(0)
     }
@@ -85,7 +89,7 @@ class BackupSectionTest {
         rule.onNodeWithText("Android cloud backup").assertExists()
         rule.onNodeWithText("A ZIP you export").assertExists()
         rule.onNodeWithContentDescription("Back").performClick()
-        rule.onNodeWithText("Your meetings move with you to a new phone").assertExists()
+        assertCloudAnswer()
     }
 
     @Test fun cloudQuotaFailureNamesTheAndroidLimit() {
@@ -122,12 +126,18 @@ class BackupSectionTest {
                 cloudQuotaExceeded = true,
             ),
         )
-        rule.onNodeWithText("Encrypted cloud backup").assertIsNotEnabled().assertIsOff()
+        rule.onNode(hasText("Encrypted cloud backup") and isToggleable()).assertIsNotEnabled().assertIsOff()
         rule.onNodeWithText("Move to a new phone").assertIsNotEnabled().assertIsOff()
         rule.onNodeWithText("Back up saved voices").assertIsNotEnabled().assertIsOff()
         assertNoQuotaWarning()
         rule.onAllNodesWithText("Choosing this needs Android 9 or newer.").assertCountEquals(3)
         rule.onNodeWithText(PHONE_ONLY).assertExists()
+    }
+
+    private fun assertCloudAnswer() {
+        rule.onAllNodesWithText("Encrypted cloud backup").assertCountEquals(2)
+        rule.onAllNodesWithText(BODY_ON, substring = true).assertCountEquals(1)
+        rule.onAllNodesWithText("Your meetings move with you to a new phone").assertCountEquals(0)
     }
 
     private fun assertNoQuotaWarning() {
@@ -147,7 +157,7 @@ class BackupSectionTest {
             )
         )
         rule.onNodeWithText("Move to a new phone").assertIsNotEnabled()
-        rule.onNodeWithText("Encrypted cloud backup").assertIsNotEnabled()
+        rule.onNode(hasText("Encrypted cloud backup") and isToggleable()).assertIsNotEnabled()
         rule.onNodeWithText("Back up saved voices").assertIsNotEnabled()
         rule.onNodeWithText("Couldn’t save this choice. Try again.").assertExists()
         rule.onNodeWithText(
