@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702; do not edit. -->
+<!-- Generated from cassini-ux c28b72461c7317ea0a4684183cb9103626aabf17; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Voix mémorisées</string>
     <string name="ui_settings_trash">Corbeille</string>
     <string name="ui_settings_language_phone">Téléphone</string>
-    <string name="ui_headline_waiting">Fin de la réunion précédente…</string>
+    <string name="ui_headline_waiting">Finalisation de la réunion précédente…</string>
     <plurals name="ui_count_ahead_of_note">
         <item quantity="one">%1$s réunion avant celle-ci.</item>
         <item quantity="many">%1$s réunions avant celle-ci.</item>
@@ -20,14 +20,16 @@
         <item quantity="other">%1$s réunions</item>
     </plurals>
     <string name="ui_voices_stale">Nommez à nouveau cette personne dans une réunion pour que Cassini continue à la reconnaître.</string>
-    <string name="ui_voices_footnote">Pour ajouter quelqu’un, nommez un intervenant dans une réunion et laissez «\u202FMémoriser cette voix\u202F» activé.</string>
+    <string name="ui_voices_footnote">Pour ajouter quelqu’un, nommez un intervenant dans une réunion et laissez « Mémoriser cette voix » activé. Si vous oubliez une voix, les noms déjà présents dans vos réunions sont conservés.</string>
+    <string name="ui_voices_options">Options pour %1$s</string>
+    <string name="ui_voices_forget">Oublier…</string>
     <string name="ui_voices_forget_body">Cassini cesse de reconnaître cette voix. Les noms déjà présents dans vos réunions restent.</string>
     <plurals name="ui_voices_forget_everyone_body">
         <item quantity="one">Cassini cesse de reconnaître %1$s voix mémorisée et supprime les empreintes vocales de toutes les réunions. Les noms déjà présents dans vos réunions restent.</item>
         <item quantity="many">Cassini cesse de reconnaître les %1$s voix mémorisées et supprime les empreintes vocales de toutes les réunions. Les noms déjà présents dans vos réunions restent.</item>
         <item quantity="other">Cassini cesse de reconnaître les %1$s voix mémorisées et supprime les empreintes vocales de toutes les réunions. Les noms déjà présents dans vos réunions restent.</item>
     </plurals>
-    <string name="ui_trash_intro">Les réunions placées ici sont supprimées définitivement après 30 jours, avec leur audio, leurs transcriptions et les empreintes vocales issues de ces réunions.</string>
+    <string name="ui_trash_intro">Les réunions placées ici sont supprimées définitivement après 30 jours.</string>
     <string name="ui_trash_delete_body">Son audio, ses transcriptions et les empreintes vocales de cette réunion sont supprimés. Cette action est irréversible.</string>
     <plurals name="ui_trash_delete_all_title">
         <item quantity="one">Supprimer définitivement %1$s réunion ?</item>
@@ -91,4 +93,22 @@
     <string name="ui_about_name_version">Cassini talk %1$s</string>
     <string name="ui_about_version">Version %1$s</string>
     <string name="ui_about_licence_line">Logiciel libre sous licence GPLv3. © %1$s Codemyriad et contributeurs.</string>
+    <string name="ui_first_run_how_to">Appuyez sur Enregistrer quand la réunion commence et sur Arrêter quand elle se termine. Cassini transcrit tout.</string>
+    <string name="ui_voices_setup_title">Reconnaître les personnes que vous nommez ?</string>
+    <string name="ui_voices_setup_body">Quand vous nommez un intervenant, Cassini peut mémoriser sa voix et le nommer pour vous dans les réunions suivantes.</string>
+    <string name="ui_voices_setup_privacy">Les empreintes vocales sont créées sur ce téléphone et ne sont jamais écrites dans les fichiers exportés ou partagés. Vous pouvez choisir dans les réglages si les sauvegardes les incluent.</string>
+    <string name="ui_voices_setup_enable">Oui, mémoriser les voix</string>
+    <string name="ui_action_not_now">Plus tard</string>
+    <string name="ui_voices_setup_kindness">Il est courtois de demander l’accord des personnes avant de mémoriser leur voix.</string>
+    <string name="ui_voices_setup_change_later">Vous pouvez modifier ce choix dans Réglages › Intervenants.</string>
+    <string name="ui_speakers_remember">Mémoriser les personnes que je nomme</string>
+    <string name="ui_speakers_remember_short">La prochaine fois, Cassini les nommera pour vous.</string>
+    <string name="ui_models_title">Transcrire sur ce téléphone</string>
+    <string name="ui_models_body">Cassini a besoin d’un seul téléchargement de %1$s. Ensuite, tout se passe sur ce téléphone, même hors ligne.</string>
+    <string name="ui_part_speech">Reconnaissance vocale</string>
+    <string name="ui_part_speakers">Distinction des intervenants</string>
+    <string name="ui_part_voices">Reconnaissance des voix mémorisées</string>
+    <string name="ui_models_space_needed">Il faut environ %1$s d’espace libre pendant l’installation. Chaque fichier est vérifié avant d’être utilisé.</string>
+    <string name="ui_models_download_and_transcribe">Télécharger et transcrire</string>
+    <string name="ui_models_recording_kept">Votre enregistrement est conservé dans tous les cas.</string>
 </resources>

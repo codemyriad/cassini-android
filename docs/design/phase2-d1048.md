@@ -28,7 +28,8 @@ The remaining legacy meeting nouns are outside these Phase 2 paths:
   `notif_failed_public`, `notif_ready_public`, `notif_stopped_public`.
 - Record button accessibility label: `ui_library_record_description`.
 
-These resources retain their Phase 1 wording in this ticket. Internal identifiers and comments using note are
+These resources retain their Phase 1 wording in this ticket. D-1086 later moved the Library banners and the record
+button label to meeting nouns (`docs/design/phase2-d1086.md`). Internal identifiers and comments using note are
 not user-facing strings. The retired transfer notice catalog entry is not displayed by the app.
 
 ## Verification

@@ -222,6 +222,7 @@ fun InkButton(
  * The outlined pill in the sizes of [SecondaryButtonSize], with an optional leading [glyph] (20 dp, stroke 1.8). Its
  * fill is a translucent ink wash; a button that floats over scrolling content passes the screen's [backdrop] token
  * (`bg`), and the wash is composited over it into an opaque fill of the same look, so nothing shows through (D-1057).
+ * [fillWidth] stretches any size to the full width (the voices question's tonal "Not now", D103); Block always does.
  */
 @Composable
 @Suppress("LongParameterList") // Size, icon, padding override, enabled, busy and the backdrop.
@@ -235,6 +236,7 @@ fun SecondaryButton(
     enabled: Boolean = true,
     busy: Boolean = false,
     backdrop: Color? = null,
+    fillWidth: Boolean = size == SecondaryButtonSize.Block,
 ) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
@@ -256,7 +258,7 @@ fun SecondaryButton(
         textColor = c.ink,
         enabled = enabled,
         busy = busy,
-        fillWidth = size == SecondaryButtonSize.Block,
+        fillWidth = fillWidth,
         leading = glyph?.let { { CassiniIcon(it, 20.dp, 1.8f, c.ink, null) } },
     )
 }

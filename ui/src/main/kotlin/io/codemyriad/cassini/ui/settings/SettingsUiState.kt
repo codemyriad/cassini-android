@@ -8,6 +8,7 @@ import kotlinx.collections.immutable.ImmutableList
 /**
  * D103 Settings map and deeper choices. Counts and duration come from the live Library; [version] is the installed
  * version name. Speaker processing choices are independent of download permission and apply to new job runs.
+ * [rememberVoices] is "Remember people I name" (D103), the default of "Remember this voice".
  */
 @Immutable
 data class SettingsUiState(
@@ -20,6 +21,7 @@ data class SettingsUiState(
     val audioDurationMs: Long = 0,
     val tellSpeakersApart: Boolean = true,
     val recogniseVoices: Boolean = true,
+    val rememberVoices: Boolean = true,
     val speakerSaving: Boolean = false,
     val speakerError: Boolean = false,
     val copyrightYear: String = "2026",

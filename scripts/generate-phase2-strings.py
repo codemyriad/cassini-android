@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate L-67 phone wording from its separately pinned shared catalog."""
+"""Generate L-67 and D103 phone wording from its separately pinned shared catalog."""
 import argparse
 import hashlib
 import importlib.util
@@ -24,10 +24,12 @@ LABELS = {
     'settings_transfer_too_large': ('settings.transfer.tooLarge', None),
     'count_notes': ('format.searchCount.meetings', 'n'),
     'voices_stale': ('savedVoices.row.stale', None),
-    'voices_footnote': ('android.savedVoices.howToAdd', None),
+    'voices_footnote': ('savedVoices.howToAdd.short', None),
+    'voices_options': ('savedVoices.row.options.a11y', 'name'),
+    'voices_forget': ('savedVoices.row.forgetEllipsis', None),
     'voices_forget_body': ('android.savedVoices.forget.body', None),
     'voices_forget_everyone_body': ('android.savedVoices.forgetEveryone.body', 'n'),
-    'trash_intro': ('android.trash.retentionNote', None),
+    'trash_intro': ('trash.phone.intro', None),
     'trash_delete_body': ('android.trash.delete.body', None),
     'trash_delete_all_title': ('android.trash.deleteAll.title', 'n'),
     'trash_is_empty_body': ('android.trash.empty.body', None),
@@ -75,6 +77,25 @@ LABELS = {
     'about_name_version': ('about.nameVersion', 'version'),
     'about_version': ('about.version', 'version'),
     'about_licence_line': ('about.licenceLine.phone', 'year'),
+    # D103 second pass (L-60, L-61, L-63): first run, the voices question and the model download sheet.
+    'first_run_how_to': ('firstRun.howTo', None),
+    'voices_setup_title': ('voices.setup.title', None),
+    'voices_setup_body': ('voices.setup.body.phone', None),
+    'voices_setup_privacy': ('voices.setup.privacy.phone', None),
+    'voices_setup_enable': ('voices.setup.enable.phone', None),
+    'action_not_now': ('common.notNow', None),
+    'voices_setup_kindness': ('voices.setup.kindness', None),
+    'voices_setup_change_later': ('voices.setup.changeLater.phone', None),
+    'speakers_remember': ('voices.rememberDefault.title', None),
+    'speakers_remember_short': ('voices.rememberDefault.subtitle', None),
+    'models_title': ('models.offer.title.phone', None),
+    'models_body': ('models.offer.body.phone', 'size'),
+    'part_speech': ('models.offer.part.speech', None),
+    'part_speakers': ('models.offer.part.tellApart', None),
+    'part_voices': ('models.offer.part.recognise', None),
+    'models_space_needed': ('models.offer.spaceNeeded', 'size'),
+    'models_download_and_transcribe': ('models.offer.download', None),
+    'models_recording_kept': ('models.offer.recordingKept', None),
 }
 
 

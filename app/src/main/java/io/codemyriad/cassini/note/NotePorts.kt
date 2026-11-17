@@ -107,6 +107,16 @@ interface NotePorts {
     fun people(): Flow<SavedVoices>
 
     val voiceModelReady: Flow<Boolean>
+
+    /** "Remember people I name" (D103): the default of "Remember this voice". */
+    val rememberVoices: Flow<Boolean>
+
+    /** The voices question (D103, L-60) was asked, answered or set in Settings; it is asked once. */
+    val voicesQuestionAsked: Flow<Boolean>
+
+    /** Records the voices question: true or false becomes the Remember default, null keeps it. */
+    suspend fun answerVoicesQuestion(remember: Boolean?)
+
     val processing: Flow<ProcessingState>
     val recording: StateFlow<RecordingState>
     val notices: Flow<NoticeFacts>
@@ -259,6 +269,11 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override val voiceModelReady: Flow<Boolean>
         get() = graph.models.status.map { it[ModelPart.VOICES] == ModelStatus.Ready }.distinctUntilChanged()
+    override val rememberVoices: Flow<Boolean> get() = graph.settings.speakerChoices.map { it.remember }
+    override val voicesQuestionAsked: Flow<Boolean> get() = graph.settings.voicesQuestionAsked
+
+    override suspend fun answerVoicesQuestion(remember: Boolean?) = graph.settings.answerVoicesQuestion(remember)
+
     override val processing: Flow<ProcessingState> get() = graph.processing.state
     override val recording: StateFlow<RecordingState> get() = graph.recording.state
     override val notices: Flow<NoticeFacts>

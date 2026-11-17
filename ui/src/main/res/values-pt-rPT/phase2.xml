@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702; do not edit. -->
+<!-- Generated from cassini-ux c28b72461c7317ea0a4684183cb9103626aabf17; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Vozes guardadas</string>
     <string name="ui_settings_trash">Lixo</string>
@@ -20,14 +20,16 @@
         <item quantity="other">%1$s reuniões</item>
     </plurals>
     <string name="ui_voices_stale">Dê novamente nome a esta pessoa numa reunião para que continue a ser reconhecida.</string>
-    <string name="ui_voices_footnote">Para adicionar alguém, dê nome a um orador em qualquer reunião e mantenha «Memorizar esta voz» ativado.</string>
+    <string name="ui_voices_footnote">Para adicionar alguém, dê nome a um orador numa reunião e deixe «Memorizar esta voz» ativado. Esquecer uma voz mantém os nomes que já estão nas suas reuniões.</string>
+    <string name="ui_voices_options">Opções de %1$s</string>
+    <string name="ui_voices_forget">Esquecer…</string>
     <string name="ui_voices_forget_body">O Cassini deixa de reconhecer esta voz. Os nomes já presentes nas suas reuniões mantêm-se.</string>
     <plurals name="ui_voices_forget_everyone_body">
         <item quantity="one">O Cassini deixa de reconhecer %1$s voz guardada e elimina as impressões vocais de todas as reuniões. Os nomes já presentes nas suas reuniões mantêm-se.</item>
         <item quantity="many">O Cassini deixa de reconhecer todas as %1$s vozes guardadas e elimina as impressões vocais de todas as reuniões. Os nomes já presentes nas suas reuniões mantêm-se.</item>
         <item quantity="other">O Cassini deixa de reconhecer todas as %1$s vozes guardadas e elimina as impressões vocais de todas as reuniões. Os nomes já presentes nas suas reuniões mantêm-se.</item>
     </plurals>
-    <string name="ui_trash_intro">As reuniões aqui são eliminadas definitivamente após 30 dias, com o áudio, as transcrições e as impressões vocais dessas reuniões.</string>
+    <string name="ui_trash_intro">As reuniões aqui são eliminadas definitivamente após 30 dias.</string>
     <string name="ui_trash_delete_body">O áudio, as transcrições e as impressões vocais desta reunião são eliminados. Esta ação não pode ser anulada.</string>
     <plurals name="ui_trash_delete_all_title">
         <item quantity="one">Eliminar %1$s reunião definitivamente?</item>
@@ -56,12 +58,12 @@
     <string name="ui_models_keep_transcript">As reuniões já transcritas mantêm a sua transcrição.</string>
     <string name="ui_transcription_online_heading">Ligação à internet</string>
     <string name="ui_models_where_from">De onde vêm os modelos</string>
-    <string name="ui_transcription_online">O Cassini só se liga à internet para descarregar um modelo que pedir. Cada ficheiro é verificado antes de ser usado.</string>
+    <string name="ui_transcription_online">O Cassini só se liga à internet para transferir um modelo que pedir. Cada ficheiro é verificado antes de ser usado.</string>
     <string name="ui_speakers_who">Quem está a falar</string>
     <string name="ui_speakers_tell_apart">Distinguir oradores</string>
     <string name="ui_speakers_tell_apart_short">Orador 1, Orador 2 e assim por diante.</string>
     <string name="ui_speakers_recognise">Reconhecer vozes guardadas</string>
-    <string name="ui_speakers_recognise_short">Dá nome às pessoas guardadas assim que falam.</string>
+    <string name="ui_speakers_recognise_short">Dá nome às pessoas que guardou assim que falam.</string>
     <string name="ui_speakers_on_device">Ambos funcionam neste telemóvel, depois da transcrição.</string>
     <string name="ui_about_title">Acerca</string>
     <string name="ui_about_tagline">Transforma a fala em texto pesquisável e com marcação de tempo, aqui mesmo no seu telemóvel.</string>
@@ -91,4 +93,22 @@
     <string name="ui_about_name_version">Cassini talk %1$s</string>
     <string name="ui_about_version">Versão %1$s</string>
     <string name="ui_about_licence_line">Software livre ao abrigo da GPLv3. © %1$s Codemyriad e colaboradores.</string>
+    <string name="ui_first_run_how_to">Carregue em Gravar quando a reunião começar e em Parar quando terminar. O Cassini transcreve tudo.</string>
+    <string name="ui_voices_setup_title">Reconhecer as pessoas a quem der nome?</string>
+    <string name="ui_voices_setup_body">Quando dá nome a um orador, o Cassini pode memorizar a voz e dar-lhe nome por si nas reuniões seguintes.</string>
+    <string name="ui_voices_setup_privacy">As impressões vocais são criadas neste telemóvel e nunca são incluídas nos ficheiros exportados ou partilhados. Nas definições, pode escolher se são incluídas nas cópias de segurança.</string>
+    <string name="ui_voices_setup_enable">Sim, memorizar vozes</string>
+    <string name="ui_action_not_now">Agora não</string>
+    <string name="ui_voices_setup_kindness">É simpático perguntar às pessoas antes de guardar a voz delas.</string>
+    <string name="ui_voices_setup_change_later">Pode alterar isto em Definições › Oradores.</string>
+    <string name="ui_speakers_remember">Memorizar as pessoas a quem dou nome</string>
+    <string name="ui_speakers_remember_short">Da próxima vez, o Cassini dá-lhes nome por si.</string>
+    <string name="ui_models_title">Transcrever neste telemóvel</string>
+    <string name="ui_models_body">O Cassini precisa de uma única transferência de %1$s. Depois disso, tudo acontece neste telemóvel, mesmo sem ligação.</string>
+    <string name="ui_part_speech">Reconhecimento de fala</string>
+    <string name="ui_part_speakers">Distinção de oradores</string>
+    <string name="ui_part_voices">Reconhecimento de vozes guardadas</string>
+    <string name="ui_models_space_needed">Precisa de cerca de %1$s livres durante a instalação. Cada ficheiro é verificado antes de ser usado.</string>
+    <string name="ui_models_download_and_transcribe">Transferir e transcrever</string>
+    <string name="ui_models_recording_kept">A sua gravação é mantida de qualquer forma.</string>
 </resources>

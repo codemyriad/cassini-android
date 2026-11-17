@@ -17,6 +17,8 @@ import io.codemyriad.cassini.data.db.SpeakerEntity
 import io.codemyriad.cassini.data.db.WordEntity
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.notes.TranscriptFormat
+import io.codemyriad.cassini.data.voices.SavedVoices
+import io.codemyriad.cassini.data.voices.VoiceProblem
 import io.codemyriad.cassini.engine.job.BatteryLine
 import io.codemyriad.cassini.engine.job.DraftState
 import io.codemyriad.cassini.engine.job.JobPhase
@@ -859,6 +861,57 @@ class NoteViewModelTest {
         assertEquals(listOf(BannerKind.TRUST_NOT_VERIFIED), viewModel.now().banners.map { it.kind })
         send(viewModel, NoteEvent.BannerAction("TRUST_NOT_VERIFIED", BannerAction.PLAY_ANYWAY))
         assertEquals(listOf("acknowledge", "play"), ports.calls.takeLast(2))
+    }
+
+    // The voices question (D103, L-60). ----------------------------------------------------------------------------
+
+    @Test fun theVoicesQuestionOpensOnceOverTheFirstMeetingWithTwoSpeakers() = runTest(dispatcher) {
+        ports.voicesQuestionAsked.value = false
+        val viewModel = viewModel()
+        assertEquals(NoteSheet.VoicesQuestion, viewModel.now().sheet)
+        send(viewModel, NoteEvent.VoicesAnswer(false))
+        assertNull(viewModel.now().sheet)
+        assertEquals("answerVoicesQuestion:false", ports.calls.last())
+        assertFalse(ports.rememberVoices.value)
+        // "Not now" is the default of Remember this voice from now on.
+        send(viewModel, NoteEvent.SpeakerTap("b"))
+        assertFalse((viewModel.now().sheet as NoteSheet.NameSpeaker).ui.remember)
+
+        val again = viewModel()
+        assertFalse(again.now().sheet == NoteSheet.VoicesQuestion)
+    }
+
+    @Test fun closingTheVoicesQuestionKeepsTheDefaultAndDoesNotAskAgain() = runTest(dispatcher) {
+        ports.voicesQuestionAsked.value = false
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.DismissSheet)
+        assertNull(viewModel.now().sheet)
+        assertEquals("answerVoicesQuestion:null", ports.calls.last())
+        assertTrue(ports.rememberVoices.value)
+        assertTrue(ports.voicesQuestionAsked.value)
+    }
+
+    @Test fun theVoicesQuestionWaitsForASecondSpeakerAndAVisibleScreen() = runTest(dispatcher) {
+        ports.voicesQuestionAsked.value = false
+        val initial = documentNote()
+        ports.details.value = initial.copy(
+            variants = initial.variants.map { it.copy(speakerCount = 1) },
+            speakers = initial.speakers.take(1),
+        )
+        ports.wordRows.value = WORDS.map { it.copy(speaker = "a") }
+        val viewModel = viewModel(visible = false)
+        assertNull(viewModel.now().sheet)
+        viewModel.onVisible(true)
+        advanceUntilIdle()
+        assertNull(viewModel.now().sheet)
+        assertTrue(ports.calls.none { it.startsWith("answerVoicesQuestion") })
+    }
+
+    @Test fun theVoicesQuestionIsNotAskedWhileSavedVoicesCannotChange() = runTest(dispatcher) {
+        ports.voicesQuestionAsked.value = false
+        ports.saved.value = SavedVoices(emptyList(), VoiceProblem.NEWER)
+        val viewModel = viewModel()
+        assertNull(viewModel.now().sheet)
     }
 
     // Naming. ---------------------------------------------------------------------------------------------------

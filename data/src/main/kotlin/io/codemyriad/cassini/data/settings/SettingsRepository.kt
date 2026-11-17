@@ -43,8 +43,12 @@ data class Settings(
     val trashLastPurgeAt: Long?,
 )
 
-/** Processing choices are independent of permission to download the optional files. */
-data class SpeakerChoices(val tellApart: Boolean = true, val recognise: Boolean = true) {
+/**
+ * Processing choices are independent of permission to download the optional files. [remember] is "Remember people
+ * I name" (D103, L-60): the default of "Remember this voice" when a speaker is named. It is on until the voices
+ * question or Settings › Speakers turns it off.
+ */
+data class SpeakerChoices(val tellApart: Boolean = true, val recognise: Boolean = true, val remember: Boolean = true) {
     fun enabled(part: ModelPart): Boolean = when (part) {
         ModelPart.SPEECH -> true
         ModelPart.SPEAKERS -> tellApart
@@ -64,8 +68,32 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     }
 
     val speakerChoices: Flow<SpeakerChoices> = preferences.map {
-        SpeakerChoices(it[Keys.TELL_SPEAKERS_APART] ?: true, it[Keys.RECOGNISE_VOICES] ?: true)
+        SpeakerChoices(
+            it[Keys.TELL_SPEAKERS_APART] ?: true,
+            it[Keys.RECOGNISE_VOICES] ?: true,
+            it[Keys.REMEMBER_VOICES] ?: true,
+        )
     }.distinctUntilChanged()
+
+    /**
+     * The voices question (D103, L-60) was answered or closed, or "Remember people I name" was set in Settings: it is
+     * asked once, over the first meeting with more than one speaker.
+     */
+    val voicesQuestionAsked: Flow<Boolean> = flag(Keys.VOICES_QUESTION_ASKED)
+
+    /**
+     * Records the voices question. [remember] is the answer ("Yes, remember voices" true, "Not now" false) and becomes
+     * the "Remember people I name" default; null (the sheet closed without an answer) keeps the default as it is.
+     */
+    suspend fun answerVoicesQuestion(remember: Boolean?) {
+        store.edit { prefs ->
+            prefs[Keys.VOICES_QUESTION_ASKED] = true
+            if (remember != null) prefs[Keys.REMEMBER_VOICES] = remember
+        }
+    }
+
+    /** "Remember people I name" in Settings › Speakers; a choice made there also answers the voices question. */
+    suspend fun setRememberVoices(remember: Boolean) = answerVoicesQuestion(remember)
 
     suspend fun setSpeakerChoice(part: ModelPart, enabled: Boolean) {
         require(part != ModelPart.SPEECH)
@@ -250,6 +278,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     object Keys {
         val TELL_SPEAKERS_APART = booleanPreferencesKey("speakers.tellApart")
         val RECOGNISE_VOICES = booleanPreferencesKey("speakers.recognise")
+        val REMEMBER_VOICES = booleanPreferencesKey("voices.rememberDefault")
+        val VOICES_QUESTION_ASKED = booleanPreferencesKey("voices.questionAsked")
         val PARAKEET_DEFAULT_NOTICE = booleanPreferencesKey("notices.parakeetDefault")
         val FIRST_WHISTLE_NOTE = stringPreferencesKey("recognition.firstWhistleNote")
         val PARAKEET_SUGGESTION_DISMISSED = booleanPreferencesKey("notices.parakeetSuggestionDismissed")

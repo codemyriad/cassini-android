@@ -122,7 +122,7 @@
     <string name="ui_library_recording_paused_card">Gravação em pausa · %1$s</string>
     <string name="ui_library_recording_tap">Toque para voltar</string>
     <string name="ui_library_record">Gravar</string>
-    <string name="ui_library_record_description">Gravar uma nova nota</string>
+    <string name="ui_library_record_description">Gravar uma nova reunião</string>
     <string name="ui_library_recording_fab">A gravar · %1$s</string>
     <string name="ui_library_return_to_recording">Voltar à gravação</string>
     <string name="ui_library_moved_to_trash">«%1$s» movida para o Lixo</string>
@@ -282,17 +282,7 @@
     <string name="ui_merge_action">Juntar</string>
 
     <!-- Model download (board 05, features.md section 5). -->
-    <string name="ui_models_title">Transcrever neste telemóvel</string>
-    <string name="ui_models_body">O Cassini precisa de uma transferência única de cerca de %1$s. Depois disso, o reconhecimento de palavras e a distinção de vozes acontecem neste telemóvel, mesmo sem ligação. O seu áudio fica aqui.</string>
-    <string name="ui_models_footnote">Precisa de cerca de %1$s livres durante a instalação. Cada ficheiro é verificado antes de ser usado.</string>
-    <string name="ui_models_sources">De onde vêm os modelos</string>
-    <string name="ui_models_privacy">Privacidade</string>
-    <string name="ui_models_download_and_transcribe">Transferir e transcrever</string>
     <string name="ui_models_download">Transferir</string>
-    <string name="ui_models_not_now">Agora não — manter o áudio</string>
-    <string name="ui_part_speech">Reconhecimento de fala</string>
-    <string name="ui_part_speakers">Distinção de oradores</string>
-    <string name="ui_part_voices">Reconhecimento de vozes guardadas</string>
     <string name="ui_part_downloading_speech">A transferir o reconhecimento de fala — %1$d%%</string>
     <string name="ui_part_downloading_speakers">A transferir a separação de oradores — %1$d%%</string>
     <string name="ui_part_downloading_voices">A transferir o reconhecimento de voz — %1$d%%</string>
@@ -351,8 +341,6 @@
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Vozes guardadas</string>
     <string name="ui_voices_confirmed_speech">%1$s de fala confirmada</string>
-    <string name="ui_voices_options">Opções para %1$s</string>
-    <string name="ui_voices_forget">Esquecer…</string>
     <string name="ui_voices_forget_title">Esquecer %1$s?</string>
     <string name="ui_voices_forget_action">Esquecer</string>
     <string name="ui_voices_rename_title">Mudar o nome da voz guardada</string>
@@ -371,7 +359,6 @@
     <string name="ui_settings_model_pending">Será transferido na próxima transcrição</string>
     <string name="ui_settings_model_not_downloaded">Não transferido</string>
     <string name="ui_settings_model_failed">Falha na transferência — toque para tentar novamente</string>
-    <string name="ui_settings_models_footnote">A transcrição é feita neste telemóvel.</string>
 
     <!-- Licenses (no board; features.md section 11). -->
     <string name="ui_licenses_third_party">Avisos de terceiros</string>
@@ -470,7 +457,7 @@
     <string name="ui_banner_dl_record_now_title">Grave agora, transcreva depois</string>
     <string name="ui_banner_dl_record_now_body">A transcrição precisa de uma transferência única. Entretanto, o áudio está seguro.</string>
 
-    <string name="ui_banner_lib_empty_title">Ainda não há notas</string>
+    <string name="ui_banner_lib_empty_title">Ainda não há reuniões</string>
     <string name="ui_banner_lib_empty_body">Grave algo ou importe um ficheiro de áudio.</string>
     <string name="ui_banner_lib_no_match_title">Sem resultados para «%1$s»</string>
     <string name="ui_banner_lib_no_match_body">Experimente outra palavra ou título.</string>
@@ -490,14 +477,13 @@
     <string name="ui_banner_notifications_off_body">O progresso só aparece na aplicação.</string>
     <string name="ui_banner_voices_unreadable_title">Não é possível ler as vozes guardadas</string>
     <string name="ui_banner_voices_unreadable_body">Foram criadas por uma versão mais recente do Cassini ou estão danificadas. Nada foi alterado.</string>
-    <string name="ui_banner_lib_unavailable_title">Não é possível abrir as suas notas</string>
+    <string name="ui_banner_lib_unavailable_title">Não é possível abrir as suas reuniões</string>
     <string name="ui_banner_lib_unavailable_body">Os seus ficheiros estão seguros. Liberte espaço e abra o Cassini novamente.</string>
     <string name="ui_settings_optional_size">Transferência opcional · %1$s</string>
     <string name="ui_settings_unavailable">Indisponível</string>
     <string name="ui_settings_not_available">Não disponível neste dispositivo.</string>
 
     <!-- Coordinator D78; ux-draft/strings.json. -->
-    <string name="ui_action_not_now">Agora não</string>
     <string name="ui_parakeet_suggestion_title">Transcrições melhores com o Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">O Whistle vem incluído para começar de imediato. O Parakeet Ultra é mais preciso. A transferência tem %1$s.</string>
     <string name="ui_parakeet_now_default">As novas reuniões passam a usar o Parakeet Ultra.</string>
