@@ -53,7 +53,10 @@ class ProcessingNotificationsTest {
         assertEquals("Matching voices…", transcribing(progress(TimeLeft.Finishing, ProgressHeadline.MATCHING_VOICES)))
         assertEquals("Saving…", transcribing(progress(TimeLeft.Finishing, ProgressHeadline.SAVING)))
         assertEquals("Starting…", notifications.content(running(JobPhase.Starting)).text)
-        assertEquals("Finishing the previous meeting…", notifications.content(running(JobPhase.WaitingForPrevious)).text)
+        assertEquals(
+            "Finishing the previous meeting…",
+            notifications.content(running(JobPhase.WaitingForPrevious)).text,
+        )
 
         val queued = running(JobPhase.Starting).copy(queue = listOf(QueuedNote("b", "B")))
         assertEquals("Transcribing “Meeting”", notifications.content(queued).title)
