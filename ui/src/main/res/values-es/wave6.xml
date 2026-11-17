@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux c28b72461c7317ea0a4684183cb9103626aabf17; do not edit. -->
+<!-- Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit. -->
 <resources>
     <string name="ui_voices_privacy_phone">Las huellas de voz se crean en este teléfono y nunca se incluyen en los archivos exportados o compartidos. Solo se incluyen los nombres que eliges.</string>
 </resources>

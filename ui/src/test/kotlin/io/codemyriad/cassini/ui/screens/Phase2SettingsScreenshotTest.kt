@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.ui.screens
 
+import androidx.compose.ui.test.onNodeWithText
 import io.codemyriad.cassini.ui.BoardTest
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.format.ModelPartUi
@@ -39,21 +40,27 @@ class Phase2SettingsScreenshotTest : BoardTest() {
     fun aboutDark() = settings(SettingsPage.ABOUT, true)
 
     private fun settings(page: SettingsPage, dark: Boolean = false) {
-        val state = BoardFixtures.settings.copy(
-            models = BoardFixtures.settings.models.map { row ->
-                if (page == SettingsPage.TRANSCRIPTION && row.part == ModelPartUi.SPEECH) {
-                    row.copy(status = ModelStatusUi.NotDownloaded)
-                } else {
-                    row
-                }
-            }.toImmutableList(),
-            version = "0.4.2-beta.3",
-            meetings = 38,
-            audioDurationMs = 41L * 3_600_000,
-            backup = BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false),
-        )
         board(if (dark) "dark" else "light", "phase2-settings-${page.name.lowercase()}", dark) {
-            SettingsScreen(state, {}, initialPage = page)
+            SettingsScreen(phase2SettingsState(page), {}, initialPage = page)
+        }
+        if (page == SettingsPage.ABOUT) {
+            // D81.1 (D-1090): the copyright line names the legal entity.
+            rule.onNodeWithText("Free software under GPLv3. © 2026 Codemyriad OÜ and contributors.").assertExists()
         }
     }
 }
+
+/** The Settings state of the D103 boards, shared by the English and Italian evidence. */
+internal fun phase2SettingsState(page: SettingsPage) = BoardFixtures.settings.copy(
+    models = BoardFixtures.settings.models.map { row ->
+        if (page == SettingsPage.TRANSCRIPTION && row.part == ModelPartUi.SPEECH) {
+            row.copy(status = ModelStatusUi.NotDownloaded)
+        } else {
+            row
+        }
+    }.toImmutableList(),
+    version = "0.4.2-beta.3",
+    meetings = 38,
+    audioDurationMs = 41L * 3_600_000,
+    backup = BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false),
+)
