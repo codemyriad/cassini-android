@@ -20,10 +20,15 @@ the hand-written copies they replace are deleted from `strings.xml`.
 - "Yes, remember voices" / "Not now" store `voices.questionAsked` and `voices.rememberDefault` (DataStore,
   `SettingsRepository.answerVoicesQuestion`). Closing the sheet (swipe, scrim, back) marks the question asked and
   leaves the default as it was (on), so it is asked once without a swipe turning remembering off.
+  "Yes" and "Not now" keep the sheet open, with both buttons disabled, until the write succeeds; a failed write keeps
+  it open with "Couldn’t save this choice. Try again." (`ui_settings_transfer_choice_failed`), and naming does not
+  open over it meanwhile. A dismissal closes at once: if its write fails, the question is asked again next time.
 - The privacy line is `voices.setup.privacy.phone` (D98), not the drawn "It is never shared." (PARITY §3). The board's
   lock glyph is drawn with the app's privacy Shield, as on every other Android privacy line.
 - `NamingInput.rememberDefault` feeds Name a speaker: "Remember this voice" starts on only when the default is on, or
-  when the speaker is already bound to a saved voice (a CONFIRMED voice stays remembered). The checkbox still turns
+  when the speaker is already bound to a saved voice (a CONFIRMED voice stays remembered), or when the draft's
+  `names.json` already holds a Remember choice for it (`NamingInput.rememberChosen`: a pending enrolment survives
+  reopening the sheet and a spelling fix). The checkbox still turns
   remembering on or off for one speaker. With the default off, a name is saved without enrolling a voiceprint.
 - Settings › Speakers › Saved voices gains "Remember people I name" (`voices.rememberDefault.*`) before the Saved
   voices row. Changing it there also counts as answering the question.

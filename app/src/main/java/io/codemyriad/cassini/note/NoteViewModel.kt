@@ -8,6 +8,7 @@ import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.checkpoint.CheckpointNames
 import io.codemyriad.cassini.core.format.DocumentState
+import io.codemyriad.cassini.core.format.SpeakerMerges
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
@@ -344,6 +345,10 @@ class NoteViewModel(
         val dialog: NoteDialog? = null,
         val snackbar: SnackbarSpec? = null,
         val busyRow: NoteAction? = null,
+        /** The voices answer is being written; the question stays open with its buttons disabled. */
+        val voicesSaving: Boolean = false,
+        /** The last voices answer could not be written: the question shows a retryable error. */
+        val voicesFailed: Boolean = false,
         val seekingMs: Long? = null,
     )
 
@@ -553,7 +558,7 @@ class NoteViewModel(
             }
             SheetKind.VERSIONS -> NoteSheet.Versions(NoteMapping.versions(details, now, clock.zone))
             SheetKind.INFO -> NoteSheet.Info(info(details, ui.info))
-            SheetKind.VOICES -> NoteSheet.VoicesQuestion
+            SheetKind.VOICES -> NoteSheet.VoicesQuestion(saving = ui.voicesSaving, failed = ui.voicesFailed)
             SheetKind.NAME -> ui.naming?.let { naming ->
                 SpeakerNaming.mergeUi(naming)?.let { NoteSheet.Merge(it) }
                     ?: NoteSheet.NameSpeaker(SpeakerNaming.ui(naming, sampling = live.playback.sample))
@@ -834,7 +839,9 @@ class NoteViewModel(
 
     private fun closeSheet() {
         saved[KEY_NAME_SHEET] = null
-        local.update { it.copy(sheet = null, naming = null, busyRow = null) }
+        local.update {
+            it.copy(sheet = null, naming = null, busyRow = null, voicesSaving = false, voicesFailed = false)
+        }
     }
 
     // The voices question (D103, L-60). ---------------------------------------------------------------------------
@@ -870,10 +877,35 @@ class NoteViewModel(
 
     private suspend fun asked(): Boolean = runCatching { ports.voicesQuestionAsked.first() }.getOrDefault(true)
 
-    /** Stores the answer (null: closed without one, the default stays) and closes the sheet. */
+    /**
+     * Stores the answer and closes the sheet. "Yes" and "Not now" change what gets remembered, so the sheet stays open
+     * (buttons disabled) until the answer is written, and a failed write keeps it open with a retryable error. A
+     * dismissal (null: no answer, the default stays) closes at once; if its write fails the question is asked again.
+     */
     private fun answerVoicesQuestion(remember: Boolean?) {
-        if (local.value.sheet == SheetKind.VOICES) closeSheet()
-        launch { ports.answerVoicesQuestion(remember) }
+        if (local.value.voicesSaving) return
+        if (remember == null) {
+            if (local.value.sheet == SheetKind.VOICES) closeSheet()
+            launch { ports.answerVoicesQuestion(null) }
+            return
+        }
+        local.update { it.copy(voicesSaving = true, voicesFailed = false) }
+        viewModelScope.launch {
+            val saved = try {
+                ports.answerVoicesQuestion(remember)
+                true
+            } catch (error: CancellationException) {
+                throw error
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                Log.w(TAG, "Cannot save the voices answer", error)
+                false
+            }
+            if (saved && local.value.sheet == SheetKind.VOICES) {
+                closeSheet()
+            } else {
+                local.update { it.copy(voicesSaving = false, voicesFailed = !saved) }
+            }
+        }
     }
 
     private fun showReadOnly(reason: ReadOnlyReason) {
@@ -1186,6 +1218,8 @@ class NoteViewModel(
 
     /** Opens the Name sheet for [speakerId], or the read-only message when renaming is not allowed now. */
     private suspend fun openNaming(speakerId: String, restoring: Boolean = false) {
+        // The voices answer is being written: naming opens with the new default once it is stored.
+        if (local.value.voicesSaving) return
         val core = core.filterNotNull().first { !restoring || it.details != null && it.shownLoaded }
         val details = core.details ?: return
         val mode = core.mode
@@ -1203,6 +1237,7 @@ class NoteViewModel(
         saved.get<String>(KEY_NAME_TEXT)?.takeIf { restoring }?.let {
             naming = SpeakerNaming.reduce(naming, NamingEvent.NameChanged(it)).state ?: naming
         }
+        if (local.value.voicesSaving) return
         saved[KEY_NAME_SHEET] = speakerId
         saved[KEY_NAME_TEXT] = naming.name
         local.update { it.copy(sheet = SheetKind.NAME, naming = naming) }
@@ -1266,9 +1301,16 @@ class NoteViewModel(
             voicesReadOnly = core.people.readOnly,
             voiceModelReady = modelReady,
             rememberDefault = ports.rememberVoices.first(),
+            rememberChosen = draftRemembered(speakerId),
             mergeTargets = targets,
             canSample = livePlayer() && core.mode !is NoteMode.Processing,
         )
+    }
+
+    /** Whether `names.json` already holds a Remember choice for [speakerId] (a pending enrolment). */
+    private suspend fun draftRemembered(speakerId: String): Boolean {
+        val names = runCatching { ports.draftNames(noteId).first() }.getOrNull() ?: return false
+        return SpeakerMerges.resolve(speakerId, names.merges) in names.remembered
     }
 
     private fun livePlayer(): Boolean = ports.playback.value.let { it.noteId == noteId && !it.failed }

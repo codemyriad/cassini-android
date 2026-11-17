@@ -178,8 +178,12 @@ sealed interface NoteSheet {
     @Immutable
     data class Info(val ui: InfoUi) : NoteSheet
 
-    /** The one voices question (D103, L-60), over the first meeting with more than one speaker. */
-    data object VoicesQuestion : NoteSheet
+    /**
+     * The one voices question (D103, L-60), over the first meeting with more than one speaker. [saving] while the
+     * answer is written (the buttons are disabled); [failed] when the last answer could not be written.
+     */
+    @Immutable
+    data class VoicesQuestion(val saving: Boolean = false, val failed: Boolean = false) : NoteSheet
 }
 
 /** The open dialog of the Note screen. */

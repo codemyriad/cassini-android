@@ -84,6 +84,15 @@ class SpeakerNamingTest {
     }
 
     @Test
+    fun rememberPeopleINameOffKeepsAPendingDraftRememberChoice() {
+        val pending = input(draft = true, label = SpeakerNameUi.Named("Paolo Verde"))
+        val state = SpeakerNaming.open(pending.copy(rememberDefault = false, rememberChosen = true))
+        assertTrue(SpeakerNaming.ui(state).remember)
+        val effects = state.on(NamingEvent.NameChanged("Paolo Verdi")).effects(NamingEvent.Save)
+        assertEquals("", effects.filterIsInstance<NamingEffect.DraftName>().single().voiceId)
+    }
+
+    @Test
     fun rememberPeopleINameOffKeepsAVoiceThatIsAlreadyBound() {
         val bound = input(
             label = SpeakerNameUi.Named("Anna Ricci"),

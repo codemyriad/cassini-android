@@ -30,7 +30,8 @@ import kotlinx.collections.immutable.toImmutableList
  *   label comes from an AUTO match.
  * - [voices] are the saved people; [voicesReadOnly] when `people.json` cannot be changed.
  * - [rememberDefault] is "Remember people I name" (D103, the voices question): whether Remember starts on for a
- *   speaker not yet bound to a saved voice.
+ *   speaker not yet bound to a saved voice. [rememberChosen] is true when the draft already holds a Remember choice
+ *   for this speaker (`names.json` `remembered`): that explicit choice wins over [rememberDefault] on reopening.
  * - [mergeTargets] are the other speakers of the shown transcript; [sealedVersions] the versions of a sealed merge.
  * - [canSample] is false when no player is open (the Transcribing mode has none).
  */
@@ -49,6 +50,7 @@ data class NamingInput(
     val voicesReadOnly: Boolean = false,
     val voiceModelReady: Boolean = true,
     val rememberDefault: Boolean = true,
+    val rememberChosen: Boolean = false,
     val mergeTargets: List<MergeTargetUi> = emptyList(),
     val sealedVersions: MergeVersionsUi? = null,
     val canSample: Boolean = true,
@@ -67,7 +69,7 @@ data class NamingInput(
         print contentEquals other.print && printSeconds == other.printSeconds &&
         willHavePrint == other.willHavePrint && match == other.match && voices == other.voices &&
         voicesReadOnly == other.voicesReadOnly && voiceModelReady == other.voiceModelReady &&
-        rememberDefault == other.rememberDefault &&
+        rememberDefault == other.rememberDefault && rememberChosen == other.rememberChosen &&
         mergeTargets == other.mergeTargets && sealedVersions == other.sealedVersions && canSample == other.canSample && quote == other.quote
 
     override fun hashCode(): Int = speakerId.hashCode() * HASH + label.hashCode()
@@ -232,8 +234,10 @@ object SpeakerNaming {
         val voice = linked?.let { match -> input.voices.firstOrNull { it.id == match.voiceId } }
         // A CONFIRMED voice is this speaker even when the label was written differently; an AUTO one only by name.
         val bound = voice?.takeIf { linked?.state == Match.State.CONFIRMED || same(it.name, name) }?.id
-        // "Remember people I name" (D103) is the default for a new voice; a voice already bound stays remembered.
-        val remember = rememberReason(input) == null && !input.voicesReadOnly && (input.rememberDefault || bound != null)
+        // "Remember people I name" (D103) is the default for a new voice; a voice already bound, or one the draft
+        // already holds a Remember choice for, stays remembered.
+        val chosen = input.rememberDefault || input.rememberChosen || bound != null
+        val remember = rememberReason(input) == null && !input.voicesReadOnly && chosen
         return NamingState(input, name, bound, remember, name, bound, remember)
     }
 

@@ -868,7 +868,7 @@ class NoteViewModelTest {
     @Test fun theVoicesQuestionOpensOnceOverTheFirstMeetingWithTwoSpeakers() = runTest(dispatcher) {
         ports.voicesQuestionAsked.value = false
         val viewModel = viewModel()
-        assertEquals(NoteSheet.VoicesQuestion, viewModel.now().sheet)
+        assertEquals(NoteSheet.VoicesQuestion(), viewModel.now().sheet)
         send(viewModel, NoteEvent.VoicesAnswer(false))
         assertNull(viewModel.now().sheet)
         assertEquals("answerVoicesQuestion:false", ports.calls.last())
@@ -878,7 +878,41 @@ class NoteViewModelTest {
         assertFalse((viewModel.now().sheet as NoteSheet.NameSpeaker).ui.remember)
 
         val again = viewModel()
-        assertFalse(again.now().sheet == NoteSheet.VoicesQuestion)
+        assertFalse(again.now().sheet is NoteSheet.VoicesQuestion)
+    }
+
+    @Test fun theVoicesQuestionStaysOpenUntilNotNowIsWritten() = runTest(dispatcher) {
+        ports.voicesQuestionAsked.value = false
+        val gate = CompletableDeferred<Unit>()
+        ports.answerGate = gate
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.VoicesAnswer(false))
+        assertEquals(NoteSheet.VoicesQuestion(saving = true), viewModel.now().sheet)
+        // A second tap while the write runs does nothing, and naming cannot open over the question.
+        send(viewModel, NoteEvent.VoicesAnswer(true), NoteEvent.SpeakerTap("b"))
+        assertEquals(1, ports.calls.count { it.startsWith("answerVoicesQuestion") })
+        assertEquals(NoteSheet.VoicesQuestion(saving = true), viewModel.now().sheet)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertNull(viewModel.now().sheet)
+        assertFalse(ports.rememberVoices.value)
+        send(viewModel, NoteEvent.SpeakerTap("b"))
+        assertFalse((viewModel.now().sheet as NoteSheet.NameSpeaker).ui.remember)
+    }
+
+    @Test fun aFailedVoicesAnswerKeepsTheQuestionOpenWithARetry() = runTest(dispatcher) {
+        ports.voicesQuestionAsked.value = false
+        ports.answerFailure = java.io.IOException("disk full")
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.VoicesAnswer(false))
+        assertEquals(NoteSheet.VoicesQuestion(failed = true), viewModel.now().sheet)
+        assertTrue("The default is unchanged", ports.rememberVoices.value)
+
+        ports.answerFailure = null
+        send(viewModel, NoteEvent.VoicesAnswer(false))
+        assertNull(viewModel.now().sheet)
+        assertFalse(ports.rememberVoices.value)
     }
 
     @Test fun closingTheVoicesQuestionKeepsTheDefaultAndDoesNotAskAgain() = runTest(dispatcher) {
@@ -985,6 +1019,47 @@ class NoteViewModelTest {
         assertEquals(ReadOnlyReason.SAVING, viewModel.now().readOnlyReason)
         send(viewModel, NoteEvent.SpeakerTap("s1"))
         assertEquals(NoteDialog.ReadOnly(ReadOnlyReason.SAVING), viewModel.now().dialog)
+    }
+
+    @Test
+    fun aDraftRememberChoiceSurvivesReopeningWithRememberPeopleINameOff() = runTest(dispatcher) {
+        ports.rememberVoices.value = false
+        val viewModel = viewModel()
+        val draft = DraftState(
+            words = listOf(Word("s1", 0, 5_000, "Lunga"), Word("s2", 5_000, 6_000, "phrase")),
+            labels = emptyMap(),
+            automatic = emptySet(),
+            suggestions = emptyList(),
+            tentativeFromMs = 6_000,
+            namingOpen = true,
+        )
+        ports.setJob(job(JobState.RUNNING), phase = JobPhase.Transcribing(progress(), draft))
+        advanceUntilIdle()
+        send(viewModel, NoteEvent.SpeakerTap("s1"))
+        assertFalse((viewModel.now().sheet as NoteSheet.NameSpeaker).ui.remember)
+        send(
+            viewModel,
+            NoteEvent.NameSheet(NameSheetEvent.NameChanged("Lucca")),
+            NoteEvent.NameSheet(NameSheetEvent.RememberChanged(true)),
+            NoteEvent.NameSheet(NameSheetEvent.Save),
+        )
+        assertEquals(listOf("draft.rename:s1:Lucca", "draft.remember:s1:"), ports.calls.takeLast(2))
+
+        // Reopen: the pending enrolment wins over the global default, and a spelling fix keeps it.
+        ports.setJob(
+            job(JobState.RUNNING),
+            phase = JobPhase.Transcribing(progress(), draft.copy(labels = mapOf("s1" to "Lucca"))),
+        )
+        advanceUntilIdle()
+        send(viewModel, NoteEvent.SpeakerTap("s1"))
+        assertTrue((viewModel.now().sheet as NoteSheet.NameSpeaker).ui.remember)
+        send(
+            viewModel,
+            NoteEvent.NameSheet(NameSheetEvent.NameChanged("Luca")),
+            NoteEvent.NameSheet(NameSheetEvent.Save),
+        )
+        assertEquals(listOf("draft.rename:s1:Luca", "draft.remember:s1:"), ports.calls.takeLast(2))
+        assertEquals("", ports.names.value.remembered["s1"])
     }
 
     @Test fun anInlineOnlyDraftSpeakerCanBeNamedAndChosenAsAMergeTarget() = runTest(dispatcher) {

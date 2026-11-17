@@ -143,8 +143,16 @@ internal class FakeNotePorts : NotePorts {
     /** Asked by default, so that the voices question stays out of the tests that are not about it. */
     override val voicesQuestionAsked = MutableStateFlow(true)
 
+    /** When set, [answerVoicesQuestion] waits for it (a slow DataStore write). */
+    var answerGate: CompletableDeferred<Unit>? = null
+
+    /** When set, [answerVoicesQuestion] fails with it after the gate (a failed write). */
+    var answerFailure: Exception? = null
+
     override suspend fun answerVoicesQuestion(remember: Boolean?) {
         calls += "answerVoicesQuestion:$remember"
+        answerGate?.await()
+        answerFailure?.let { throw it }
         voicesQuestionAsked.value = true
         if (remember != null) rememberVoices.value = remember
     }
@@ -352,6 +360,7 @@ internal class FakeNotePorts : NotePorts {
 
         override suspend fun rename(speakerId: String, name: String): Boolean {
             calls += "draft.rename:$speakerId:$name"
+            names.value = names.value.rename(speakerId, name)
             return true
         }
 
@@ -362,6 +371,7 @@ internal class FakeNotePorts : NotePorts {
 
         override suspend fun remember(speakerId: String, voiceId: String?): Boolean {
             calls += "draft.remember:$speakerId:$voiceId"
+            names.value = names.value.remember(speakerId, voiceId, names.value.generation)
             return true
         }
     }

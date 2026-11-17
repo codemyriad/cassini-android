@@ -18,7 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -37,14 +39,20 @@ import io.codemyriad.cassini.ui.theme.Glyph
 /**
  * The one voices question (D103, L-60; board P2Voices-Phones) in its [CassiniSheet] window over the open meeting. It
  * is asked once, the first time a meeting has more than one speaker. "Yes, remember voices" and "Not now" send
- * [onAnswer] with true or false; the ViewModel stores the answer and closes the sheet. The answer becomes the default
+ * [onAnswer] with true or false; the ViewModel stores the answer and closes the sheet once it is written. While
+ * [saving] the buttons are disabled; [failed] shows a retryable error above them. The answer becomes the default
  * of "Remember this voice" ("Remember people I name" in Settings › Speakers). A swipe, a scrim tap or back sends
  * [onDismiss]: the question is not asked again and the default stays as it is.
  */
 @Composable
-fun VoicesQuestionSheet(onAnswer: (Boolean) -> Unit, onDismiss: () -> Unit) {
+fun VoicesQuestionSheet(
+    onAnswer: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    saving: Boolean = false,
+    failed: Boolean = false,
+) {
     CassiniSheet(onDismissRequest = onDismiss, containerColor = CassiniTheme.colors.raised) {
-        VoicesQuestionContent(onAnswer)
+        VoicesQuestionContent(onAnswer, saving = saving, failed = failed)
     }
 }
 
@@ -55,7 +63,12 @@ fun VoicesQuestionSheet(onAnswer: (Boolean) -> Unit, onDismiss: () -> Unit) {
  * change the answer (13 sp, centred). Padding 24 at the sides and 26 at the bottom; gap 14.
  */
 @Composable
-fun VoicesQuestionContent(onAnswer: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+fun VoicesQuestionContent(
+    onAnswer: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    saving: Boolean = false,
+    failed: Boolean = false,
+) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
     Column(
@@ -83,22 +96,7 @@ fun VoicesQuestionContent(onAnswer: (Boolean) -> Unit, modifier: Modifier = Modi
             Spacer(Modifier.width(6.dp))
             Text(text = stringResource(R.string.ui_voices_setup_privacy), style = t.snippet, color = c.text2)
         }
-        Column(
-            Modifier.padding(top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            PrimaryButton(
-                text = stringResource(R.string.ui_voices_setup_enable),
-                onClick = { onAnswer(true) },
-                size = PrimaryButtonSize.Large,
-            )
-            SecondaryButton(
-                text = stringResource(R.string.ui_action_not_now),
-                onClick = { onAnswer(false) },
-                size = SecondaryButtonSize.Large,
-                fillWidth = true,
-            )
-        }
+        VoicesAnswers(onAnswer, saving, failed)
         Text(
             text = stringResource(R.string.ui_voices_setup_kindness) + "\n" +
                 stringResource(R.string.ui_voices_setup_change_later),
@@ -106,6 +104,39 @@ fun VoicesQuestionContent(onAnswer: (Boolean) -> Unit, modifier: Modifier = Modi
             style = t.caption.copy(lineHeight = 18.2.sp),
             color = c.text2,
             textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** The retryable error ([failed]) and the two answers, disabled while [saving]. */
+@Composable
+private fun VoicesAnswers(onAnswer: (Boolean) -> Unit, saving: Boolean, failed: Boolean) {
+    val c = CassiniTheme.colors
+    val t = CassiniTheme.type
+    if (failed) {
+        Text(
+            text = stringResource(R.string.ui_settings_transfer_choice_failed),
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag("voices-question-error"),
+            style = t.snippet,
+            color = c.error,
+        )
+    }
+    Column(
+        Modifier.padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        PrimaryButton(
+            text = stringResource(R.string.ui_voices_setup_enable),
+            onClick = { onAnswer(true) },
+            size = PrimaryButtonSize.Large,
+            enabled = !saving,
+        )
+        SecondaryButton(
+            text = stringResource(R.string.ui_action_not_now),
+            onClick = { onAnswer(false) },
+            size = SecondaryButtonSize.Large,
+            fillWidth = true,
+            enabled = !saving,
         )
     }
 }
