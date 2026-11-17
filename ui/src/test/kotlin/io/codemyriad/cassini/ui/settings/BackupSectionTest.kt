@@ -6,8 +6,11 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -27,19 +30,22 @@ class BackupSectionTest {
     private fun show(state: BackupSettingsUi) {
         rule.setContent {
             CassiniTheme {
-                androidx.compose.foundation.layout.Column {
-                    BackupSection(state, events::add)
-                }
+                SettingsScreen(
+                    BoardFixtures.settings.copy(backup = state),
+                    events::add,
+                    initialPage = SettingsPage.BACKUP,
+                    exportEnabled = true,
+                )
             }
         }
     }
 
     @Test fun defaultsShowThreeAccessibleSwitchesAllOn() {
         show(BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false))
-        rule.onNodeWithText("MOVING AND BACKUP").assertExists()
-        rule.onNodeWithText("Encrypted cloud backup").assertIsOn().performClick()
-        rule.onNodeWithText("Move to a new phone").assertIsOn().performClick()
-        rule.onNodeWithText("Include saved voices in backups").assertIsOn().performClick()
+        rule.onNodeWithText("Your meetings move with you to a new phone").assertExists()
+        rule.onNodeWithText("Encrypted cloud backup").performScrollTo().assertIsOn().performClick()
+        rule.onNodeWithText("Move to a new phone").performScrollTo().assertIsOn().performClick()
+        rule.onNodeWithText("Back up saved voices").performScrollTo().assertIsOn().performClick()
         assertEquals(
             listOf(SettingsEvent.Cloud(false), SettingsEvent.Transfer(false), SettingsEvent.IncludeVoices(false)),
             events,
@@ -68,18 +74,18 @@ class BackupSectionTest {
 
     @Test fun savedVoicesOffSaysTheyStayOnThisPhone() {
         show(BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false, voices = false))
-        rule.onNodeWithText("Include saved voices in backups").assertIsOff()
+        rule.onNodeWithText("Back up saved voices").assertIsOff()
         rule.onNodeWithText("Saved voices stay on this phone only", substring = true).assertExists()
     }
 
-    @Test fun learnMoreOpensWhatIsBackedUpAndWhoCanReadIt() {
+    @Test fun detailsOpensWhatMovesAndReturnsToBackup() {
         show(BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false))
-        rule.onNodeWithText("Learn more").performClick()
-        rule.onNodeWithText("What is backed up").assertExists()
+        rule.onNodeWithText("What moves").performScrollTo().performClick()
+        rule.onNodeWithText("WHAT MOVES").assertExists()
         rule.onNodeWithText("Android cloud backup").assertExists()
-        rule.onNodeWithText("A copy you keep yourself").assertExists()
-        rule.onNodeWithText("Close").performClick()
-        rule.onAllNodesWithText("What is backed up").assertCountEquals(0)
+        rule.onNodeWithText("A ZIP you export").assertExists()
+        rule.onNodeWithContentDescription("Back").performClick()
+        rule.onNodeWithText("Your meetings move with you to a new phone").assertExists()
     }
 
     @Test fun cloudQuotaFailureNamesTheAndroidLimit() {
@@ -104,7 +110,7 @@ class BackupSectionTest {
         ).assertExists()
         rule.onNodeWithText(CLOUD_OFF).assertExists()
         rule.onNodeWithText(PHONE_ONLY).assertExists()
-        rule.onNodeWithText("To keep a copy somewhere safe, use Export All as ZIP.").assertExists()
+        rule.onNodeWithText("Save every meeting to a folder, a drive or another app.").assertExists()
     }
 
     @Test fun beforeAndroid9NoChannelCanBeToggledAndEachExplainsWhy() {
@@ -118,7 +124,7 @@ class BackupSectionTest {
         )
         rule.onNodeWithText("Encrypted cloud backup").assertIsNotEnabled().assertIsOff()
         rule.onNodeWithText("Move to a new phone").assertIsNotEnabled().assertIsOff()
-        rule.onNodeWithText("Include saved voices in backups").assertIsNotEnabled().assertIsOff()
+        rule.onNodeWithText("Back up saved voices").assertIsNotEnabled().assertIsOff()
         assertNoQuotaWarning()
         rule.onAllNodesWithText("Choosing this needs Android 9 or newer.").assertCountEquals(3)
         rule.onNodeWithText(PHONE_ONLY).assertExists()
@@ -142,7 +148,7 @@ class BackupSectionTest {
         )
         rule.onNodeWithText("Move to a new phone").assertIsNotEnabled()
         rule.onNodeWithText("Encrypted cloud backup").assertIsNotEnabled()
-        rule.onNodeWithText("Include saved voices in backups").assertIsNotEnabled()
+        rule.onNodeWithText("Back up saved voices").assertIsNotEnabled()
         rule.onNodeWithText("Couldn’t save this choice. Try again.").assertExists()
         rule.onNodeWithText(
             "Your meetings and saved voices are too large to move in one transfer. " +

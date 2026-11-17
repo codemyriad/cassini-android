@@ -3,18 +3,19 @@
 package io.codemyriad.cassini.ui.settings
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -23,53 +24,110 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
-import io.codemyriad.cassini.ui.components.CassiniDialog
-import io.codemyriad.cassini.ui.components.GroupCard
 import io.codemyriad.cassini.ui.components.HelperText
 import io.codemyriad.cassini.ui.components.SectionHeader
 import io.codemyriad.cassini.ui.components.SettingsRow
 import io.codemyriad.cassini.ui.components.SettingsTrailing
-import io.codemyriad.cassini.ui.components.TextButton
+import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
+import io.codemyriad.cassini.ui.theme.Glyph
 
-/**
- * Moving and backup (PARITY Wave 6 contract §3, D98): layer 1 is three independent switches, "Encrypted cloud
- * backup", "Move to a new phone" and "Include saved voices in backups", whose copy follows the actual state (the
- * Android table); "Learn more" opens layer 2. Entire-row switch semantics, one node per choice; a failed write never
- * optimistically changes a switch.
- */
+/** D103 L-59 ordering, with the three independent D98 choices and truthful channel-specific copy. */
 @Composable
-internal fun BackupSection(state: BackupSettingsUi, onEvent: (SettingsEvent) -> Unit) {
-    var info by rememberSaveable { mutableStateOf(false) }
+internal fun BackupSection(
+    state: BackupSettingsUi,
+    onEvent: (SettingsEvent) -> Unit,
+    onDetails: () -> Unit,
+    exportEnabled: Boolean,
+    onExport: () -> Unit,
+) {
+    BackupAnswer(state)
+    Spacer(Modifier.height(18.dp))
     val voicesAvailable = state.cloudAvailable || state.transferAvailable
-    SectionHeader(stringResource(R.string.ui_backup_heading))
-    GroupCard(Modifier.padding(horizontal = 16.dp)) {
+    SettingsGroup {
         BackupSwitch(
             stringResource(R.string.ui_backup_cloud_title),
-            stringResource(cloudBody(state)),
+            stringResource(R.string.ui_backup_meetings_subtitle),
             state.cloudOn,
             !state.saving && state.cloudAvailable,
         ) { onEvent(SettingsEvent.Cloud(it)) }
+    }
+    HelperText(stringResource(cloudBody(state)))
+    SettingsGroup(Modifier.padding(top = 12.dp)) {
         BackupSwitch(
             stringResource(R.string.ui_settings_transfer_title),
             stringResource(transferBody(state)),
             state.transferOn,
             !state.saving && state.transferAvailable,
         ) { onEvent(SettingsEvent.Transfer(it)) }
+    }
+    SettingsGroup(Modifier.padding(top = 12.dp)) {
         BackupSwitch(
             stringResource(R.string.ui_backup_voices_title),
-            stringResource(voicesBody(state, voicesAvailable)),
+            stringResource(R.string.ui_backup_voices_why),
             voicesAvailable && state.voices,
             !state.saving && voicesAvailable,
         ) { onEvent(SettingsEvent.IncludeVoices(it)) }
-        SettingsRow(
-            stringResource(R.string.ui_backup_learn_more),
-            trailing = SettingsTrailing.Chevron,
-            onClick = { info = true },
-        )
     }
-    for (helper in helpers(state)) HelperText(stringResource(helper))
-    if (info) BackupInfoDialog { info = false }
+    HelperText(stringResource(voicesBody(state, voicesAvailable)))
+    BackupWarnings(state)
+    SectionHeader(stringResource(R.string.ui_backup_more_detail))
+    SettingsGroup {
+        SettingsRow(stringResource(R.string.ui_backup_moves), trailing = SettingsTrailing.Chevron, onClick = onDetails)
+        SettingsRow(stringResource(R.string.ui_backup_who), trailing = SettingsTrailing.Chevron, onClick = onDetails)
+    }
+    SectionHeader(stringResource(R.string.ui_backup_own_copy))
+    SettingsGroup {
+        Row(
+            Modifier.fillMaxWidth().clickable(enabled = exportEnabled, role = Role.Button, onClick = onExport)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CassiniIcon(Glyph.Import, 24.dp, 1.8f, CassiniTheme.colors.accentInk, null)
+            Text(
+                stringResource(R.string.ui_backup_export_all),
+                Modifier.padding(start = 12.dp),
+                style = CassiniTheme.type.body16,
+                color = if (exportEnabled) CassiniTheme.colors.ink else CassiniTheme.colors.text3,
+            )
+        }
+    }
+    HelperText(stringResource(R.string.ui_backup_zip_subtitle))
+}
+
+/** The transfer sentence belongs to this channel; the separate cloud choice directly follows it. */
+@Composable
+private fun BackupAnswer(state: BackupSettingsUi) {
+    val title = when {
+        state.transferOn -> R.string.ui_backup_page_transfer
+        state.cloudOn -> R.string.ui_backup_cloud_title
+        else -> R.string.ui_setting_off
+    }
+    val body = when {
+        state.transferOn -> R.string.ui_settings_transfer_body
+        state.cloudOn -> R.string.ui_backup_cloud_body_on
+        else -> R.string.ui_backup_phone_only_body
+    }
+    Row(
+        Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            .background(CassiniTheme.colors.accentTint, RoundedCornerShape(20.dp)).padding(18.dp),
+    ) {
+        CassiniIcon(Glyph.PhoneTransfer, 24.dp, 1.7f, CassiniTheme.colors.accentInk, null)
+        Column(Modifier.weight(1f).padding(start = 14.dp)) {
+            Text(
+                stringResource(title),
+                Modifier.semantics { heading() },
+                style = CassiniTheme.type.button,
+                color = CassiniTheme.colors.ink,
+            )
+            Text(
+                stringResource(body),
+                Modifier.padding(top = 4.dp),
+                style = CassiniTheme.type.body14,
+                color = CassiniTheme.colors.text2,
+            )
+        }
+    }
 }
 
 @StringRes
@@ -79,7 +137,6 @@ private fun cloudBody(state: BackupSettingsUi): Int = when {
     else -> R.string.ui_backup_cloud_body_off
 }
 
-/** With cloud backup on, "off" says that meetings still come back from the cloud backup (the Android table). */
 @StringRes
 private fun transferBody(state: BackupSettingsUi): Int = when {
     !state.transferAvailable -> R.string.ui_settings_transfer_unavailable
@@ -95,42 +152,11 @@ private fun voicesBody(state: BackupSettingsUi, available: Boolean): Int = when 
     else -> R.string.ui_backup_voices_subtitle_off
 }
 
-/** The lines under the group: phone-only, the ZIP hint, each channel's size refusal and a failed write. */
-private fun helpers(state: BackupSettingsUi): List<Int> = buildList {
-    if (state.phoneOnly) add(R.string.ui_backup_phone_only_body)
-    add(R.string.ui_settings_transfer_export_hint)
-    if (state.cloudOn && state.cloudQuotaExceeded) add(R.string.ui_backup_info_over_quota)
-    if (state.transferOn && state.quotaExceeded) add(R.string.ui_settings_transfer_too_large)
-    if (state.error) add(R.string.ui_settings_transfer_choice_failed)
-}
-
-/** Layer 2: what is backed up, who can read it and a copy you keep yourself (PARITY Wave 6 contract §3). */
 @Composable
-private fun BackupInfoDialog(onDismiss: () -> Unit) {
-    CassiniDialog(
-        onDismissRequest = onDismiss,
-        title = stringResource(R.string.ui_backup_info_title),
-        actions = { TextButton(stringResource(R.string.ui_action_close), onClick = onDismiss) },
-        content = {
-            InfoBlock(R.string.ui_backup_info_what_heading, R.string.ui_backup_info_what_body)
-            InfoBlock(R.string.ui_backup_info_android_heading, R.string.ui_backup_info_android_body)
-            InfoBlock(R.string.ui_backup_info_manual_heading, R.string.ui_settings_transfer_export_hint)
-        },
-    )
-}
-
-@Composable
-private fun InfoBlock(heading: Int, body: Int) {
-    val colors = CassiniTheme.colors
-    Column(Modifier.padding(bottom = 12.dp)) {
-        Text(
-            stringResource(heading),
-            Modifier.semantics { heading() },
-            style = CassiniTheme.type.button,
-            color = colors.ink,
-        )
-        Text(stringResource(body), style = CassiniTheme.type.body14, color = colors.text2)
-    }
+internal fun BackupWarnings(state: BackupSettingsUi) {
+    if (state.cloudOn && state.cloudQuotaExceeded) HelperText(stringResource(R.string.ui_backup_info_over_quota))
+    if (state.transferOn && state.quotaExceeded) HelperText(stringResource(R.string.ui_settings_transfer_too_large))
+    if (state.error) HelperText(stringResource(R.string.ui_settings_transfer_choice_failed))
 }
 
 @Composable

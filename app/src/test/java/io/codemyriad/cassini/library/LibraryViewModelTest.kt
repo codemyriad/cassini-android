@@ -149,12 +149,17 @@ class LibraryViewModelTest {
         ports.backupReach.value = BackupReach(cloud = true, transfer = true, card = true)
         val viewModel = viewModel()
         advanceUntilIdle()
-        assertTrue(viewModel.now().backupCard)
+        assertFalse(viewModel.now().backupCard)
         assertEquals(FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP), viewModel.now().hero)
+        ports.rows.value = listOf(libraryRow("first"))
+        advanceUntilIdle()
+        assertTrue(viewModel.now().backupCard)
         viewModel.onEvent(LibraryEvent.KeepOnPhoneOnly)
         advanceUntilIdle()
         assertTrue("keepOnPhoneOnly" in ports.actions)
         assertFalse(viewModel.now().backupCard)
+        ports.rows.value = emptyList()
+        advanceUntilIdle()
         assertEquals(FirstRunHeroUi(false, FirstRunPrivacy.PHONE_ONLY), viewModel.now().hero)
     }
 
@@ -171,7 +176,28 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun backupNoticeWaitsForASavedMeetingAndStaysAcknowledged() = runTest(dispatcher) {
+        ports.backupReach.value = BackupReach(cloud = true, transfer = true, card = true)
+        val vm = viewModel()
+        assertFalse(vm.now().backupCard)
+        ports.rows.value = listOf(libraryRow("first").copy(audioKind = AudioKind.LIVE_CAPTURE))
+        advanceUntilIdle()
+        assertFalse(vm.now().backupCard)
+        ports.rows.value = listOf(libraryRow("first"))
+        advanceUntilIdle()
+        assertTrue(vm.now().backupCard)
+        vm.onEvent(LibraryEvent.DismissBackupCard)
+        advanceUntilIdle()
+        assertFalse(vm.now().backupCard)
+        ports.rows.value = listOf(libraryRow("first"), libraryRow("second"))
+        advanceUntilIdle()
+        assertFalse(vm.now().backupCard)
+        assertFalse(viewModel().now().backupCard)
+    }
+
+    @Test
     fun theBackupCardIsNotShownWhileSearching() = runTest(dispatcher) {
+        ports.rows.value = listOf(libraryRow("first"))
         ports.backupReach.value = BackupReach(cloud = true, transfer = true, card = true)
         val viewModel = viewModel()
         viewModel.onEvent(LibraryEvent.Query("budget"))

@@ -536,9 +536,7 @@
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Date unknown</string>
 
-    <string name="ui_settings_transfer_title">Move to a new phone</string>
     <string name="ui_settings_transfer_unavailable">Choosing this needs Android 9 or newer.</string>
-    <string name="ui_settings_transfer_export_hint">To keep a copy somewhere safe, use Export All as ZIP.</string>
     <string name="ui_settings_transfer_choice_failed">Couldn’t save this choice. Try again.</string>
     <string name="ui_search_filter_any_date">Any date</string>
     <string name="ui_search_filter_recorded_by_me">Recorded by me</string>

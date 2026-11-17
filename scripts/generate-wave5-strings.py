@@ -24,28 +24,6 @@ LABELS = {
 # Wave 6 Moving and backup, the phone-only card and the phone Saved voices privacy line (PARITY Wave 6 contract
 # sections 3-5, D98). None of these carry placeholders either.
 WAVE6_LABELS = {
-    'backup_heading': 'backup.settings.heading',
-    'backup_cloud_title': 'backup.cloud.title',
-    'backup_cloud_body_on': 'backup.cloud.body.on',
-    'backup_cloud_body_off': 'backup.cloud.body.off',
-    'backup_phone_only_body': 'backup.phoneOnly.body',
-    'backup_voices_title': 'backup.includeSavedVoices.title',
-    'backup_voices_subtitle': 'backup.includeSavedVoices.subtitle',
-    'backup_voices_subtitle_off': 'backup.includeSavedVoices.subtitle.off',
-    'backup_learn_more': 'backup.settings.learnMore',
-    'backup_info_title': 'backup.info.title',
-    'backup_info_what_heading': 'backup.info.what.heading',
-    'backup_info_what_body': 'backup.info.what.body',
-    'backup_info_android_heading': 'backup.info.android.heading',
-    'backup_info_android_body': 'backup.info.android.body',
-    'backup_info_over_quota': 'backup.info.android.overQuota',
-    'backup_info_manual_heading': 'backup.info.manualCopy.heading',
-    'backup_card_title': 'backup.phoneOnlyCard.title',
-    'backup_card_body': 'backup.phoneOnlyCard.body',
-    'backup_card_action': 'backup.phoneOnlyCard.action',
-    'backup_card_dismiss': 'backup.phoneOnlyCard.dismiss',
-    'backup_card_close': 'backup.phoneOnlyCard.close.a11y',
-    'settings_transfer_body_off_backup_on': 'settings.transfer.body.offBackupOn',
     'voices_privacy_phone': 'savedVoices.privacy.phone',
 }
 OUTPUTS = {'wave5.xml': LABELS, 'wave6.xml': WAVE6_LABELS}

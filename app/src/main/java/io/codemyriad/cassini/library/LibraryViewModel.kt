@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.codemyriad.cassini.core.audio.ImportTypes
+import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.SearchDate
@@ -348,7 +349,8 @@ class LibraryViewModel(
             // The first-run hero replaces the empty-Library banner (L-27); until the choices are read, neither shows.
             banners = if (empty) notices.filterNot { it.kind == BannerKind.LIB_EMPTY }.toImmutableList() else notices,
             hero = live.backupReach?.takeIf { empty }?.let(LibraryMapping::hero),
-            backupCard = live.backupReach?.card == true && !searching,
+            // A LIVE_CAPTURE row exists before Stop: only a saved recording or import unlocks the notice.
+            backupCard = live.backupReach?.card == true && !searching && rows.any { it.audioKind != AudioKind.LIVE_CAPTURE },
             libraryFilter = if (listing.starredOnly) LibraryFilterUi.STARRED else LibraryFilterUi.ALL,
             libraryFilters = !searching && rows.isNotEmpty(),
             starredEmpty = !searching && listing.starredOnly && rows.isNotEmpty() && !mapped.anyStarred,

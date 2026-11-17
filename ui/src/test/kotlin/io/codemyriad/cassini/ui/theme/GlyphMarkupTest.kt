@@ -76,6 +76,7 @@ class GlyphMarkupTest {
         assertEquals(
             "glyphs without a board",
             listOf(
+                Glyph.PhoneTransfer,
                 Glyph.Wave,
                 Glyph.People,
                 Glyph.Language,

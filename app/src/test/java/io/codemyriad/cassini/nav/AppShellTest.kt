@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
@@ -128,6 +129,24 @@ class AppShellTest {
 
     @get:Rule val chain: RuleChain =
         RuleChain.outerRule(NoUncaughtCoroutines()).around(folder).around(mainEvents).around(graphRule).around(rule)
+
+    @Test fun backupExportUsesTheExistingSelectionAndSurvivesRecreation() {
+        importDocument()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        waitFor(hasText("Backup"))
+        rule.onNodeWithText("Backup").performClick()
+        waitFor(hasText("Export All as ZIP…"))
+        rule.onNodeWithText("Export All as ZIP…").performScrollTo().performClick()
+        val selected = app.getString(io.codemyriad.cassini.R.string.export_zip_selected)
+        waitFor(hasText(selected))
+        rule.onNodeWithText(TITLE).assertExists()
+        rule.activityRule.scenario.recreate()
+        waitFor(hasText(selected))
+        rule.onNodeWithText(TITLE).assertExists()
+        rule.onNodeWithText("Cancel").performClick()
+        waitGone(hasText(selected))
+        rule.onNodeWithText("Backup").assertExists()
+    }
 
     @Test fun backClosesTheSheetThenTheSearchThenLeavesTheNote() {
         importDocument()

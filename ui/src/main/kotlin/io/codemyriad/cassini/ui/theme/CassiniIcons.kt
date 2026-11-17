@@ -49,6 +49,10 @@ private fun dots(r: Float): List<GlyphPart> = listOf(5f, 12f, 19f).map { circle(
  * glyphs ignore it. Draw one with [CassiniIcon]; the board sizes and strokes are in the ui.md table.
  */
 enum class Glyph(internal val parts: List<GlyphPart>, val filled: Boolean = false, val viewport: Float = 24f) {
+    PhoneTransfer(
+        listOf(GlyphPart.Rect(3f, 5f, 8f, 14f, 2f), GlyphPart.Rect(13f, 5f, 8f, 14f, 2f)) +
+            paths("M9.5 12h5M13 10l2 2-2 2"),
+    ),
     Wave(paths("M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2")),
     People(
         listOf(circle(9f, 7f, 3f), circle(17f, 8f, 2f)) + paths("M3 20v-2a6 6 0 0 1 12 0v2M17 13a4 4 0 0 1 4 4v3"),

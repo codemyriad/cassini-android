@@ -2,10 +2,12 @@ package io.codemyriad.cassini.ui.library
 
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,5 +40,8 @@ class BackupCardTest {
     @Test fun theLibraryShowsTheCardOnlyWhenAsked() {
         rule.setContent { CassiniTheme { LibraryScreen(LibraryUiState(backupCard = true), events::add) } }
         rule.onNodeWithText("Keep them on this phone only").assertExists()
+        val notice = rule.onNodeWithTag("backup-notice").fetchSemanticsNode().boundsInRoot
+        val record = rule.onNodeWithText("Record").fetchSemanticsNode().boundsInRoot
+        assertTrue("notice stays above the bottom actions", notice.bottom <= record.top)
     }
 }
