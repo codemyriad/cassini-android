@@ -47,7 +47,7 @@ class LibraryActionBarTest {
     @Test fun recordAcknowledgesPointerDownWithTheCanvasShadeBeforeClick() {
         var clicks = 0
         rule.setContent { CassiniTheme { RecordFab(onClick = { clicks++ }) } }
-        val button = rule.onNodeWithContentDescription("Record a new note")
+        val button = rule.onNodeWithContentDescription("Record a new meeting")
         val bounds = button.getBoundsInRoot()
         assertEquals(56f, (bounds.bottom - bounds.top).value, 0.1f)
         val rest = button.captureToImage()
@@ -91,7 +91,7 @@ class LibraryActionBarTest {
             focus.requestFocus()
         }
         rule.waitForIdle()
-        val bounds = rule.onNodeWithContentDescription("Record a new note").getBoundsInRoot()
+        val bounds = rule.onNodeWithContentDescription("Record a new meeting").getBoundsInRoot()
         val image = rule.onRoot().captureToImage().toPixelMap()
         // The stroke is centred 3 dp outside the pill: 2 dp clear gap, then a 2 dp accent ring.
         val ring = image[
@@ -117,7 +117,7 @@ class LibraryActionBarTest {
             }
         }
         val import = rule.onNodeWithContentDescription("Import audio")
-        val record = rule.onNodeWithContentDescription("Record a new note")
+        val record = rule.onNodeWithContentDescription("Record a new meeting")
         for (node in listOf(import, record)) {
             val bounds = node.getBoundsInRoot()
             assertTrue((bounds.bottom - bounds.top).value >= 48f && (bounds.right - bounds.left).value >= 48f)

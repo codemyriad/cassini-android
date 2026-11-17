@@ -84,9 +84,10 @@ class SettingsBehaviourTest {
         val events = mutableListOf<ModelDownloadEvent>()
         setThemed { ModelDownloadScreen(BoardFixtures.modelDownload, onEvent = { events += it }) }
         rule.onNodeWithContentDescription("Close").performClick()
-        rule.onNodeWithText("Where the models come from · Privacy").performClick()
+        rule.onNodeWithText("Where the models come from").performClick()
         rule.onNodeWithText("Download and transcribe").performClick()
-        rule.onNodeWithText("Not now — keep the audio").performClick()
+        rule.onNodeWithText("Not now").performClick()
+        rule.onNodeWithText("Your recording is kept either way.").assertExists()
         // The figure keeps its unit on its line with a no-break space.
         rule.onNodeWithText("730\u00A0MB", substring = true).assertExists()
         rule.runOnIdle {
@@ -117,7 +118,7 @@ class SettingsBehaviourTest {
         setThemed { ModelDownloadScreen(state, onEvent = {}) }
         rule.onNodeWithText("640 MB").assertExists()
         rule.onNodeWithText("62 MB").assertExists()
-        rule.onNodeWithText("about 702\u00A0MB", substring = true).assertExists()
+        rule.onNodeWithText("download of 702\u00A0MB", substring = true).assertExists()
     }
 
     @Test fun modelDownloadWithoutANoteOnlyDownloads() {
@@ -126,12 +127,13 @@ class SettingsBehaviourTest {
         rule.onAllNodesWithText("Download and transcribe").assertCountEquals(0)
     }
 
-    @Test fun singlePartStandaloneConsentUsesNeutralCopy() {
+    /** D103 (L-61): one body for any set of missing parts; the single-part wording is gone. */
+    @Test fun singlePartUsesTheSameOneTimeDownloadBody() {
         val sample = VariantFixtures.modelDownload.getValue("models-without-note")
         val state = sample.copy(parts = persistentListOf(sample.parts.last()))
         setThemed { ModelDownloadScreen(state, onEvent = {}) }
-        rule.onNodeWithText("Optional download", substring = true).assertExists()
-        rule.onAllNodesWithText("recognising words and telling voices apart", substring = true).assertCountEquals(0)
+        rule.onNodeWithText("Cassini needs a one-time download of", substring = true).assertExists()
+        rule.onAllNodesWithText("Optional download", substring = true).assertCountEquals(0)
     }
 
     @Test fun pendingOptionalRowsHaveAnActionButAnActiveParakeetDoesNot() {
