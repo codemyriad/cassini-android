@@ -113,7 +113,11 @@ class AppShellTest {
             }
             platform.controller = { app.graph.recording }
             shadowOf(app as Application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
-            runBlocking { withTimeout(TIMEOUT_MS) { app.graph.ready.await() } }
+            runBlocking {
+                withTimeout(TIMEOUT_MS) { app.graph.ready.await() }
+                // The voices question (D103) is covered by NoteViewModelTest; here it would sit over every meeting.
+                app.graph.settings.answerVoicesQuestion(null)
+            }
         }
 
         override fun after() {

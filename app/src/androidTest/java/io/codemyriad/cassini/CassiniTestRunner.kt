@@ -60,7 +60,11 @@ class CassiniTestRunner : AndroidJUnitRunner() {
                 recording = AppGraph.RecordingHooks(platform = TestHooks.recordingPlatform(application)),
                 processing = AppGraph.ProcessingHooks(jobs = TestHooks::jobs),
             )
-            AppGraph(application, config).also { graph = it }
+            AppGraph(application, config).also {
+                graph = it
+                // The voices question (D103) would sit over every meeting the flows open; NoteViewModelTest covers it.
+                kotlinx.coroutines.runBlocking { it.settings.answerVoicesQuestion(null) }
+            }
         }
         Log.i(TAG, "Scratch root $scratch, models in $models")
         super.callApplicationOnCreate(app)
