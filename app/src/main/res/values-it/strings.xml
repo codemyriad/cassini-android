@@ -21,7 +21,7 @@
     <string name="error_playback">Riproduzione non disponibile per questo file.</string>
     <string name="error_opus_encoder">Questo dispositivo non ha un codificatore Opus. Può aprire documenti esistenti, ma non creare nuovi file Cassini.</string>
     <string name="error_speakers">Nessun turno di parola trovato. La trascrizione originale è invariata.</string>
-    <string name="error_document_unverified">Non è stato possibile verificare l’audio di questo documento, quindi non si può aggiungere una nuova versione.</string>
+    <string name="error_document_unverified">Impossibile verificare l’audio di questo documento, quindi non si può aggiungere una nuova versione.</string>
     <string name="error_document_unknown_format">Questo documento ha un formato Cassini più recente, quindi qui non si può aggiungere una nuova versione.</string>
     <string name="recording_channel">Registrazione</string>
     <string name="import_fallback_title">Audio importato</string>
@@ -48,7 +48,7 @@
     <string name="notif_processing_public">Trascrizione di una riunione</string>
     <string name="notif_part_speech">riconoscimento vocale</string>
     <string name="notif_part_speakers">distinzione delle voci</string>
-    <string name="notif_part_voices">riconoscere le voci salvate</string>
+    <string name="notif_part_voices">riconoscimento delle voci salvate</string>
     <plurals name="notif_queue_more">
         <item quantity="one">ancora %d in coda</item>
         <item quantity="many">ancora %d in coda</item>
@@ -93,13 +93,13 @@
     <string name="notif_rec_paused_at">In pausa a %1$s</string>
     <string name="notif_rec_starting">Avvio del microfono…</string>
     <string name="notif_rec_saving">Salvataggio della registrazione…</string>
-    <string name="notif_rec_other_app">In pausa — un\'altra app sta usando l\'audio</string>
+    <string name="notif_rec_other_app">In pausa — un’altra app sta usando l’audio</string>
     <string name="notif_rec_storage_low">Spazio quasi esaurito — circa %1$d min rimasti</string>
     <string name="notif_rec_file_low">File della registrazione quasi pieno — circa %1$d min rimasti</string>
     <string name="notif_rec_stopped_title">Registrazione interrotta</string>
     <string name="notif_rec_stopped_text">Meno di 200 MB liberi. La registrazione fin qui è salvata.</string>
     <string name="notif_rec_file_full_text">Cassini chiude le registrazioni M4A a 1 GB, circa 74 ore. La registrazione fin qui è salvata. Avvia una nuova registrazione per continuare.</string>
     <string name="notif_rec_failed_title">Il microfono ha smesso di funzionare</string>
-    <string name="notif_rec_failed_text">Registrazione terminata. L\'audio fin qui è nella libreria.</string>
+    <string name="notif_rec_failed_text">Registrazione terminata. L’audio fin qui è nella Libreria.</string>
 
 </resources>

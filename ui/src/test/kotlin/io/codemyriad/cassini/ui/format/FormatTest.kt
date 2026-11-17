@@ -251,7 +251,7 @@ class FormatItalianTest {
         assertEquals("1 minuto", Spoken.duration(res, MIN, f))
         assertEquals("0 secondi", Spoken.duration(res, 0, f))
         assertEquals(
-            "Continua a registrare a schermo spento o in un’altra app. Spazio per circa ${nb("31 h")} ancora.",
+            "Continua a registrare a schermo spento o in un’altra app. Ancora spazio per circa ${nb("31 h")}.",
             Durations.spaceHint(res, 31 * H),
         )
         assertEquals("11:44 di 23:50", Spoken.position(res, 11 * MIN + 44 * S, 23 * MIN + 50 * S))

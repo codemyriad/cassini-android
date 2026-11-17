@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 5e4f0bff95300f2ef795fe71244b22644cad5c25; do not edit. -->
+<!-- Generated from cassini-ux c28b72461c7317ea0a4684183cb9103626aabf17; do not edit. -->
 <resources>
     <string name="ui_badge_recording">Enregistrement %1$s</string>
     <string name="ui_badge_importing">Importation…</string>
@@ -72,11 +72,11 @@
     <string name="ui_tx_details">Détails de la transcription</string>
     <string name="ui_tx_stop">Arrêter</string>
     <string name="ui_tx_stop_keep">Arrêter et garder la progression</string>
-    <string name="ui_tx_transcript">Transcription jusqu’ici</string>
+    <string name="ui_tx_transcript">Transcription partielle</string>
     <string name="ui_tx_reading">Lecture</string>
     <string name="ui_tx_preparing">Préparation</string>
     <string name="ui_tx_words">Mots</string>
-    <string name="ui_tx_matching">Intervenants et correspondance</string>
+    <string name="ui_tx_matching">Intervenants et reconnaissance</string>
     <string name="ui_tx_saving">Sauvegarde</string>
     <string name="ui_tx_audio_done">Audio traité</string>
     <string name="ui_tx_audio_done_value">%1$s sur %2$s</string>
@@ -86,7 +86,7 @@
         <item quantity="many">Environ %1$s min</item>
         <item quantity="other">Environ %1$s min</item>
     </plurals>
-    <string name="ui_tx_words_so_far">Mots jusqu’ici</string>
+    <string name="ui_tx_words_so_far">Mots transcrits</string>
     <string name="ui_tx_battery_finish">Batterie à la fin</string>
     <string name="ui_tx_suggestion_question">Est-ce %1$s ?</string>
     <string name="ui_tx_suggestion_yes">Oui</string>

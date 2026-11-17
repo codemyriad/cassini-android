@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 5e4f0bff95300f2ef795fe71244b22644cad5c25; do not edit. -->
+<!-- Generated from cassini-ux c28b72461c7317ea0a4684183cb9103626aabf17; do not edit. -->
 <resources>
     <string name="ui_badge_recording">A gravar %1$s</string>
     <string name="ui_badge_importing">A importar…</string>
@@ -77,7 +77,7 @@
     <string name="ui_tx_preparing">Preparação</string>
     <string name="ui_tx_words">Palavras</string>
     <string name="ui_tx_matching">Oradores e reconhecimento</string>
-    <string name="ui_tx_saving">Gravação</string>
+    <string name="ui_tx_saving">A guardar</string>
     <string name="ui_tx_audio_done">Áudio processado</string>
     <string name="ui_tx_audio_done_value">%1$s de %2$s</string>
     <string name="ui_tx_time_left">Tempo restante</string>

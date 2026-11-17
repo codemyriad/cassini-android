@@ -131,7 +131,7 @@
     <string name="ui_status_queued">In coda</string>
     <string name="ui_status_paused_at">In pausa a %1$s</string>
     <string name="ui_status_failed">Trascrizione non riuscita</string>
-    <string name="ui_status_unplayable">Non riproducibile</string>
+    <string name="ui_status_unplayable">Impossibile riprodurre</string>
     <string name="ui_status_unreadable">Trascrizione illeggibile</string>
     <string name="ui_status_newer_format">Formato più recente</string>
     <string name="ui_status_transcribed">Trascritta</string>
@@ -159,7 +159,7 @@
     <string name="ui_recording_needs_permission">Cassini ha bisogno del microfono per registrare.</string>
     <string name="ui_recording_waveform">Livello del microfono, ultimi 7 secondi</string>
     <string name="ui_recording_hint">Continua a registrare a schermo spento o in un’altra app.</string>
-    <string name="ui_recording_hint_space">Spazio per circa %1$s ancora.</string>
+    <string name="ui_recording_hint_space">Ancora spazio per circa %1$s.</string>
     <string name="ui_recording_pause">Metti in pausa la registrazione</string>
     <string name="ui_recording_resume">Riprendi la registrazione</string>
 
@@ -173,7 +173,7 @@
     <string name="ui_note_queued">In coda</string>
     <string name="ui_note_queued_after_current">Parte dopo la trascrizione in corso.</string>
     <string name="ui_note_start_over_title">Ricominciare?</string>
-    <string name="ui_note_start_over_body">La bozza fin qui viene scartata. La registrazione resta.</string>
+    <string name="ui_note_start_over_body">La bozza creata fin qui viene scartata. La registrazione resta.</string>
 
     <!-- Avanzamento. -->
     <string name="ui_headline_starting">Avvio…</string>
@@ -198,7 +198,7 @@
     <string name="ui_stat_time_left">Tempo rimasto</string>
     <string name="ui_stat_processed">Elaborato</string>
     <string name="ui_stat_battery">Batteria alla fine</string>
-    <string name="ui_stat_words">Parole finora</string>
+    <string name="ui_stat_words">Parole fin qui</string>
     <string name="ui_time_left_minutes_range">%1$d–%2$d min</string>
     <string name="ui_time_left_about">Circa %1$s</string>
     <string name="ui_time_left_under_minute">Meno di 1 min</string>
@@ -210,7 +210,7 @@
     <string name="ui_battery_projected">%1$d%% → circa %2$d%%</string>
     <string name="ui_battery_plugged_in">In carica</string>
     <string name="ui_battery_measuring">Misurazione…</string>
-    <string name="ui_progress_footnote">Continua anche se esci dall’app. Una notifica mostra i progressi e permette di fermare.</string>
+    <string name="ui_progress_footnote">Continua anche se esci dall’app. Una notifica mostra i progressi e permette di fermare la trascrizione.</string>
     <string name="ui_progress_footnote_no_notifications">Le notifiche sono disattivate, quindi i progressi si vedono solo qui.</string>
     <string name="ui_progress_low_memory">Il telefono ha poca memoria. Chiudi altre app se la trascrizione si ferma.</string>
 
@@ -312,7 +312,7 @@
     <string name="ui_info_model">Modello</string>
     <string name="ui_info_speakers">Voci</string>
     <string name="ui_info_speakers_apart">Voci distinte su questo telefono</string>
-    <string name="ui_info_one_voice">Tutte le parole come una sola voce</string>
+    <string name="ui_info_one_voice">Tutte le parole attribuite a una sola voce</string>
     <string name="ui_info_resumed_from">Ripresa da %1$s</string>
     <string name="ui_info_file_size">Dimensione del file</string>
     <string name="ui_info_meeting_id">ID della riunione</string>
@@ -368,7 +368,7 @@
     <string name="ui_banner_trust_verified_title">Verificata</string>
     <string name="ui_banner_trust_verified_body">L’audio corrisponde esattamente alla trascrizione. Tutto funziona.</string>
     <string name="ui_banner_trust_not_verified_title">Non verificata</string>
-    <string name="ui_banner_trust_not_verified_body">Non è stato possibile controllare l’audio, quindi i tempi delle parole potrebbero non corrispondere.</string>
+    <string name="ui_banner_trust_not_verified_body">Impossibile controllare l’audio, quindi i tempi delle parole potrebbero non corrispondere.</string>
     <string name="ui_banner_trust_audio_changed_title">Audio cambiato dopo la trascrizione</string>
     <string name="ui_banner_trust_audio_changed_body">I tempi delle parole potrebbero non corrispondere a ciò che senti.</string>
     <string name="ui_banner_trust_unreadable_title">Trascrizione illeggibile</string>
@@ -387,13 +387,13 @@
     <string name="ui_banner_rec_stopped_file_title">Registrazione interrotta — file pieno</string>
     <string name="ui_banner_rec_stopped_file_body">Cassini chiude le registrazioni M4A a 1\u00A0GB, circa 74\u00A0ore. La registrazione fin qui è salvata. Avvia una nuova registrazione per continuare.</string>
     <string name="ui_banner_rec_file_low_title">File della registrazione quasi pieno — restano circa %1$s</string>
-    <string name="ui_banner_rec_file_low_body">Cassini chiude le registrazioni M4A a 1\u00A0GB e le salva. Per continuare, ferma e avvia una nuova registrazione.</string>
+    <string name="ui_banner_rec_file_low_body">Cassini chiude le registrazioni M4A a 1\u00A0GB e le salva. Per continuare, ferma la registrazione e avviane una nuova.</string>
     <string name="ui_banner_rec_stopped_storage_title">Registrazione interrotta — memoria quasi piena</string>
     <string name="ui_banner_rec_stopped_storage_body">Meno di %1$s liberi. La registrazione fin qui è salvata.</string>
     <string name="ui_banner_rec_mic_off_title">L’accesso al microfono è disattivato</string>
     <string name="ui_banner_rec_mic_off_body">Attivalo nelle impostazioni di sistema. La registrazione parte quando torni.</string>
     <string name="ui_banner_rec_mic_failed_title">Il microfono ha smesso di funzionare</string>
-    <string name="ui_banner_rec_mic_failed_body">La registrazione è terminata. L’audio fin qui è nella libreria.</string>
+    <string name="ui_banner_rec_mic_failed_body">La registrazione è terminata. L’audio fin qui è nella Libreria.</string>
     <string name="ui_banner_rec_could_not_start_title">Impossibile avviare il microfono</string>
     <string name="ui_banner_rec_could_not_start_body">Forse lo sta usando un’altra app. Riprova.</string>
     <plurals name="ui_banner_recovered_title">
@@ -418,8 +418,8 @@
     <string name="ui_banner_tx_calculating_body">Una stima compare dopo i primi minuti di audio.</string>
     <string name="ui_banner_tx_battery_title">Misurazione del consumo di batteria…</string>
     <string name="ui_banner_tx_battery_body">In carica — non serve una stima della batteria.</string>
-    <string name="ui_banner_tx_one_voice_title">Tutte le parole come una sola voce</string>
-    <string name="ui_banner_tx_one_voice_body">Non è stato possibile distinguere le voci in questa registrazione.</string>
+    <string name="ui_banner_tx_one_voice_title">Tutte le parole attribuite a una sola voce</string>
+    <string name="ui_banner_tx_one_voice_body">Impossibile distinguere le voci in questa registrazione.</string>
     <string name="ui_banner_tx_checkpoint_mismatch_title">I progressi salvati non corrispondono più</string>
     <string name="ui_banner_tx_checkpoint_mismatch_body">La registrazione o i modelli sono cambiati. La registrazione resta.</string>
     <string name="ui_banner_tx_memory_title">Memoria insufficiente</string>
@@ -451,7 +451,7 @@
     <string name="ui_banner_lib_empty_title">Ancora nessuna riunione</string>
     <string name="ui_banner_lib_empty_body">Registra qualcosa o importa un file audio.</string>
     <string name="ui_banner_lib_no_match_title">Nessun risultato per “%1$s”</string>
-    <string name="ui_banner_lib_no_match_body">Prova un’altra parola o un titolo.</string>
+    <string name="ui_banner_lib_no_match_body">Prova un’altra parola o un altro titolo.</string>
     <string name="ui_banner_importing_title">Importazione di %1$s…</string>
     <string name="ui_banner_import_too_large_title">File troppo grande</string>
     <string name="ui_banner_import_too_large_body">Scegli un file sotto i 4 GB.</string>
@@ -478,7 +478,7 @@
     <string name="ui_parakeet_suggestion_title">Trascrizioni migliori con Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">Whistle è incluso per iniziare subito. Parakeet Ultra è più preciso. Il download è di %1$s.</string>
     <string name="ui_parakeet_now_default">Le nuove riunioni ora usano Parakeet Ultra.</string>
-    <string name="ui_turn_crosstalk">Probabile diafonia</string>
+    <string name="ui_turn_crosstalk">Probabile sovrapposizione di voci</string>
     <!-- cassini-ux b86b7b0: Markdown export, D50.2/D50.3. -->
     <string name="ui_actions_markdown" formatted="false">Markdown</string>
     <string name="ui_markdown_description" formatted="false">La trascrizione come file di testo, con voci e tempi.</string>

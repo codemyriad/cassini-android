@@ -161,7 +161,7 @@
     <string name="ui_recording_needs_permission">Cassini necesita el micrófono para grabar.</string>
     <string name="ui_recording_waveform">Nivel del micrófono, últimos 7 segundos</string>
     <string name="ui_recording_hint">Sigue grabando con la pantalla apagada o en otra app.</string>
-    <string name="ui_recording_hint_space">Espacio para unos %1$s más.</string>
+    <string name="ui_recording_hint_space">Espacio para aproximadamente %1$s más.</string>
     <string name="ui_recording_pause">Pausar grabación</string>
     <string name="ui_recording_resume">Reanudar grabación</string>
 
@@ -175,7 +175,7 @@
     <string name="ui_note_queued">En cola</string>
     <string name="ui_note_queued_after_current">Empieza después de la transcripción actual.</string>
     <string name="ui_note_start_over_title">¿Empezar de nuevo?</string>
-    <string name="ui_note_start_over_body">El borrador hasta ahora se descarta. Tu grabación se conserva.</string>
+    <string name="ui_note_start_over_body">Se descarta el borrador generado hasta ahora. Tu grabación se conserva.</string>
 
     <!-- Progress card. -->
     <string name="ui_headline_starting">Iniciando…</string>
@@ -202,17 +202,17 @@
     <string name="ui_stat_battery">Batería al final</string>
     <string name="ui_stat_words">Palabras hasta ahora</string>
     <string name="ui_time_left_minutes_range">%1$d–%2$d min</string>
-    <string name="ui_time_left_about">Unos %1$s</string>
+    <string name="ui_time_left_about">Aproximadamente %1$s</string>
     <string name="ui_time_left_under_minute">Menos de 1 min</string>
     <string name="ui_time_left_calculating">Calculando…</string>
     <string name="ui_time_left_finishing">Terminando…</string>
-    <string name="ui_time_left_line_about">Quedan unos %1$s</string>
+    <string name="ui_time_left_line_about">Tiempo restante: aproximadamente %1$s</string>
     <string name="ui_time_left_line_under_minute">Queda menos de 1 min</string>
     <string name="ui_time_left_line_calculating">Calculando el tiempo restante…</string>
-    <string name="ui_battery_projected">%1$d\u00A0%% → unos %2$d\u00A0%%</string>
-    <string name="ui_battery_plugged_in">Cargando</string>
+    <string name="ui_battery_projected">%1$d\u00A0%% → aprox. %2$d\u00A0%%</string>
+    <string name="ui_battery_plugged_in">Conectado a la corriente</string>
     <string name="ui_battery_measuring">Midiendo…</string>
-    <string name="ui_progress_footnote">Continúa aunque salgas de la app. Una notificación muestra el progreso y permite detenerla.</string>
+    <string name="ui_progress_footnote">Continúa aunque salgas de la app. Una notificación muestra el progreso y permite detener la transcripción.</string>
     <string name="ui_progress_footnote_no_notifications">Las notificaciones están desactivadas, así que el progreso solo se ve aquí.</string>
     <string name="ui_progress_low_memory">Este teléfono tiene poca memoria. Cierra otras apps si la transcripción se detiene.</string>
 
@@ -319,7 +319,7 @@
     <string name="ui_info_model">Modelo</string>
     <string name="ui_info_speakers">Hablantes</string>
     <string name="ui_info_speakers_apart">Hablantes distinguidos en este teléfono</string>
-    <string name="ui_info_one_voice">Todas las palabras como una sola voz</string>
+    <string name="ui_info_one_voice">Todas las palabras se muestran como una sola voz</string>
     <string name="ui_info_resumed_from">Reanudada desde %1$s</string>
     <string name="ui_info_file_size">Tamaño del archivo</string>
     <string name="ui_info_meeting_id">ID de reunión</string>
@@ -395,7 +395,7 @@
     <string name="ui_banner_rec_stopped_file_title">Grabación detenida — archivo lleno</string>
     <string name="ui_banner_rec_stopped_file_body">Cassini termina las grabaciones M4A al llegar a 1\u00A0GB, unas 74\u00A0horas. Lo grabado hasta ahora está guardado. Empieza una grabación nueva para continuar.</string>
     <string name="ui_banner_rec_file_low_title">Archivo de grabación casi lleno — quedan unos %1$s</string>
-    <string name="ui_banner_rec_file_low_body">Cassini termina las grabaciones M4A al llegar a 1\u00A0GB y las guarda. Para seguir, detén y empieza una grabación nueva.</string>
+    <string name="ui_banner_rec_file_low_body">Cassini termina las grabaciones M4A al llegar a 1\u00A0GB y las guarda. Para seguir, detén la grabación y empieza una nueva.</string>
     <string name="ui_banner_rec_stopped_storage_title">Grabación detenida — almacenamiento casi lleno</string>
     <string name="ui_banner_rec_stopped_storage_body">Quedan menos de %1$s libres. Lo grabado hasta ahora está guardado.</string>
     <string name="ui_banner_rec_mic_off_title">El acceso al micrófono está desactivado</string>
@@ -412,7 +412,7 @@
     <string name="ui_banner_recovered_body">Cassini se cerró inesperadamente. Guardamos lo que se había captado (%1$s).</string>
 
     <string name="ui_banner_tx_paused_title">En pausa en %1$s de %2$s</string>
-    <string name="ui_banner_tx_paused_body">Sigue donde lo dejaste. El borrador hasta ahora se conserva.</string>
+    <string name="ui_banner_tx_paused_body">Sigue donde lo dejaste. Se conserva el borrador generado hasta ahora.</string>
     <string name="ui_banner_tx_paused_early_title">En pausa antes de encontrar palabras</string>
     <string name="ui_banner_tx_paused_early_body">Reanuda para empezar a transcribir.</string>
     <string name="ui_banner_tx_paused_system_body">Android la pausó: el trabajo en segundo plano tiene un límite de unas 6 horas al día. Reanuda para continuar donde se detuvo.</string>
@@ -425,8 +425,8 @@
     <string name="ui_banner_tx_calculating_title">Calculando el tiempo restante…</string>
     <string name="ui_banner_tx_calculating_body">Aparecerá una estimación tras los primeros minutos de audio.</string>
     <string name="ui_banner_tx_battery_title">Midiendo el consumo de batería…</string>
-    <string name="ui_banner_tx_battery_body">Conectado a la corriente — no hace falta estimar la batería.</string>
-    <string name="ui_banner_tx_one_voice_title">Todas las palabras como una sola voz</string>
+    <string name="ui_banner_tx_battery_body">Conectado a la corriente — no hace falta estimar el consumo de batería.</string>
+    <string name="ui_banner_tx_one_voice_title">Todas las palabras se muestran como una sola voz</string>
     <string name="ui_banner_tx_one_voice_body">No se pudieron distinguir los hablantes en esta grabación.</string>
     <string name="ui_banner_tx_checkpoint_mismatch_title">El progreso guardado ya no coincide</string>
     <string name="ui_banner_tx_checkpoint_mismatch_body">La grabación o los modelos cambiaron. Tu grabación se conserva.</string>
@@ -486,7 +486,7 @@
     <string name="ui_parakeet_suggestion_title">Mejores transcripciones con Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">Whistle viene incluido para que empieces enseguida. Parakeet Ultra es más preciso. La descarga ocupa %1$s.</string>
     <string name="ui_parakeet_now_default">Las reuniones nuevas ahora usan Parakeet Ultra.</string>
-    <string name="ui_turn_crosstalk">Probable diafonía</string>
+    <string name="ui_turn_crosstalk">Probable solapamiento de voces</string>
     <!-- cassini-ux b86b7b0: Markdown export, D50.2/D50.3. -->
     <string name="ui_actions_markdown" formatted="false">Markdown</string>
     <string name="ui_markdown_description" formatted="false">La transcripción como archivo de texto, con hablantes y marcas de tiempo.</string>

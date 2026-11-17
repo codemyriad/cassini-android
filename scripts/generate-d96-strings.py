@@ -11,6 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 VENDOR = ROOT / 'third_party/cassini-ux'
 LOCALES = {'en': 'values', 'it': 'values-it', 'fr': 'values-fr', 'es': 'values-es',
            'pt-BR': 'values-pt-rBR', 'pt-PT': 'values-pt-rPT'}
+# D96 entries the catalog has but Android does not show yet. import.failed.diskFull (D-1059) needs disk-full detection
+# in the import path; generate it when that lands, or the unused resource fails release lint.
+DEFERRED = {'import.failed.diskFull'}
 
 
 def resource_id(catalog_id):
@@ -30,7 +33,7 @@ def generated():
     pin = json.loads((VENDOR / 'UPSTREAM.json').read_text())
     assert hashlib.sha256(raw).hexdigest() == pin['files']['strings.json']['sha256']
     entries = [e for e in json.loads(raw)['entries']
-               if e['milestone'] == 'D96' or e['id'] in {'common.cancel', 'common.done'}]
+               if (e['milestone'] == 'D96' and e['id'] not in DEFERRED) or e['id'] in {'common.cancel', 'common.done'}]
     for language, directory in LOCALES.items():
         lines = ['<?xml version="1.0" encoding="utf-8"?>',
                  '<!-- Generated from cassini-ux ' + pin['commit'] + '; do not edit. -->', '<resources>']

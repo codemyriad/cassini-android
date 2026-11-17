@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 5e4f0bff95300f2ef795fe71244b22644cad5c25; do not edit. -->
+<!-- Generated from cassini-ux c28b72461c7317ea0a4684183cb9103626aabf17; do not edit. -->
 <resources>
     <string name="ui_badge_recording">Gravando %1$s</string>
     <string name="ui_badge_importing">Importando…</string>
@@ -54,7 +54,7 @@
     <string name="ui_sp_duplicate_notice">%1$s já é uma voz salva.</string>
     <string name="ui_sp_same_person">Mesma pessoa</string>
     <string name="ui_sp_someone_else">Outra pessoa</string>
-    <string name="ui_sp_voices_ranked">Vozes salvas, mais próximas primeiro</string>
+    <string name="ui_sp_voices_ranked">Vozes salvas, mais semelhantes primeiro</string>
     <string name="ui_sp_voices">Vozes salvas</string>
     <string name="ui_sp_likely">Provável</string>
     <string name="ui_sp_remember_title">Lembrar esta voz</string>

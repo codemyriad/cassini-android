@@ -17,7 +17,7 @@
     <string name="error_verify">Falha na verificação do modelo. Transfira-o novamente.</string>
     <string name="error_install">Não foi possível guardar o modelo. Liberte espaço e tente novamente.</string>
     <string name="error_save">Não foi possível guardar a transcrição. Escolha outro local.</string>
-    <string name="error_memory">Memória insuficiente. Experimente um excerto mais curto e feche outras apps.</string>
+    <string name="error_memory">Memória insuficiente. Experimente um excerto mais curto e feche outras aplicações.</string>
     <string name="error_cancelled">Operação cancelada.</string>
     <string name="error_unknown">Ocorreu um erro. Tente novamente.</string>
     <string name="error_playback">A reprodução não está disponível para este ficheiro.</string>
@@ -82,7 +82,7 @@
     <string name="notif_ready_text">%1$s está em espera. Abra o Cassini para começar.</string>
     <string name="notif_ready_public">Uma reunião está em espera. Abra o Cassini para começar.</string>
     <string name="notif_paused_title">Transcrição pausada pelo Android</string>
-    <string name="notif_paused_text">Pausada em %1$s de %2$s. O Android limita o trabalho em segundo plano a cerca de 6 horas por dia. Abra o Cassini para retomar.</string>
+    <string name="notif_paused_text">Em pausa aos %1$s de %2$s. O Android limita o trabalho em segundo plano a cerca de 6 horas por dia. Abra o Cassini para retomar.</string>
     <string name="notif_paused_text_early">Pausada antes de encontrar palavras. O Android limita o trabalho em segundo plano a cerca de 6 horas por dia. Abra o Cassini para retomar.</string>
     <string name="notif_paused_public">Abra o Cassini para retomar.</string>
     <string name="notif_stopped_title">Transcrição interrompida</string>
@@ -92,16 +92,16 @@
     <string name="rec_default_title">Reunião %1$s</string>
     <string name="notif_rec_title">A gravar</string>
     <string name="notif_rec_paused_title">Gravação em pausa</string>
-    <string name="notif_rec_paused_at">Pausada em %1$s</string>
+    <string name="notif_rec_paused_at">Em pausa aos %1$s</string>
     <string name="notif_rec_starting">A iniciar o microfone…</string>
     <string name="notif_rec_saving">A guardar a gravação…</string>
     <string name="notif_rec_other_app">Em pausa — outra aplicação está a usar o áudio</string>
     <string name="notif_rec_storage_low">Armazenamento quase cheio — restam cerca de %1$d min</string>
     <string name="notif_rec_file_low">Ficheiro de gravação quase cheio — restam cerca de %1$d min</string>
     <string name="notif_rec_stopped_title">Gravação interrompida</string>
-    <string name="notif_rec_stopped_text">Menos de 200 MB livres. A gravação até agora está guardada.</string>
-    <string name="notif_rec_file_full_text">O Cassini termina as gravações M4A ao atingir 1 GB, cerca de 74 horas. A gravação até agora está guardada. Inicie uma nova gravação para continuar.</string>
+    <string name="notif_rec_stopped_text">Menos de 200 MB livres. A gravação feita até agora está guardada.</string>
+    <string name="notif_rec_file_full_text">O Cassini termina as gravações M4A ao atingir 1 GB, cerca de 74 horas. A gravação feita até agora está guardada. Inicie uma nova gravação para continuar.</string>
     <string name="notif_rec_failed_title">O microfone deixou de funcionar</string>
-    <string name="notif_rec_failed_text">A gravação terminou. O áudio até agora está na sua biblioteca.</string>
+    <string name="notif_rec_failed_text">A gravação terminou. O áudio gravado até agora está na sua Biblioteca.</string>
 
 </resources>
