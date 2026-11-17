@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.DpRect
@@ -28,7 +29,11 @@ import io.codemyriad.cassini.ui.theme.CassiniTheme
 
 /** A [CassiniSheet] as it shows: the content in the sheet surface with its [DragHandle], at the bottom of the scrim. */
 @Composable
-internal fun SheetBoardFrame(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+internal fun SheetBoardFrame(
+    modifier: Modifier = Modifier,
+    color: Color = CassiniTheme.colors.surface,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val c = CassiniTheme.colors
     Box(
         modifier = modifier
@@ -41,7 +46,7 @@ internal fun SheetBoardFrame(modifier: Modifier = Modifier, content: @Composable
             Modifier
                 .fillMaxWidth()
                 .clip(CassiniTheme.shapes.sheet)
-                .background(c.surface),
+                .background(color),
         ) {
             DragHandle(Modifier.align(Alignment.CenterHorizontally))
             content()

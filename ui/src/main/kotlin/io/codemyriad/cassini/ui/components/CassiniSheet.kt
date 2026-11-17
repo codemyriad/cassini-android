@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,6 +48,7 @@ import kotlinx.coroutines.launch
  * The sheet state stays inside (its API is experimental). To close the sheet from its content (an action row), call
  * [SheetHider.hide] on the content's parameter: the sheet slides down, then [onDismissRequest] runs and the screen
  * drops the sheet from its state. A swipe or a scrim tap also ends in [onDismissRequest].
+ * [confirmDismiss] can defer hiding until an asynchronous choice is stored; it is called before the hide transition.
  * Screenshot tests render the same content inline in `SheetBoardFrame` (test sources).
  */
 @Composable
@@ -55,10 +57,15 @@ fun CassiniSheet(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     containerColor: Color = CassiniTheme.colors.surface,
+    confirmDismiss: () -> Boolean = { true },
     content: @Composable ColumnScope.(SheetHider) -> Unit,
 ) {
     val c = CassiniTheme.colors
-    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val confirm by rememberUpdatedState(confirmDismiss)
+    val state = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden || confirm() },
+    )
     val scope = rememberCoroutineScope()
     val dismiss by rememberUpdatedState(onDismissRequest)
     val hider = remember(state, scope) {

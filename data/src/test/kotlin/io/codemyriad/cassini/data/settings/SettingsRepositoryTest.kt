@@ -56,6 +56,32 @@ class SettingsRepositoryTest {
         }
     }
 
+    @Test fun voicesQuestionAnswerBecomesTheRememberDefaultAndSurvivesReopen() = runTest {
+        withStore { store ->
+            assertFalse(store.voicesQuestionAsked.first())
+            assertTrue(store.speakerChoices.first().remember)
+            // Closing the sheet without an answer: asked once, the default stays on.
+            store.answerVoicesQuestion(null)
+            assertTrue(store.voicesQuestionAsked.first())
+            assertTrue(store.speakerChoices.first().remember)
+            store.answerVoicesQuestion(false)
+        }
+        withStore { store ->
+            assertTrue(store.voicesQuestionAsked.first())
+            assertEquals(SpeakerChoices(remember = false), store.speakerChoices.first())
+            store.setRememberVoices(true)
+            assertTrue(store.speakerChoices.first().remember)
+        }
+    }
+
+    @Test fun rememberChoiceInSettingsAnswersTheVoicesQuestion() = runTest {
+        withStore { store ->
+            store.setRememberVoices(false)
+            assertTrue(store.voicesQuestionAsked.first())
+            assertFalse(store.speakerChoices.first().remember)
+        }
+    }
+
     @Test fun singlePartConsentSurvivesReopenWithoutAuthorizingAnyOtherPart() = runTest {
         withStore { store -> store.recordConsent(100, setOf(ModelPart.VOICES)) }
         withStore { store ->

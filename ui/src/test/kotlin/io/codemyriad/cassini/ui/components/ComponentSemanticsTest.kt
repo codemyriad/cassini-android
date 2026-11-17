@@ -115,10 +115,10 @@ class ComponentSemanticsTest {
             "Phone", "English", "Italiano", "Open", "Not verified",
         )
         for (label in labels) rule.onNodeWithText(label).assertTouchAtLeast48()
-        for (description in listOf("Back to library", "Clear search", "Dismiss", "Record a new note")) {
+        for (description in listOf("Back to library", "Clear search", "Dismiss", "Record a new meeting")) {
             rule.onNodeWithContentDescription(description).assertTouchAtLeast48()
         }
-        rule.onNodeWithContentDescription("Record a new note").assertHasClickAction()
+        rule.onNodeWithContentDescription("Record a new meeting").assertHasClickAction()
         val chip = rule.onNodeWithText("Not verified").fetchSemanticsNode().config
         assertEquals("Show details", chip[SemanticsActions.OnClick].label)
         assertEquals(Role.Button, chip[SemanticsProperties.Role])

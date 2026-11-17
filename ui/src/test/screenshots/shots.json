@@ -1,4 +1,6 @@
 {"shots": [
+  {"screen": "phase2-voices-save-error", "label": "Voices choice — save failure", "scheme": "light", "lang": "en", "device": "phone", "path": "light/phase2-voices-save-error.png"},
+  {"screen": "phase2-voices-save-error", "label": "Voices choice — save failure", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-voices-save-error.png"},
   {"screen": "phase2-backup", "label": "Phase2 Backup", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-backup.png"},
   {"screen": "phase2-backup-end", "label": "Phase2 Backup End", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-backup-end.png"},
   {"screen": "phase2-backup-details", "label": "Phase2 Backup Details", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-backup-details.png"},
@@ -86,6 +88,7 @@
   {"screen": "phase2-settings-map", "label": "Phase 2 Settings", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-settings-map.png"},
   {"screen": "phase2-settings-speakers", "label": "Phase 2 Speakers", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-settings-speakers.png"},
   {"screen": "phase2-settings-transcription", "label": "Phase 2 Transcription", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-settings-transcription.png"},
+  {"screen": "phase2-voices-question", "label": "Phase 2 Voices question", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/phase2-voices-question.png"},
   {"screen": "fontscale-library", "label": "Fontscale library", "scheme": "light", "lang": "en", "device": "phone", "path": "fontscale/00-library.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
   {"screen": "fontscale-read-and-listen", "label": "Fontscale read and listen", "scheme": "light", "lang": "en", "device": "phone", "path": "fontscale/03-read-and-listen.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
   {"screen": "fontscale-name-a-speaker-end", "label": "Fontscale name a speaker end", "scheme": "light", "lang": "en", "device": "phone", "path": "fontscale/04-name-a-speaker-end.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
@@ -150,6 +153,7 @@
   {"screen": "phase2-settings-map", "label": "Phase 2 Settings", "scheme": "light", "lang": "en", "device": "phone", "path": "light/phase2-settings-map.png"},
   {"screen": "phase2-settings-speakers", "label": "Phase 2 Speakers", "scheme": "light", "lang": "en", "device": "phone", "path": "light/phase2-settings-speakers.png"},
   {"screen": "phase2-settings-transcription", "label": "Phase 2 Transcription", "scheme": "light", "lang": "en", "device": "phone", "path": "light/phase2-settings-transcription.png"},
+  {"screen": "phase2-voices-question", "label": "Phase 2 Voices question", "scheme": "light", "lang": "en", "device": "phone", "path": "light/phase2-voices-question.png"},
   {"screen": "scaffold-hello", "label": "Scaffold hello", "scheme": "light", "lang": "en", "device": "phone", "path": "scaffold/hello.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
   {"screen": "scaffold-link-paragraph", "label": "Scaffold link paragraph", "scheme": "light", "lang": "en", "device": "phone", "path": "scaffold/link-paragraph.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
   {"screen": "states-col1", "label": "States col1", "scheme": "light", "lang": "en", "device": "phone", "path": "states/10-states-col1.png"},

@@ -30,4 +30,5 @@ at that commit in its own `UPSTREAM.json` entry. It supplies only the first-run 
 
 `phase2/strings.json` (L-67, D-1048) is the complete catalog pinned independently for phone meeting nouns.
 `scripts/generate-phase2-strings.py` generates the affected Settings, Saved voices, transcription and shared-path
-resources in all six languages. See `docs/design/phase2-d1048.md`; the original Phase 1 and Wave 5 pins stay fixed.
+resources in all six languages. See `docs/design/phase2-d1048.md` and, for the D103 second pass (re-pinned at
+`c28b724`), `docs/design/phase2-d1086.md`; the original Phase 1 and Wave 5 pins stay fixed.

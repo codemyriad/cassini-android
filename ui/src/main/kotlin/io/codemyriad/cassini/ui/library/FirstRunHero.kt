@@ -107,7 +107,7 @@ fun FirstRunHero(hero: FirstRunHeroUi, modifier: Modifier = Modifier) {
                 .height(FirstRunHeroMetrics.waveHeight),
         )
         Text(
-            stringResource(R.string.ui_banner_lib_empty_body),
+            stringResource(R.string.ui_first_run_how_to),
             Modifier.padding(top = FirstRunHeroMetrics.howToTop),
             style = CassiniTheme.type.about,
             color = c.text2,

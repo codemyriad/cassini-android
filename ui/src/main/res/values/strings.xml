@@ -105,7 +105,7 @@
     <string name="ui_day_yesterday_inline">yesterday</string>
     <string name="ui_day_time">%1$s, %2$s</string>
     <string name="ui_day_time_spoken">%1$s %2$s</string>
-    <string name="ui_voice_note_title">Voice note %1$s</string>
+    <string name="ui_voice_note_title">Meeting %1$s</string>
 
     <!-- Counts (features.md section 0). -->
     <plurals name="ui_count_speakers">
@@ -145,7 +145,7 @@
     <string name="ui_library_recording_paused_card">Recording paused · %1$s</string>
     <string name="ui_library_recording_tap">Tap to return</string>
     <string name="ui_library_record">Record</string>
-    <string name="ui_library_record_description">Record a new note</string>
+    <string name="ui_library_record_description">Record a new meeting</string>
     <string name="ui_library_recording_fab">Recording · %1$s</string>
     <string name="ui_library_return_to_recording">Return to recording</string>
     <string name="ui_library_moved_to_trash">“%1$s” moved to trash</string>
@@ -305,17 +305,7 @@
     <string name="ui_merge_action">Merge</string>
 
     <!-- Model download (board 05, features.md section 5). -->
-    <string name="ui_models_title">Transcribe on this phone</string>
-    <string name="ui_models_body">Cassini needs a one-time download of about %1$s. After that, recognising words and telling voices apart happen on this phone, even offline. Your audio stays here.</string>
-    <string name="ui_models_footnote">Needs about %1$s free while installing. Each file is checked before it is used.</string>
-    <string name="ui_models_sources">Where the models come from</string>
-    <string name="ui_models_privacy">Privacy</string>
-    <string name="ui_models_download_and_transcribe">Download and transcribe</string>
     <string name="ui_models_download">Download</string>
-    <string name="ui_models_not_now">Not now — keep the audio</string>
-    <string name="ui_part_speech">Speech recognition</string>
-    <string name="ui_part_speakers">Telling speakers apart</string>
-    <string name="ui_part_voices">Recognising saved voices</string>
     <string name="ui_part_downloading_speech">Downloading speech recognition — %1$d%%</string>
     <string name="ui_part_downloading_speakers">Downloading speaker separation — %1$d%%</string>
     <string name="ui_part_downloading_voices">Downloading voice recognition — %1$d%%</string>
@@ -374,8 +364,6 @@
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Saved voices</string>
     <string name="ui_voices_confirmed_speech">%1$s confirmed speech</string>
-    <string name="ui_voices_options">Options for %1$s</string>
-    <string name="ui_voices_forget">Forget…</string>
     <string name="ui_voices_forget_title">Forget %1$s?</string>
     <string name="ui_voices_forget_action">Forget</string>
     <string name="ui_voices_rename_title">Rename saved voice</string>
@@ -394,7 +382,6 @@
     <string name="ui_settings_model_pending">Downloads with next transcription</string>
     <string name="ui_settings_model_not_downloaded">Not downloaded</string>
     <string name="ui_settings_model_failed">Download failed — tap to try again</string>
-    <string name="ui_settings_models_footnote">Transcription runs on this phone.</string>
 
     <!-- Licenses (no board; features.md section 11). -->
     <string name="ui_licenses_third_party">Third-party notices</string>
@@ -491,7 +478,7 @@
     <string name="ui_banner_dl_record_now_title">Record now, transcribe later</string>
     <string name="ui_banner_dl_record_now_body">Transcription needs a one-time download. Audio is safe meanwhile.</string>
 
-    <string name="ui_banner_lib_empty_title">No notes yet</string>
+    <string name="ui_banner_lib_empty_title">No meetings yet</string>
     <string name="ui_banner_lib_empty_body">Record something, or import an audio file.</string>
     <string name="ui_banner_lib_no_match_title">Nothing matches “%1$s”</string>
     <string name="ui_banner_lib_no_match_body">Try another word or title.</string>
@@ -511,14 +498,13 @@
     <string name="ui_banner_notifications_off_body">Progress shows only in the app.</string>
     <string name="ui_banner_voices_unreadable_title">Saved voices can’t be read</string>
     <string name="ui_banner_voices_unreadable_body">They were made by a newer Cassini or are damaged. Nothing was changed.</string>
-    <string name="ui_banner_lib_unavailable_title">Your notes can’t be opened</string>
+    <string name="ui_banner_lib_unavailable_title">Your meetings can’t be opened</string>
     <string name="ui_banner_lib_unavailable_body">Your files are kept. Free some storage, then open Cassini again.</string>
     <string name="ui_settings_optional_size">Optional download · %1$s</string>
     <string name="ui_settings_unavailable">Unavailable</string>
     <string name="ui_settings_not_available">Not available on this device.</string>
 
     <!-- Coordinator D78; ux-draft/strings.json. -->
-    <string name="ui_action_not_now">Not now</string>
     <string name="ui_parakeet_suggestion_title">Get better transcripts with Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">Whistle is built in so you can start right away. Parakeet Ultra is more accurate. It’s a %1$s download.</string>
     <string name="ui_parakeet_now_default">New meetings now use Parakeet Ultra.</string>

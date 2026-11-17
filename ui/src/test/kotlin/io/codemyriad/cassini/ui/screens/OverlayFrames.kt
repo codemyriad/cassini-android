@@ -15,6 +15,7 @@ import io.codemyriad.cassini.ui.note.NoteDialogContent
 import io.codemyriad.cassini.ui.note.NoteSheet
 import io.codemyriad.cassini.ui.note.NoteUiState
 import io.codemyriad.cassini.ui.note.VersionsSheetContent
+import io.codemyriad.cassini.ui.note.VoicesQuestionContent
 
 /**
  * The open overlay of a Note screen state drawn inline, as its window shows it (docs/design/ui.md section 10.1):
@@ -44,5 +45,6 @@ private fun NoteSheetContent(sheet: NoteSheet) {
         is NoteSheet.Merge -> MergeSheetContent(sheet.ui, onEvent = {})
         is NoteSheet.Versions -> VersionsSheetContent(sheet.ui, onPick = {})
         is NoteSheet.Info -> error("Document info is a dialog")
+        is NoteSheet.VoicesQuestion -> VoicesQuestionContent(onAnswer = {}, ui = sheet)
     }
 }

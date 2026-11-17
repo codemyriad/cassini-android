@@ -20,14 +20,16 @@
         <item quantity="other">%1$s reuniones</item>
     </plurals>
     <string name="ui_voices_stale">Vuelve a poner nombre a esta persona en una reunión para que Cassini la siga reconociendo.</string>
-    <string name="ui_voices_footnote">Para añadir a alguien, pon nombre a un hablante en cualquier reunión y deja activado “Recordar esta voz”.</string>
+    <string name="ui_voices_footnote">Para añadir a alguien, pon nombre a un hablante en una reunión y deja activado “Recordar esta voz”. Si olvidas una voz, los nombres que ya están en tus reuniones se mantienen.</string>
+    <string name="ui_voices_options">Opciones de %1$s</string>
+    <string name="ui_voices_forget">Olvidar…</string>
     <string name="ui_voices_forget_body">Cassini deja de reconocer esta voz. Los nombres que ya están en tus reuniones se mantienen.</string>
     <plurals name="ui_voices_forget_everyone_body">
         <item quantity="one">Cassini deja de reconocer %1$s voz guardada y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen.</item>
         <item quantity="many">Cassini deja de reconocer las %1$s voces guardadas y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen.</item>
         <item quantity="other">Cassini deja de reconocer las %1$s voces guardadas y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen.</item>
     </plurals>
-    <string name="ui_trash_intro">Las reuniones de aquí se eliminan definitivamente tras 30 días, con su audio, sus transcripciones y las huellas de voz de esas reuniones.</string>
+    <string name="ui_trash_intro">Las reuniones de aquí se eliminan definitivamente tras 30 días.</string>
     <string name="ui_trash_delete_body">Se eliminan su audio, sus transcripciones y las huellas de voz de esta reunión. No se puede deshacer.</string>
     <plurals name="ui_trash_delete_all_title">
         <item quantity="one">¿Eliminar %1$s reunión definitivamente?</item>
@@ -131,4 +133,22 @@
     <string name="ui_about_name_version">Cassini talk %1$s</string>
     <string name="ui_about_version">Versión %1$s</string>
     <string name="ui_about_licence_line">Software libre bajo GPLv3. © %1$s Codemyriad y colaboradores.</string>
+    <string name="ui_first_run_how_to">Pulsa Grabar cuando empiece la reunión y Detener cuando termine. Cassini lo transcribe todo.</string>
+    <string name="ui_voices_setup_title">¿Reconocer a las personas a las que pones nombre?</string>
+    <string name="ui_voices_setup_body">Cuando pones nombre a un hablante, Cassini puede recordar su voz y ponerle nombre por ti en reuniones posteriores.</string>
+    <string name="ui_voices_setup_privacy">Las huellas de voz se crean en este teléfono y nunca se incluyen en los archivos exportados o compartidos. En Ajustes puedes elegir si se incluyen en las copias de seguridad.</string>
+    <string name="ui_voices_setup_enable">Sí, recordar voces</string>
+    <string name="ui_action_not_now">Ahora no</string>
+    <string name="ui_voices_setup_kindness">Es un gesto de cortesía preguntar antes de guardar la voz de alguien.</string>
+    <string name="ui_voices_setup_change_later">Puedes cambiarlo en Ajustes › Hablantes.</string>
+    <string name="ui_speakers_remember">Recordar a las personas a las que pongo nombre</string>
+    <string name="ui_speakers_remember_short">La próxima vez, Cassini les pondrá nombre por ti.</string>
+    <string name="ui_models_title">Transcribir en este teléfono</string>
+    <string name="ui_models_body">Cassini necesita una única descarga de %1$s. Después, todo ocurre en este teléfono, incluso sin conexión.</string>
+    <string name="ui_part_speech">Reconocimiento de voz</string>
+    <string name="ui_part_speakers">Separación de hablantes</string>
+    <string name="ui_part_voices">Reconocimiento de voces guardadas</string>
+    <string name="ui_models_space_needed">Necesita unos %1$s libres mientras se instala. Cada archivo se comprueba antes de usarlo.</string>
+    <string name="ui_models_download_and_transcribe">Descargar y transcribir</string>
+    <string name="ui_models_recording_kept">Tu grabación se conserva en cualquier caso.</string>
 </resources>

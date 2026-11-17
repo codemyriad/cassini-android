@@ -237,7 +237,7 @@ internal object VariantFixtures {
         ),
         "recording-permission-off" to b.recording.copy(
             phase = RecordingPhase.NeedsPermission,
-            title = "Voice note 9 Oct, 10:30",
+            title = "Meeting 9 Oct, 10:30",
             elapsedMs = 0,
             levels = WaveformLevels.Empty,
             hint = null,
@@ -245,7 +245,7 @@ internal object VariantFixtures {
         ),
         "recording-starting" to b.recording.copy(
             phase = RecordingPhase.Starting,
-            title = "Voice note 9 Oct, 10:30",
+            title = "Meeting 9 Oct, 10:30",
             elapsedMs = 0,
             levels = WaveformLevels.Empty,
         ),

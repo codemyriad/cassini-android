@@ -39,7 +39,7 @@
     <string name="notif_processing_finishing">%1$d%% · finalizando</string>
     <string name="notif_processing_calculating">Calculando o tempo restante…</string>
     <string name="notif_processing_starting">Iniciando…</string>
-    <string name="notif_processing_waiting">Concluindo a nota anterior…</string>
+    <string name="notif_processing_waiting">Concluindo a reunião anterior…</string>
     <string name="notif_processing_stopping">Parando e mantendo o progresso…</string>
     <string name="notif_processing_matching">Comparando vozes…</string>
     <string name="notif_processing_saving">Salvando…</string>
@@ -47,7 +47,7 @@
     <string name="notif_processing_download_models">Baixando modelos…</string>
     <string name="notif_processing_download_bytes">%1$d de %2$d MB</string>
     <string name="notif_processing_checking">Verificando arquivos — %1$d%%</string>
-    <string name="notif_processing_public">Transcrevendo uma nota</string>
+    <string name="notif_processing_public">Transcrevendo uma reunião</string>
     <string name="notif_part_speech">reconhecimento de fala</string>
     <string name="notif_part_speakers">distinção de locutores</string>
     <string name="notif_part_voices">reconhecimento de vozes salvas</string>
@@ -72,24 +72,24 @@
         <item quantity="many">%1$d locutores · %2$s</item>
         <item quantity="other">%1$d locutores · %2$s</item>
     </plurals>
-    <string name="notif_transcribed_public">Uma nota foi transcrita</string>
+    <string name="notif_transcribed_public">Uma reunião foi transcrita</string>
     <string name="notif_failed_title">Não foi possível transcrever %1$s</string>
-    <string name="notif_failed_public">Não foi possível transcrever uma nota</string>
+    <string name="notif_failed_public">Não foi possível transcrever uma reunião</string>
     <string name="notif_failed_mismatch">O progresso salvo não corresponde mais. Sua gravação é mantida.</string>
     <string name="notif_failed_document">Esta transcrição não aceita uma nova versão. Sua gravação é mantida.</string>
     <string name="notif_failed_no_connection">Sem conexão. Conecte-se à internet e tente novamente.</string>
     <string name="notif_ready_title">Pronta para transcrever</string>
     <string name="notif_ready_text">%1$s está aguardando. Abra o Cassini para começar.</string>
-    <string name="notif_ready_public">Uma nota está aguardando. Abra o Cassini para começar.</string>
+    <string name="notif_ready_public">Uma reunião está aguardando. Abra o Cassini para começar.</string>
     <string name="notif_paused_title">Transcrição pausada pelo Android</string>
     <string name="notif_paused_text">Pausada em %1$s de %2$s. O Android limita o trabalho em segundo plano a cerca de 6 horas por dia. Abra o Cassini para retomar.</string>
     <string name="notif_paused_text_early">Pausada antes de encontrar palavras. O Android limita o trabalho em segundo plano a cerca de 6 horas por dia. Abra o Cassini para retomar.</string>
     <string name="notif_paused_public">Abra o Cassini para retomar.</string>
     <string name="notif_stopped_title">Transcrição interrompida</string>
     <string name="notif_stopped_text">O Cassini fechou durante a transcrição de %1$s.</string>
-    <string name="notif_stopped_public">O Cassini fechou durante a transcrição de uma nota.</string>
+    <string name="notif_stopped_public">O Cassini fechou durante a transcrição de uma reunião.</string>
     <!-- Recording (features.md sections 2, 12 and 13.2). -->
-    <string name="rec_default_title">Nota de voz %1$s</string>
+    <string name="rec_default_title">Reunião %1$s</string>
     <string name="notif_rec_title">Gravando</string>
     <string name="notif_rec_paused_title">Gravação pausada</string>
     <string name="notif_rec_paused_at">Pausada em %1$s</string>

@@ -138,6 +138,20 @@ internal class FakeNotePorts : NotePorts {
     )
     val saved = MutableStateFlow(SavedVoices(listOf(SavedVoice(voice("anna", "Anna Ricci"), 1, false)), null))
     override val voiceModelReady = MutableStateFlow(true)
+    override val rememberVoices = MutableStateFlow(true)
+
+    /** Asked by default, so that the voices question stays out of the tests that are not about it. */
+    override val voicesQuestionAsked = MutableStateFlow(true)
+
+    var beforeVoicesAnswer: suspend () -> Unit = {}
+
+    override suspend fun answerVoicesQuestion(remember: Boolean?) {
+        calls += "answerVoicesQuestion:$remember"
+        beforeVoicesAnswer()
+        voicesQuestionAsked.value = true
+        if (remember != null) rememberVoices.value = remember
+    }
+
     override val processing = MutableStateFlow(ProcessingState(loading = false))
     override val recording: MutableStateFlow<RecordingState> = MutableStateFlow(RecordingState.Idle)
     override val notices = MutableStateFlow(NoticeFacts())

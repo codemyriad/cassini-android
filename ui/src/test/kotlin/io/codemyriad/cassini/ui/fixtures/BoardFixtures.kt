@@ -130,7 +130,7 @@ internal object BoardFixtures {
     )
     val voiceNote = NoteRowUi(
         id = "voice-note",
-        title = "Voice note 8 Oct, 08:14",
+        title = "Meeting 8 Oct, 08:14",
         durationMs = clock(2, 41),
         time = LocalTime.of(8, 14),
         status = NoteStatusUi.AudioOnly,

@@ -74,7 +74,7 @@
     <string name="ui_day_yesterday_inline">ieri</string>
     <string name="ui_day_time">%1$s, %2$s</string>
     <string name="ui_day_time_spoken">%1$s alle %2$s</string>
-    <string name="ui_voice_note_title">Nota vocale %1$s</string>
+    <string name="ui_voice_note_title">Riunione %1$s</string>
 
     <!-- Conteggi. -->
     <plurals name="ui_count_speakers">
@@ -121,7 +121,7 @@
     <string name="ui_library_recording_paused_card">Registrazione in pausa · %1$s</string>
     <string name="ui_library_recording_tap">Tocca per tornare</string>
     <string name="ui_library_record">Registra</string>
-    <string name="ui_library_record_description">Registra una nuova nota</string>
+    <string name="ui_library_record_description">Registra una nuova riunione</string>
     <string name="ui_library_recording_fab">Registrazione · %1$s</string>
     <string name="ui_library_return_to_recording">Torna alla registrazione</string>
     <string name="ui_library_moved_to_trash">“%1$s” spostata nel Cestino</string>
@@ -275,17 +275,7 @@
     <string name="ui_merge_action">Unisci</string>
 
     <!-- Download dei modelli. -->
-    <string name="ui_models_title">Trascrivi su questo telefono</string>
-    <string name="ui_models_body">Cassini ha bisogno di un unico download di circa %1$s. Dopo, il riconoscimento delle parole e la distinzione delle voci avvengono su questo telefono, anche offline. Il tuo audio resta qui.</string>
-    <string name="ui_models_footnote">Servono circa %1$s liberi durante l’installazione. Ogni file viene verificato prima dell’uso.</string>
-    <string name="ui_models_sources">Da dove vengono i modelli</string>
-    <string name="ui_models_privacy">Privacy</string>
-    <string name="ui_models_download_and_transcribe">Scarica e trascrivi</string>
     <string name="ui_models_download">Scarica</string>
-    <string name="ui_models_not_now">Non ora — tieni l’audio</string>
-    <string name="ui_part_speech">Riconoscimento vocale</string>
-    <string name="ui_part_speakers">Distinzione delle voci</string>
-    <string name="ui_part_voices">Riconoscimento delle voci salvate</string>
     <string name="ui_part_downloading_speech">Download del riconoscimento vocale — %1$d%%</string>
     <string name="ui_part_downloading_speakers">Download della distinzione delle voci — %1$d%%</string>
     <string name="ui_part_downloading_voices">Download del riconoscimento delle voci — %1$d%%</string>
@@ -343,8 +333,6 @@
     <!-- Voci salvate. -->
     <string name="ui_voices_title">Voci salvate</string>
     <string name="ui_voices_confirmed_speech">%1$s di parlato confermato</string>
-    <string name="ui_voices_options">Opzioni per %1$s</string>
-    <string name="ui_voices_forget">Dimentica…</string>
     <string name="ui_voices_forget_title">Dimenticare %1$s?</string>
     <string name="ui_voices_forget_action">Dimentica</string>
     <string name="ui_voices_rename_title">Rinomina la voce salvata</string>
@@ -363,7 +351,6 @@
     <string name="ui_settings_model_pending">Si scarica con la prossima trascrizione</string>
     <string name="ui_settings_model_not_downloaded">Non scaricato</string>
     <string name="ui_settings_model_failed">Download non riuscito — tocca per riprovare</string>
-    <string name="ui_settings_models_footnote">La trascrizione avviene su questo telefono.</string>
 
     <string name="ui_licenses_third_party">Avvisi di terze parti</string>
     <string name="ui_licenses_third_party_body">Le librerie che Cassini usa e le loro licenze</string>
@@ -461,7 +448,7 @@
     <string name="ui_banner_dl_record_now_title">Registra ora, trascrivi dopo</string>
     <string name="ui_banner_dl_record_now_body">La trascrizione richiede un unico download. Intanto l’audio è al sicuro.</string>
 
-    <string name="ui_banner_lib_empty_title">Ancora nessuna nota</string>
+    <string name="ui_banner_lib_empty_title">Ancora nessuna riunione</string>
     <string name="ui_banner_lib_empty_body">Registra qualcosa o importa un file audio.</string>
     <string name="ui_banner_lib_no_match_title">Nessun risultato per “%1$s”</string>
     <string name="ui_banner_lib_no_match_body">Prova un’altra parola o un titolo.</string>
@@ -481,14 +468,13 @@
     <string name="ui_banner_notifications_off_body">I progressi si vedono solo nell’app.</string>
     <string name="ui_banner_voices_unreadable_title">Impossibile leggere le voci salvate</string>
     <string name="ui_banner_voices_unreadable_body">Sono state create da una versione più recente di Cassini o sono danneggiate. Non è stato modificato nulla.</string>
-    <string name="ui_banner_lib_unavailable_title">Impossibile aprire le note</string>
+    <string name="ui_banner_lib_unavailable_title">Le tue riunioni non si possono aprire</string>
     <string name="ui_banner_lib_unavailable_body">I file sono al sicuro. Libera spazio, poi apri di nuovo Cassini.</string>
     <string name="ui_settings_optional_size">Download facoltativo · %1$s</string>
     <string name="ui_settings_unavailable">Non disponibile</string>
     <string name="ui_settings_not_available">Non disponibile su questo dispositivo.</string>
 
     <!-- Coordinator D78; ux-draft/strings.json. -->
-    <string name="ui_action_not_now">Non ora</string>
     <string name="ui_parakeet_suggestion_title">Trascrizioni migliori con Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">Whistle è incluso per iniziare subito. Parakeet Ultra è più preciso. Il download è di %1$s.</string>
     <string name="ui_parakeet_now_default">Le nuove riunioni ora usano Parakeet Ultra.</string>

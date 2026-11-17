@@ -133,6 +133,7 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         base.copy(
             tellSpeakersApart = speakers.first.tellApart,
             recogniseVoices = speakers.first.recognise,
+            rememberVoices = speakers.first.remember,
             speakerSaving = speakers.second,
             speakerError = speakers.third,
             meetings = totals.first,
@@ -164,6 +165,7 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             is SettingsEvent.ChooseSpeech -> chooseSpeech(event.model)
             is SettingsEvent.OpenModel -> openModel(event)
             is SettingsEvent.SpeakerChoice -> speakerChoice(event)
+            is SettingsEvent.RememberVoices -> saveSpeakerChoice { ports.setRememberVoices(event.enabled) }
             SettingsEvent.OpenPrivacy -> emit(SettingsEffect.Open(LicenseDetailKey(LicenseEntry.PRIVACY.name)))
             SettingsEvent.OpenSources -> emit(SettingsEffect.Open(LicenseDetailKey(LicenseEntry.MODEL_SOURCES.name)))
             SettingsEvent.OpenHelp -> emit(SettingsEffect.OpenUrl("https://cassini.talk/help"))
@@ -176,14 +178,22 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     }
 
     private fun speakerChoice(event: SettingsEvent.SpeakerChoice) {
-        if (speakerSaving.value || event.part == io.codemyriad.cassini.ui.format.ModelPartUi.SPEECH) return
+        if (event.part == io.codemyriad.cassini.ui.format.ModelPartUi.SPEECH) return
+        saveSpeakerChoice {
+            val part = ModelPart.entries.single { Notices.partUi(it) == event.part }
+            ports.setSpeakerChoice(part, event.enabled)
+            if (event.enabled) openModel(SettingsEvent.OpenModel(event.part))
+        }
+    }
+
+    /** One speaker switch at a time: the switches are disabled while [save] runs and a failure shows the error. */
+    private fun saveSpeakerChoice(save: suspend () -> Unit) {
+        if (speakerSaving.value) return
         speakerSaving.value = true
         speakerError.value = false
         viewModelScope.launch {
             try {
-                val part = ModelPart.entries.single { Notices.partUi(it) == event.part }
-                ports.setSpeakerChoice(part, event.enabled)
-                if (event.enabled) openModel(SettingsEvent.OpenModel(event.part))
+                save()
             } catch (error: CancellationException) {
                 throw error
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {

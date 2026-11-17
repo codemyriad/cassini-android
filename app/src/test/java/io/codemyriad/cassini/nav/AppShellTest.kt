@@ -114,7 +114,11 @@ class AppShellTest {
             }
             platform.controller = { app.graph.recording }
             shadowOf(app as Application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
-            runBlocking { withTimeout(TIMEOUT_MS) { app.graph.ready.await() } }
+            runBlocking {
+                withTimeout(TIMEOUT_MS) { app.graph.ready.await() }
+                // The voices question (D103) is covered by NoteViewModelTest; here it would sit over every meeting.
+                app.graph.settings.answerVoicesQuestion(null)
+            }
         }
 
         override fun after() {
@@ -241,7 +245,7 @@ class AppShellTest {
         rule.waitForIdle()
 
         val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
-        val record = rule.onNodeWithContentDescription("Record a new note").fetchSemanticsNode().boundsInRoot.bottom
+        val record = rule.onNodeWithContentDescription("Record a new meeting").fetchSemanticsNode().boundsInRoot.bottom
         val settings = rule.onNodeWithContentDescription("Settings").fetchSemanticsNode().boundsInRoot
         val density = rule.activity.resources.displayMetrics.density
         // The board puts Record 24 dp above the bottom; the navigation bar adds its height.
@@ -412,7 +416,7 @@ class AppShellTest {
         waitFor(FIND_BUTTON)
         // Under a settled note the Library is composed but not placed: no node of it is reachable.
         rule.onNodeWithContentDescription("Settings").assertDoesNotExist()
-        rule.onNodeWithContentDescription("Record a new note").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Record a new meeting").assertDoesNotExist()
 
         Espresso.pressBack()
         waitGone(FIND_BUTTON)
@@ -523,7 +527,7 @@ class AppShellTest {
         const val TIMEOUT_MS = 10_000L
 
         // The bottom bar Record button (its label is merged into this description); the empty Library has no banner Record.
-        const val RECORD = "Record a new note"
+        const val RECORD = "Record a new meeting"
         const val PLAYER_DURATION_MS = 60_000L
         const val STATUS_PX = 60
         const val NAVIGATION_PX = 96

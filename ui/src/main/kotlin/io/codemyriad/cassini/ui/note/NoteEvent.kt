@@ -101,6 +101,9 @@ sealed interface NoteEvent {
     @Immutable
     data class DismissBanner(val id: String) : NoteEvent
 
+    /** "Yes, remember voices" (true) or "Not now" (false) in the voices question (D103). */
+    data class VoicesAnswer(val remember: Boolean) : NoteEvent
+
     data object DismissSheet : NoteEvent
 
     data object DismissDialog : NoteEvent

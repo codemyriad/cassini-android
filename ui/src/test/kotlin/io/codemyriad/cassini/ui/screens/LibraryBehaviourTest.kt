@@ -190,7 +190,7 @@ class LibraryBehaviourTest {
 
     @Test fun theControlsSendTheirEvents() {
         show(BoardFixtures.library)
-        rule.onNodeWithContentDescription("Record a new note").performClick()
+        rule.onNodeWithContentDescription("Record a new meeting").performClick()
         rule.onNodeWithText("Import audio").performClick()
         rule.onNode(hasContentDescription("Weekly product sync,", substring = true)).performClick()
         assertEvents(
