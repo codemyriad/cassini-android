@@ -55,7 +55,7 @@ internal object ComponentFixtures {
     )
     val voiceNote = NoteRowUi(
         id = "voice",
-        title = "Voice note 8 Oct, 08:14",
+        title = "Meeting 8 Oct, 08:14",
         durationMs = 161_000,
         time = LocalTime.of(8, 14),
         status = NoteStatusUi.AudioOnly,

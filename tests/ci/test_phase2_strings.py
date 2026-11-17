@@ -33,6 +33,17 @@ class Phase2StringsTest(unittest.TestCase):
                         for text in entry.itertext():
                             self.assertIsNone(LEGACY_NOUN.search(text), (path, entry.get('name'), text))
 
+    def test_recording_titles_agree_and_notifications_use_meeting_nouns(self):
+        for directory in PHASE2.phase1.LOCALES.values():
+            resources = {}
+            for module in ('app', 'ui'):
+                path = ROOT / module / 'src/main/res' / directory / 'strings.xml'
+                resources[module] = {e.get('name'): e.text for e in ET.parse(path).getroot()}
+            self.assertEqual(resources['app']['rec_default_title'], resources['ui']['ui_voice_note_title'], directory)
+            for name, text in resources['app'].items():
+                if name.startswith('notif_') or name == 'rec_default_title':
+                    self.assertIsNone(LEGACY_NOUN.search(text or ''), (directory, name, text))
+
     def test_backup_notice_keeps_d98_copy_after_catalog_migration(self):
         expected = {
             'backup_card_title': 'backup.phoneOnlyCard.title',

@@ -37,7 +37,7 @@
     <string name="notif_processing_finishing">%1$d%% · quasi finito</string>
     <string name="notif_processing_calculating">Calcolo del tempo rimanente…</string>
     <string name="notif_processing_starting">Avvio…</string>
-    <string name="notif_processing_waiting">Completamento della nota precedente…</string>
+    <string name="notif_processing_waiting">Completamento della riunione precedente…</string>
     <string name="notif_processing_stopping">Interruzione, i progressi restano salvati…</string>
     <string name="notif_processing_matching">Riconoscimento delle voci…</string>
     <string name="notif_processing_saving">Salvataggio…</string>
@@ -45,7 +45,7 @@
     <string name="notif_processing_download_models">Download dei modelli…</string>
     <string name="notif_processing_download_bytes">%1$d di %2$d MB</string>
     <string name="notif_processing_checking">Verifica dei file — %1$d%%</string>
-    <string name="notif_processing_public">Trascrizione di una nota</string>
+    <string name="notif_processing_public">Trascrizione di una riunione</string>
     <string name="notif_part_speech">riconoscimento vocale</string>
     <string name="notif_part_speakers">distinzione delle voci</string>
     <string name="notif_part_voices">riconoscere le voci salvate</string>
@@ -70,24 +70,24 @@
         <item quantity="many">%1$d voci · %2$s</item>
         <item quantity="other">%1$d voci · %2$s</item>
     </plurals>
-    <string name="notif_transcribed_public">Una nota è stata trascritta</string>
+    <string name="notif_transcribed_public">Una riunione è stata trascritta</string>
     <string name="notif_failed_title">Impossibile trascrivere %1$s</string>
-    <string name="notif_failed_public">Impossibile trascrivere una nota</string>
+    <string name="notif_failed_public">Impossibile trascrivere una riunione</string>
     <string name="notif_failed_mismatch">I progressi salvati non corrispondono più. La registrazione resta.</string>
     <string name="notif_failed_document">Questa trascrizione non può avere una nuova versione. La registrazione resta.</string>
     <string name="notif_failed_no_connection">Nessuna connessione. Connettiti a internet e riprova.</string>
     <string name="notif_ready_title">Pronta da trascrivere</string>
     <string name="notif_ready_text">%1$s è in attesa. Apri Cassini per iniziare.</string>
-    <string name="notif_ready_public">Una nota è in attesa. Apri Cassini per iniziare.</string>
+    <string name="notif_ready_public">Una riunione è in attesa. Apri Cassini per iniziare.</string>
     <string name="notif_paused_title">Trascrizione sospesa da Android</string>
     <string name="notif_paused_text">In pausa a %1$s di %2$s. Android limita il lavoro in background a circa 6 ore al giorno. Apri Cassini per riprendere.</string>
     <string name="notif_paused_text_early">In pausa prima di trovare parole. Android limita il lavoro in background a circa 6 ore al giorno. Apri Cassini per riprendere.</string>
     <string name="notif_paused_public">Apri Cassini per riprendere.</string>
     <string name="notif_stopped_title">Trascrizione interrotta</string>
     <string name="notif_stopped_text">Cassini si è chiuso durante la trascrizione di %1$s.</string>
-    <string name="notif_stopped_public">Cassini si è chiuso durante la trascrizione di una nota.</string>
+    <string name="notif_stopped_public">Cassini si è chiuso durante la trascrizione di una riunione.</string>
     <!-- Registrazione (features.md sezioni 2, 12 e 13.2). -->
-    <string name="rec_default_title">Nota vocale %1$s</string>
+    <string name="rec_default_title">Riunione %1$s</string>
     <string name="notif_rec_title">Registrazione</string>
     <string name="notif_rec_paused_title">Registrazione in pausa</string>
     <string name="notif_rec_paused_at">In pausa a %1$s</string>

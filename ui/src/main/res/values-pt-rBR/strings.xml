@@ -75,7 +75,7 @@
     <string name="ui_day_yesterday_inline">ontem</string>
     <string name="ui_day_time">%1$s, %2$s</string>
     <string name="ui_day_time_spoken">%1$s às %2$s</string>
-    <string name="ui_voice_note_title">Nota de voz %1$s</string>
+    <string name="ui_voice_note_title">Reunião %1$s</string>
 
     <!-- Counts (features.md section 0). -->
     <plurals name="ui_count_speakers">

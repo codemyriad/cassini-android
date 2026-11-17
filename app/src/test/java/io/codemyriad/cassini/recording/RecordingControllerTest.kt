@@ -170,7 +170,7 @@ class RecordingControllerTest {
 
     @Test fun aBlankTitleBecomesTheDefault() = runBlocking {
         val active = startRecording("")
-        assertTrue(row(active.noteId)?.title.orEmpty().startsWith("Voice note "))
+        assertTrue(row(active.noteId)?.title.orEmpty().startsWith("Meeting "))
         assertEquals(row(active.noteId)?.title, active.defaultTitle)
         assertEquals(
             "the notification shows the row title",
@@ -180,7 +180,7 @@ class RecordingControllerTest {
 
         controller.finish("   ")
         awaitEnded()
-        assertTrue(row(active.noteId)?.title.orEmpty().startsWith("Voice note "))
+        assertTrue(row(active.noteId)?.title.orEmpty().startsWith("Meeting "))
     }
 
     // The policy loop. ----------------------------------------------------------------------------------------------

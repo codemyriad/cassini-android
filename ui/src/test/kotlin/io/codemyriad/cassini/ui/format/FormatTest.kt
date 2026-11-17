@@ -190,7 +190,7 @@ class FormatTest {
             Dates.trashLine(res, DayLabel.Date(MONDAY.minusDays(3), withYear = false), 23, f),
         )
         assertEquals("Deleted today · 30 days left", Dates.trashLine(res, DayLabel.Today, 30, f))
-        assertEquals("Voice note 8 Oct, 08:14", Dates.voiceNoteTitle(res, MONDAY.plusDays(3), LocalTime.of(8, 14), f))
+        assertEquals("Meeting 8 Oct, 08:14", Dates.voiceNoteTitle(res, MONDAY.plusDays(3), LocalTime.of(8, 14), f))
     }
 
     @Test fun twelveAndTwentyFourHours() {
@@ -292,7 +292,7 @@ class FormatItalianTest {
         assertEquals("Lunedì 5 ott", Dates.dayLabel(res, DayLabel.Date(MONDAY, withYear = false), f))
         assertEquals("5 ott 2025", Dates.dayLabel(res, DayLabel.Date(MONDAY.minusYears(1), withYear = true), f))
         assertEquals("Oggi, 10:02", Dates.dayTime(res, DayLabel.Today, LocalTime.of(10, 2), f))
-        assertEquals("Nota vocale 8 ott, 08:14", Dates.voiceNoteTitle(res, MONDAY.plusDays(3), LocalTime.of(8, 14), f))
+        assertEquals("Riunione 8 ott, 08:14", Dates.voiceNoteTitle(res, MONDAY.plusDays(3), LocalTime.of(8, 14), f))
         assertEquals(
             "Eliminata 2 ott · 23 giorni rimasti",
             Dates.trashLine(res, DayLabel.Date(MONDAY.minusDays(3), withYear = false), 23, f),

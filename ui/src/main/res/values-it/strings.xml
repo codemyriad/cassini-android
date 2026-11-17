@@ -74,7 +74,7 @@
     <string name="ui_day_yesterday_inline">ieri</string>
     <string name="ui_day_time">%1$s, %2$s</string>
     <string name="ui_day_time_spoken">%1$s alle %2$s</string>
-    <string name="ui_voice_note_title">Nota vocale %1$s</string>
+    <string name="ui_voice_note_title">Riunione %1$s</string>
 
     <!-- Conteggi. -->
     <plurals name="ui_count_speakers">
