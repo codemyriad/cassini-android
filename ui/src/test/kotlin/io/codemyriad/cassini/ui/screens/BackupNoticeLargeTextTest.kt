@@ -1,6 +1,8 @@
 package io.codemyriad.cassini.ui.screens
 
 import android.content.Context
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -29,7 +31,9 @@ class BackupNoticeLargeTextTest : BoardTest() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         rule.mainClock.autoAdvance = true
         rule.onNodeWithText(context.getString(R.string.ui_backup_card_dismiss)).performScrollTo().performClick()
-        rule.onNodeWithText(context.getString(R.string.ui_backup_card_action)).performScrollTo().performClick()
+        rule.onNode(
+            hasText(context.getString(R.string.ui_backup_card_action)) and hasClickAction(),
+        ).performScrollTo().performClick()
         assertEquals(listOf(LibraryEvent.DismissBackupCard, LibraryEvent.KeepOnPhoneOnly), events)
     }
 }

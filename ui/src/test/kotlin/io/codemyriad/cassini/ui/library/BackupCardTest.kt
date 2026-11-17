@@ -41,7 +41,7 @@ class BackupCardTest {
         rule.setContent { CassiniTheme { LibraryScreen(LibraryUiState(backupCard = true), events::add) } }
         rule.onNodeWithText("Keep them on this phone only").assertExists()
         val notice = rule.onNodeWithTag("backup-notice").fetchSemanticsNode().boundsInRoot
-        val record = rule.onNodeWithText("Record").fetchSemanticsNode().boundsInRoot
+        val record = rule.onNodeWithText("Record", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("notice stays above the bottom actions", notice.bottom <= record.top)
     }
 }
