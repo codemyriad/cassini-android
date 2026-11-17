@@ -85,7 +85,7 @@ class TranscribingDetailsTest {
         }
         rule.onNodeWithContentDescription("Etapa 3 de 5: Palavras").assertExists()
         rule.onNodeWithContentDescription("Etapa 4 de 5: Oradores e reconhecimento").assertExists()
-        rule.onNodeWithContentDescription("Etapa 5 de 5: Gravação").assertExists()
+        rule.onNodeWithContentDescription("Etapa 5 de 5: A guardar").assertExists()
         rule.onNodeWithContentDescription("Etapa 5 de 5: Armazenamento").assertDoesNotExist()
     }
 

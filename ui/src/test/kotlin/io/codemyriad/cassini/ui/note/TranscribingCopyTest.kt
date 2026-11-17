@@ -19,7 +19,7 @@ class TranscribingCopyTest {
             "en" to ("about 1 min left" to "about 2 min left"),
             "fr" to ("environ 1 min restante" to "environ 2 min restantes"),
             "it" to ("circa 1 min rimanente" to "circa 2 min rimanenti"),
-            "es" to ("queda 1 min" to "quedan unos 2 min"),
+            "es" to ("queda aprox. 1 min" to "quedan unos 2 min"),
             "pt-BR" to ("cerca de 1 min restante" to "cerca de 2 min restantes"),
             "pt-PT" to ("cerca de 1 min restante" to "cerca de 2 min restantes"),
         )
