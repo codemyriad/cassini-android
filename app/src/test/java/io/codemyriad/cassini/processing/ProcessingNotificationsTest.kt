@@ -53,7 +53,7 @@ class ProcessingNotificationsTest {
         assertEquals("Matching voices…", transcribing(progress(TimeLeft.Finishing, ProgressHeadline.MATCHING_VOICES)))
         assertEquals("Saving…", transcribing(progress(TimeLeft.Finishing, ProgressHeadline.SAVING)))
         assertEquals("Starting…", notifications.content(running(JobPhase.Starting)).text)
-        assertEquals("Finishing the previous note…", notifications.content(running(JobPhase.WaitingForPrevious)).text)
+        assertEquals("Finishing the previous meeting…", notifications.content(running(JobPhase.WaitingForPrevious)).text)
 
         val queued = running(JobPhase.Starting).copy(queue = listOf(QueuedNote("b", "B")))
         assertEquals("Transcribing “Meeting”", notifications.content(queued).title)
@@ -117,7 +117,7 @@ class ProcessingNotificationsTest {
         )
         assertEquals(Notification.VISIBILITY_PRIVATE, failed.visibility)
         assertEquals(
-            "A note couldn't be transcribed",
+            "A meeting couldn't be transcribed",
             failed.publicVersion.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
         )
     }
@@ -171,7 +171,7 @@ class ProcessingNotificationsLocaleTest {
             posted.extras.getCharSequence(Notification.EXTRA_TEXT).toString(),
         )
         assertEquals(
-            "Una nota è in attesa. Apri Cassini per iniziare.",
+            "Una riunione è in attesa. Apri Cassini per iniziare.",
             posted.publicVersion.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
         )
 
