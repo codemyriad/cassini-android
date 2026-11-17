@@ -20,14 +20,16 @@
         <item quantity="other">%1$s reuniões</item>
     </plurals>
     <string name="ui_voices_stale">Nomeie essa pessoa de novo em uma reunião para que ela continue sendo reconhecida.</string>
-    <string name="ui_voices_footnote">Para adicionar alguém, nomeie um locutor em qualquer reunião e deixe “Lembrar esta voz” ativado.</string>
+    <string name="ui_voices_footnote">Para adicionar alguém, dê nome a um locutor em uma reunião e deixe “Lembrar esta voz” ativado. Esquecer uma voz mantém os nomes que já estão nas suas reuniões.</string>
+    <string name="ui_voices_options">Opções de %1$s</string>
+    <string name="ui_voices_forget">Esquecer…</string>
     <string name="ui_voices_forget_body">O Cassini deixa de reconhecer esta voz. Os nomes já presentes nas suas reuniões permanecem.</string>
     <plurals name="ui_voices_forget_everyone_body">
         <item quantity="one">O Cassini deixa de reconhecer %1$s voz salva e exclui as impressões de voz de todas as reuniões. Os nomes já presentes nas suas reuniões permanecem.</item>
         <item quantity="many">O Cassini deixa de reconhecer todas as %1$s vozes salvas e exclui as impressões de voz de todas as reuniões. Os nomes já presentes nas suas reuniões permanecem.</item>
         <item quantity="other">O Cassini deixa de reconhecer todas as %1$s vozes salvas e exclui as impressões de voz de todas as reuniões. Os nomes já presentes nas suas reuniões permanecem.</item>
     </plurals>
-    <string name="ui_trash_intro">As reuniões aqui são excluídas para sempre após 30 dias, com o áudio, as transcrições e as impressões de voz dessas reuniões.</string>
+    <string name="ui_trash_intro">As reuniões aqui são excluídas para sempre após 30 dias.</string>
     <string name="ui_trash_delete_body">O áudio, as transcrições e as impressões de voz desta reunião são excluídos. Isso não pode ser desfeito.</string>
     <plurals name="ui_trash_delete_all_title">
         <item quantity="one">Excluir %1$s reunião para sempre?</item>
@@ -131,4 +133,22 @@
     <string name="ui_about_name_version">Cassini talk %1$s</string>
     <string name="ui_about_version">Versão %1$s</string>
     <string name="ui_about_licence_line">Software livre sob a GPLv3. © %1$s Codemyriad e colaboradores.</string>
+    <string name="ui_first_run_how_to">Pressione Gravar quando a reunião começar e Parar quando terminar. O Cassini transcreve tudo.</string>
+    <string name="ui_voices_setup_title">Reconhecer as pessoas que você nomear?</string>
+    <string name="ui_voices_setup_body">Quando você dá nome a um locutor, o Cassini pode lembrar a voz dele e dar o nome por você nas próximas reuniões.</string>
+    <string name="ui_voices_setup_privacy">As impressões de voz são criadas neste celular e nunca são incluídas em arquivos exportados ou compartilhados. Nos Ajustes, você pode escolher se elas entram nos backups.</string>
+    <string name="ui_voices_setup_enable">Sim, lembrar vozes</string>
+    <string name="ui_action_not_now">Agora não</string>
+    <string name="ui_voices_setup_kindness">É gentil perguntar às pessoas antes de salvar a voz delas.</string>
+    <string name="ui_voices_setup_change_later">Você pode mudar isso em Ajustes › Locutores.</string>
+    <string name="ui_speakers_remember">Lembrar as pessoas que eu nomear</string>
+    <string name="ui_speakers_remember_short">Da próxima vez, o Cassini dá nome a elas para você.</string>
+    <string name="ui_models_title">Transcrever neste celular</string>
+    <string name="ui_models_body">O Cassini precisa de um único download de %1$s. Depois disso, tudo acontece neste celular, mesmo offline.</string>
+    <string name="ui_part_speech">Reconhecimento de fala</string>
+    <string name="ui_part_speakers">Separação de locutores</string>
+    <string name="ui_part_voices">Reconhecimento de vozes salvas</string>
+    <string name="ui_models_space_needed">Precisa de cerca de %1$s livres durante a instalação. Cada arquivo é verificado antes de ser usado.</string>
+    <string name="ui_models_download_and_transcribe">Baixar e transcrever</string>
+    <string name="ui_models_recording_kept">Sua gravação é mantida de qualquer forma.</string>
 </resources>

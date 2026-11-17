@@ -122,7 +122,7 @@
     <string name="ui_library_recording_paused_card">Enregistrement en pause · %1$s</string>
     <string name="ui_library_recording_tap">Appuyez pour revenir</string>
     <string name="ui_library_record">Enregistrer</string>
-    <string name="ui_library_record_description">Enregistrer une nouvelle note</string>
+    <string name="ui_library_record_description">Enregistrer une nouvelle réunion</string>
     <string name="ui_library_recording_fab">Enregistrement · %1$s</string>
     <string name="ui_library_return_to_recording">Revenir à l’enregistrement</string>
     <string name="ui_library_moved_to_trash">«\u202F%1$s\u202F» mise à la corbeille</string>
@@ -282,17 +282,7 @@
     <string name="ui_merge_action">Fusionner</string>
 
     <!-- Model download (board 05, features.md section 5). -->
-    <string name="ui_models_title">Transcrire sur ce téléphone</string>
-    <string name="ui_models_body">Cassini a besoin d’un téléchargement unique d’environ %1$s. Ensuite, la reconnaissance des mots et la distinction des intervenants se font sur ce téléphone, même hors connexion. Votre audio reste ici.</string>
-    <string name="ui_models_footnote">Nécessite environ %1$s d’espace libre pendant l’installation. Chaque fichier est vérifié avant utilisation.</string>
-    <string name="ui_models_sources">Provenance des modèles</string>
-    <string name="ui_models_privacy">Confidentialité</string>
-    <string name="ui_models_download_and_transcribe">Télécharger et transcrire</string>
     <string name="ui_models_download">Télécharger</string>
-    <string name="ui_models_not_now">Plus tard — garder l’audio</string>
-    <string name="ui_part_speech">Reconnaissance vocale</string>
-    <string name="ui_part_speakers">Distinction des intervenants</string>
-    <string name="ui_part_voices">Reconnaissance des voix mémorisées</string>
     <string name="ui_part_downloading_speech">Téléchargement de la reconnaissance vocale — %1$d\u202F%%</string>
     <string name="ui_part_downloading_speakers">Téléchargement de la distinction des intervenants — %1$d\u202F%%</string>
     <string name="ui_part_downloading_voices">Téléchargement de la reconnaissance des voix — %1$d\u202F%%</string>
@@ -351,8 +341,6 @@
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Voix mémorisées</string>
     <string name="ui_voices_confirmed_speech">%1$s de parole confirmée</string>
-    <string name="ui_voices_options">Options pour %1$s</string>
-    <string name="ui_voices_forget">Oublier…</string>
     <string name="ui_voices_forget_title">Oublier %1$s\u202F?</string>
     <string name="ui_voices_forget_action">Oublier</string>
     <string name="ui_voices_rename_title">Renommer la voix mémorisée</string>
@@ -371,7 +359,6 @@
     <string name="ui_settings_model_pending">Se télécharge à la prochaine transcription</string>
     <string name="ui_settings_model_not_downloaded">Non téléchargé</string>
     <string name="ui_settings_model_failed">Échec du téléchargement — touchez pour réessayer</string>
-    <string name="ui_settings_models_footnote">La transcription se fait sur ce téléphone.</string>
 
     <!-- Licenses (no board; features.md section 11). -->
     <string name="ui_licenses_third_party">Mentions de tiers</string>
@@ -470,7 +457,7 @@
     <string name="ui_banner_dl_record_now_title">Enregistrer maintenant, transcrire plus tard</string>
     <string name="ui_banner_dl_record_now_body">La transcription nécessite un téléchargement unique. En attendant, l’audio est en sécurité.</string>
 
-    <string name="ui_banner_lib_empty_title">Aucune note pour l’instant</string>
+    <string name="ui_banner_lib_empty_title">Aucune réunion pour l’instant</string>
     <string name="ui_banner_lib_empty_body">Enregistrez quelque chose ou importez un fichier audio.</string>
     <string name="ui_banner_lib_no_match_title">Aucun résultat pour «\u202F%1$s\u202F»</string>
     <string name="ui_banner_lib_no_match_body">Essayez un autre mot ou titre.</string>
@@ -490,14 +477,13 @@
     <string name="ui_banner_notifications_off_body">La progression ne s’affiche que dans l’application.</string>
     <string name="ui_banner_voices_unreadable_title">Impossible de lire les voix mémorisées</string>
     <string name="ui_banner_voices_unreadable_body">Elles ont été créées par une version plus récente de Cassini ou sont endommagées. Rien n’a été modifié.</string>
-    <string name="ui_banner_lib_unavailable_title">Impossible d’ouvrir vos notes</string>
+    <string name="ui_banner_lib_unavailable_title">Impossible d’ouvrir vos réunions</string>
     <string name="ui_banner_lib_unavailable_body">Vos fichiers sont conservés. Libérez de l’espace, puis rouvrez Cassini.</string>
     <string name="ui_settings_optional_size">Téléchargement facultatif · %1$s</string>
     <string name="ui_settings_unavailable">Indisponible</string>
     <string name="ui_settings_not_available">Indisponible sur cet appareil.</string>
 
     <!-- Coordinator D78; ux-draft/strings.json. -->
-    <string name="ui_action_not_now">Plus tard</string>
     <string name="ui_parakeet_suggestion_title">De meilleures transcriptions avec Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">Whistle est inclus pour commencer tout de suite. Parakeet Ultra est plus précis. Le téléchargement fait %1$s.</string>
     <string name="ui_parakeet_now_default">Les nouvelles réunions utilisent désormais Parakeet Ultra.</string>

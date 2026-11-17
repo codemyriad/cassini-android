@@ -51,12 +51,12 @@ class ModelDownloadFlowTest {
         compose.onNodeWithText(text(UiR.string.ui_part_speech)).assertIsDisplayed()
         compose.onNodeWithText(text(UiR.string.ui_part_speakers)).assertDoesNotExist()
 
-        compose.onNodeWithText(text(UiR.string.ui_models_sources), substring = true).performClick()
+        compose.onNodeWithText(text(UiR.string.ui_models_where_from), substring = true).performClick()
         compose.awaitUi(TIMEOUT_MS) { shows(text(UiR.string.ui_about_licences)) }
         compose.onNodeWithContentDescription(text(UiR.string.ui_back)).performClick()
 
-        compose.awaitUi(TIMEOUT_MS) { shows(text(UiR.string.ui_models_not_now)) }
-        compose.onNodeWithText(text(UiR.string.ui_models_not_now)).performClick()
+        compose.awaitUi(TIMEOUT_MS) { shows(text(UiR.string.ui_action_not_now)) }
+        compose.onNodeWithText(text(UiR.string.ui_action_not_now)).performClick()
         compose.awaitUi(TIMEOUT_MS) {
             shows(text(UiR.string.ui_settings_model_not_downloaded))
         }

@@ -55,6 +55,9 @@ interface SettingsPorts {
 
     suspend fun setSpeakerChoice(part: ModelPart, enabled: Boolean) { error("Speaker choices are unavailable") }
 
+    /** "Remember people I name" (D103); it also answers the voices question. */
+    suspend fun setRememberVoices(enabled: Boolean) { error("Speaker choices are unavailable") }
+
     fun meetings(): Flow<Int> = flowOf(0)
 
     fun audioDuration(): Flow<Long> = flowOf(0L)
@@ -107,6 +110,8 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
 
     override suspend fun setSpeakerChoice(part: ModelPart, enabled: Boolean) =
         graph.settings.setSpeakerChoice(part, enabled)
+
+    override suspend fun setRememberVoices(enabled: Boolean) = graph.settings.setRememberVoices(enabled)
 
     override fun meetings(): Flow<Int> = flow { emitAll(graph.awaitCatalogue().notes.counts()) }.map { it.live }
 

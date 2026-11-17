@@ -36,6 +36,13 @@ internal fun SpeakerSettings(state: SettingsUiState, onEvent: (SettingsEvent) ->
     if (state.speakerError) HelperText(stringResource(R.string.ui_settings_transfer_choice_failed))
     SectionHeader(stringResource(R.string.ui_settings_voices))
     SettingsGroup {
+        // D103 (L-60): the default of "Remember this voice"; the voices question sets it first.
+        BackupSwitch(
+            stringResource(R.string.ui_speakers_remember),
+            stringResource(R.string.ui_speakers_remember_short),
+            state.rememberVoices,
+            !state.speakerSaving,
+        ) { onEvent(SettingsEvent.RememberVoices(it)) }
         MapRow(
             stringResource(R.string.ui_settings_voices),
             Counts.plural(R.plurals.ui_settings_people, state.voices),

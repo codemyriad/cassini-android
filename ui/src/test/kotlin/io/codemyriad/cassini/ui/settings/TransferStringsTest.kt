@@ -49,7 +49,6 @@ class TransferStringsTest {
             "settings.transfer.tooLarge" to R.string.ui_settings_transfer_too_large,
             "settings.transfer.unavailable" to R.string.ui_settings_transfer_unavailable,
             "settings.transfer.choice.failed" to R.string.ui_settings_transfer_choice_failed,
-            "android.privacy.processing" to R.string.ui_settings_models_footnote,
         )
     }
 }

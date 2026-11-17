@@ -42,6 +42,10 @@ internal fun NoteOverlays(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
             onDismiss = dismissSheet,
         )
         is NoteSheet.Info -> DocumentInfoDialog(ui = sheet.ui, onDismiss = dismissSheet)
+        NoteSheet.VoicesQuestion -> VoicesQuestionSheet(
+            onAnswer = { onEvent(NoteEvent.VoicesAnswer(it)) },
+            onDismiss = dismissSheet,
+        )
         null -> Unit
     }
     when (val dialog = state.dialog) {

@@ -18,13 +18,15 @@
         <item quantity="other">%1$s meetings</item>
     </plurals>
     <string name="ui_voices_stale">Name them again in a meeting to keep recognising them.</string>
-    <string name="ui_voices_footnote">To add someone, name a speaker in any meeting and keep “Remember this voice” on.</string>
+    <string name="ui_voices_footnote">To add someone, name a speaker in a meeting and keep “Remember this voice” on. Forgetting a voice keeps the names already in your meetings.</string>
+    <string name="ui_voices_options">Options for %1$s</string>
+    <string name="ui_voices_forget">Forget…</string>
     <string name="ui_voices_forget_body">Cassini stops recognising this voice. Names already in your meetings stay.</string>
     <plurals name="ui_voices_forget_everyone_body">
         <item quantity="one">Cassini stops recognising %1$s saved voice and deletes the voiceprints from every meeting. Names already in your meetings stay.</item>
         <item quantity="other">Cassini stops recognising all %1$s saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.</item>
     </plurals>
-    <string name="ui_trash_intro">Meetings here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those meetings.</string>
+    <string name="ui_trash_intro">Meetings here are deleted for good after 30 days.</string>
     <string name="ui_trash_delete_body">Its audio, transcripts and voiceprints from this meeting are deleted. This can’t be undone.</string>
     <plurals name="ui_trash_delete_all_title">
         <item quantity="one">Delete %1$s meeting for good?</item>
@@ -124,4 +126,22 @@
     <string name="ui_about_name_version">Cassini talk %1$s</string>
     <string name="ui_about_version">Version %1$s</string>
     <string name="ui_about_licence_line">Free software under GPLv3. © %1$s Codemyriad and contributors.</string>
+    <string name="ui_first_run_how_to">Press Record when the meeting starts and Stop when it ends. Cassini writes it all down.</string>
+    <string name="ui_voices_setup_title">Recognise people you name?</string>
+    <string name="ui_voices_setup_body">When you name a speaker, Cassini can remember their voice and name them for you in later meetings.</string>
+    <string name="ui_voices_setup_privacy">Voiceprints are created on this phone and are never written into exported or shared files. You can choose in Settings whether backups include them.</string>
+    <string name="ui_voices_setup_enable">Yes, remember voices</string>
+    <string name="ui_action_not_now">Not now</string>
+    <string name="ui_voices_setup_kindness">It’s kind to ask people before you save their voice.</string>
+    <string name="ui_voices_setup_change_later">You can change this in Settings › Speakers.</string>
+    <string name="ui_speakers_remember">Remember people I name</string>
+    <string name="ui_speakers_remember_short">Next time, Cassini names them for you.</string>
+    <string name="ui_models_title">Transcribe on this phone</string>
+    <string name="ui_models_body">Cassini needs a one-time download of %1$s. After that, everything happens on this phone, even offline.</string>
+    <string name="ui_part_speech">Speech recognition</string>
+    <string name="ui_part_speakers">Telling speakers apart</string>
+    <string name="ui_part_voices">Recognising saved voices</string>
+    <string name="ui_models_space_needed">Needs about %1$s free while it installs. Each file is checked before it is used.</string>
+    <string name="ui_models_download_and_transcribe">Download and transcribe</string>
+    <string name="ui_models_recording_kept">Your recording is kept either way.</string>
 </resources>

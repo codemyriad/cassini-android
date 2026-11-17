@@ -70,6 +70,29 @@ class SpeakerNamingTest {
     }
 
     @Test
+    fun rememberPeopleINameOffStartsRememberOffForANewVoiceAndSavesOnlyTheName() {
+        val state = SpeakerNaming.open(input(draft = true).copy(rememberDefault = false))
+        val ui = SpeakerNaming.ui(state)
+        assertFalse(ui.remember)
+        assertTrue(ui.rememberEnabled)
+        val effects = state.on(NamingEvent.NameChanged("Paolo Verdi")).effects(NamingEvent.Save)
+        val name = effects.filterIsInstance<NamingEffect.DraftName>().single()
+        assertEquals(null, name.voiceId)
+        // The checkbox still turns Remember on for this speaker.
+        val on = state.on(NamingEvent.NameChanged("Paolo Verdi"), NamingEvent.RememberToggled(true))
+        assertTrue(SpeakerNaming.ui(on).remember)
+    }
+
+    @Test
+    fun rememberPeopleINameOffKeepsAVoiceThatIsAlreadyBound() {
+        val bound = input(
+            label = SpeakerNameUi.Named("Anna Ricci"),
+            match = Match("anna", 0.8f, Match.State.CONFIRMED),
+        ).copy(rememberDefault = false)
+        assertTrue(SpeakerNaming.ui(SpeakerNaming.open(bound)).remember)
+    }
+
+    @Test
     fun aPlaceholderOpensEmptyWithRememberOnAndNothingToSave() {
         val state = SpeakerNaming.open(input())
         val ui = SpeakerNaming.ui(state)

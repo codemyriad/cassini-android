@@ -32,6 +32,9 @@ sealed interface SettingsEvent {
 
     data class SpeakerChoice(val part: ModelPartUi, val enabled: Boolean) : SettingsEvent
 
+    /** "Remember people I name" (D103): the default of "Remember this voice" in Name a speaker. */
+    data class RememberVoices(val enabled: Boolean) : SettingsEvent
+
     data object OpenPrivacy : SettingsEvent
 
     data object OpenSources : SettingsEvent
