@@ -629,7 +629,7 @@ class NoteViewModel(
             is NoteEvent.BannerAction -> launch { bannerAction(event.id, event.action) }
             is NoteEvent.DismissBanner -> dismissBanner(event.id)
             is NoteEvent.VoicesAnswer -> answerVoicesQuestion(event.remember)
-            NoteEvent.DismissSheet -> if (local.value.sheet == SheetKind.VOICES) answerVoicesQuestion(null) else closeSheet()
+            NoteEvent.DismissSheet -> dismissSheet()
             NoteEvent.DismissDialog -> local.update { it.copy(dialog = null) }
             NoteEvent.SnackbarTimeout -> local.update { it.copy(snackbar = null) }
         }
@@ -826,6 +826,11 @@ class NoteViewModel(
     // Sheets and dialogs. --------------------------------------------------------------------------------------------
 
     private fun openSheet(kind: SheetKind) = local.update { it.copy(sheet = kind) }
+
+    /** A swipe, scrim tap or back: the voices question counts as asked without an answer. */
+    private fun dismissSheet() {
+        if (local.value.sheet == SheetKind.VOICES) answerVoicesQuestion(null) else closeSheet()
+    }
 
     private fun closeSheet() {
         saved[KEY_NAME_SHEET] = null
