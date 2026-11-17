@@ -44,8 +44,8 @@ class Wave5StringsTest(unittest.TestCase):
                 expected = entry['en'] if locale == 'en' else entry['l10n'][locale]['text']
                 self.assertEqual(expected.replace("'", "\\'"), resources['ui_' + name], (locale, name))
 
-    def test_wave6_backup_copy_is_the_d98_android_wording(self):
-        self.assertEqual('backup.phoneOnlyCard.action', WAVE5.WAVE6_LABELS['backup_card_action'])
+    def test_wave6_privacy_copy_is_the_d98_android_wording(self):
+        self.assertEqual('savedVoices.privacy.phone', WAVE5.WAVE6_LABELS['voices_privacy_phone'])
         self.assertFalse(any(i.endswith('.ios') for i in WAVE5.WAVE6_LABELS.values()))
         self.assertFalse(set(WAVE5.LABELS) & set(WAVE5.WAVE6_LABELS))
 
