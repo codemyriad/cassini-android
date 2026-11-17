@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702; do not edit. -->
+<!-- Generated from cassini-ux c28b72461c7317ea0a4684183cb9103626aabf17; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Voces guardadas</string>
     <string name="ui_settings_trash">Papelera</string>
@@ -64,7 +64,7 @@
     <string name="ui_speakers_recognise_short">Pone nombre a las personas guardadas en cuanto hablan.</string>
     <string name="ui_speakers_on_device">Ambos funcionan en este teléfono, después de la transcripción.</string>
     <string name="ui_about_title">Información</string>
-    <string name="ui_about_tagline">Convierte la voz en texto con tiempos en el que puedes buscar, aquí mismo en tu teléfono.</string>
+    <string name="ui_about_tagline">Convierte la voz en texto con marcas de tiempo en el que puedes buscar, aquí mismo en tu teléfono.</string>
     <string name="ui_about_help">Ayuda</string>
     <string name="ui_about_help_subtitle">Respuestas en cassini.talk</string>
     <string name="ui_about_privacy">Privacidad</string>

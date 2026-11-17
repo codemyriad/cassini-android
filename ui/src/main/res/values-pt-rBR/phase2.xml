@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702; do not edit. -->
+<!-- Generated from cassini-ux c28b72461c7317ea0a4684183cb9103626aabf17; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Vozes salvas</string>
     <string name="ui_settings_trash">Lixeira</string>
@@ -61,7 +61,7 @@
     <string name="ui_speakers_tell_apart">Distinguir locutores</string>
     <string name="ui_speakers_tell_apart_short">Locutor 1, Locutor 2 e assim por diante.</string>
     <string name="ui_speakers_recognise">Reconhecer vozes salvas</string>
-    <string name="ui_speakers_recognise_short">Dá nome às pessoas salvas assim que elas falam.</string>
+    <string name="ui_speakers_recognise_short">Dá nome às pessoas que você salvou assim que elas falam.</string>
     <string name="ui_speakers_on_device">Os dois funcionam neste celular, depois da transcrição.</string>
     <string name="ui_about_title">Sobre</string>
     <string name="ui_about_tagline">Transforma a fala em texto pesquisável e com marcação de tempo, aqui mesmo no seu celular.</string>
