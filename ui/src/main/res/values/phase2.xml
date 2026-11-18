@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit. -->
+<!-- Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Saved voices</string>
     <string name="ui_settings_trash">Trash</string>
@@ -51,7 +51,7 @@
     <string name="ui_model_parakeet_short">More accurate. 25 European languages.</string>
     <string name="ui_model_built_in">Built in</string>
     <string name="ui_model_download">Download</string>
-    <string name="ui_models_keep_transcript">Meetings already written down keep their transcript.</string>
+    <string name="ui_models_keep_transcript">Meetings already transcribed keep their transcript.</string>
     <string name="ui_transcription_online_heading">Going online</string>
     <string name="ui_models_where_from">Where the models come from</string>
     <string name="ui_transcription_online">Cassini goes online only to download a model you ask for. Each file is checked before it is used.</string>
@@ -144,4 +144,8 @@
     <string name="ui_models_space_needed">Needs about %1$s free while it installs. Each file is checked before it is used.</string>
     <string name="ui_models_download_and_transcribe">Download and transcribe</string>
     <string name="ui_models_recording_kept">Your recording is kept either way.</string>
+    <string name="ui_hero_subtitle_phone">Right here, on this phone.</string>
+    <string name="ui_first_run_how_to_phone">Record something, or import an audio file.</string>
+    <string name="ui_first_run_privacy_phone">Transcribed on this phone.</string>
+    <string name="ui_first_run_privacy_backups">Backups follow your phone’s settings.</string>
 </resources>

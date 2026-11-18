@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit. -->
+<!-- Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit. -->
 <resources>
     <string name="ui_hero_title">Every word written down.</string>
     <string name="ui_hero_subtitle">None of it uploaded.</string>
     <string name="ui_hero_backup_qualifier">(except for encrypted cloud backup)</string>
     <string name="ui_hero_subtitle_backup">None of it uploaded. (except for encrypted cloud backup)</string>
-    <string name="ui_privacy_phone_only">Written down on this phone. The audio never leaves it.</string>
-    <string name="ui_privacy_with_backup">Written down on this phone. Never uploaded, except to your encrypted cloud backup.</string>
+    <string name="ui_privacy_phone_only">Transcribed on this phone. The audio never leaves it.</string>
+    <string name="ui_privacy_with_backup">Transcribed on this phone. Never uploaded, except to your encrypted cloud backup.</string>
     <string name="ui_privacy_processing">Transcription runs on this phone.</string>
 </resources>

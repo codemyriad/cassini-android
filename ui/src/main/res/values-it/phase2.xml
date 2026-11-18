@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit. -->
+<!-- Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Voci salvate</string>
     <string name="ui_settings_trash">Cestino</string>
@@ -151,4 +151,8 @@
     <string name="ui_models_space_needed">Servono circa %1$s liberi durante l’installazione. Ogni file viene verificato prima dell’uso.</string>
     <string name="ui_models_download_and_transcribe">Scarica e trascrivi</string>
     <string name="ui_models_recording_kept">La registrazione viene conservata in ogni caso.</string>
+    <string name="ui_hero_subtitle_phone">Proprio qui, su questo telefono.</string>
+    <string name="ui_first_run_how_to_phone">Registra qualcosa o importa un file audio.</string>
+    <string name="ui_first_run_privacy_phone">Trascritto su questo telefono.</string>
+    <string name="ui_first_run_privacy_backups">I backup seguono le impostazioni del telefono.</string>
 </resources>

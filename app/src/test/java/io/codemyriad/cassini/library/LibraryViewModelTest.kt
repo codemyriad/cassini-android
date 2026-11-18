@@ -27,7 +27,6 @@ import io.codemyriad.cassini.ui.components.SnackbarKind
 import io.codemyriad.cassini.ui.components.SnackbarSpec
 import io.codemyriad.cassini.ui.format.DayLabel
 import io.codemyriad.cassini.ui.library.FirstRunHeroUi
-import io.codemyriad.cassini.ui.library.FirstRunPrivacy
 import io.codemyriad.cassini.ui.library.LibraryDialog
 import io.codemyriad.cassini.ui.library.LibraryEvent
 import io.codemyriad.cassini.ui.library.LibrarySheet
@@ -116,7 +115,7 @@ class LibraryViewModelTest {
     fun groupsTheLibraryByDayAndShowsTheFirstRunHeroInsteadOfTheEmptyBanner() = runTest(dispatcher) {
         val viewModel = viewModel()
         assertTrue(viewModel.now().banners.isEmpty())
-        assertEquals(FirstRunHeroUi(cloudBackup = false, privacy = FirstRunPrivacy.PROCESSING), viewModel.now().hero)
+        assertEquals(FirstRunHeroUi, viewModel.now().hero)
         ports.add(libraryRow("a", createdAt = daysAgo(0)))
         ports.add(libraryRow("b", createdAt = daysAgo(1)))
         advanceUntilIdle()
@@ -129,28 +128,28 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun theFirstRunHeroFollowsEveryAutomaticCopyThatCanLeaveThePhone() = runTest(dispatcher) {
+    fun theFirstRunHeroIsShownInEveryBackupState() = runTest(dispatcher) {
         val viewModel = viewModel()
-        val expected = mapOf(
-            BackupReach(cloud = true, transfer = true) to FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP),
-            BackupReach(cloud = true, transfer = false) to FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP),
-            BackupReach(cloud = false, transfer = true) to FirstRunHeroUi(false, FirstRunPrivacy.PROCESSING),
-            BackupReach(cloud = false, transfer = false) to FirstRunHeroUi(false, FirstRunPrivacy.PHONE_ONLY),
+        val reaches = listOf(
+            BackupReach(cloud = true, transfer = true),
+            BackupReach(cloud = true, transfer = false),
+            BackupReach(cloud = false, transfer = true),
+            BackupReach(cloud = false, transfer = false),
         )
-        for ((reach, hero) in expected) {
+        for (reach in reaches) {
             ports.backupReach.value = reach
             advanceUntilIdle()
-            assertEquals(reach.toString(), hero, viewModel.now().hero)
+            assertEquals(reach.toString(), FirstRunHeroUi, viewModel.now().hero)
         }
     }
 
     @Test
-    fun keepOnPhoneOnlyHidesTheCardAndTheHeroThenSaysTheAudioNeverLeaves() = runTest(dispatcher) {
+    fun keepOnPhoneOnlyHidesTheCardAndKeepsTheFirstRunHero() = runTest(dispatcher) {
         ports.backupReach.value = BackupReach(cloud = true, transfer = true, card = true)
         val viewModel = viewModel()
         advanceUntilIdle()
         assertFalse(viewModel.now().backupCard)
-        assertEquals(FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP), viewModel.now().hero)
+        assertEquals(FirstRunHeroUi, viewModel.now().hero)
         ports.rows.value = listOf(libraryRow("first"))
         advanceUntilIdle()
         assertTrue(viewModel.now().backupCard)
@@ -160,11 +159,11 @@ class LibraryViewModelTest {
         assertFalse(viewModel.now().backupCard)
         ports.rows.value = emptyList()
         advanceUntilIdle()
-        assertEquals(FirstRunHeroUi(false, FirstRunPrivacy.PHONE_ONLY), viewModel.now().hero)
+        assertEquals(FirstRunHeroUi, viewModel.now().hero)
     }
 
     @Test
-    fun keepBackupOnHidesTheCardAndKeepsTheBackupCopy() = runTest(dispatcher) {
+    fun keepBackupOnHidesTheCardAndKeepsTheHero() = runTest(dispatcher) {
         ports.backupReach.value = BackupReach(cloud = true, transfer = true, card = true)
         val viewModel = viewModel()
         advanceUntilIdle()
@@ -172,7 +171,7 @@ class LibraryViewModelTest {
         advanceUntilIdle()
         assertTrue("dismissBackupCard" in ports.actions)
         assertFalse(viewModel.now().backupCard)
-        assertEquals(FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP), viewModel.now().hero)
+        assertEquals(FirstRunHeroUi, viewModel.now().hero)
     }
 
     @Test

@@ -136,6 +136,11 @@ LABELS = {
     'models_space_needed': ('models.offer.spaceNeeded', 'size'),
     'models_download_and_transcribe': ('models.offer.download', None),
     'models_recording_kept': ('models.offer.recordingKept', None),
+    # D105 first run (L-70, L-71): hero line 2, how-to and two-line always-true privacy line.
+    'hero_subtitle_phone': ('firstRun.hero.subtitle.phone', None),
+    'first_run_how_to_phone': ('firstRun.howTo.phone', None),
+    'first_run_privacy_phone': ('firstRun.privacy.phone', None),
+    'first_run_privacy_backups': ('firstRun.privacy.backups.phone', None),
 }
 
 

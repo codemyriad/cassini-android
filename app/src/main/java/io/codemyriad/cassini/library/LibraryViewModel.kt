@@ -346,9 +346,9 @@ class LibraryViewModel(
             searchFilters = listing.environment.filters,
             recording = LibraryMapping.recordingPill(recording),
             progress = progress,
-            // The first-run hero replaces the empty-Library banner (L-27); until the choices are read, neither shows.
+            // The first-run hero replaces the empty-Library banner (L-70, L-71, D105).
             banners = if (empty) notices.filterNot { it.kind == BannerKind.LIB_EMPTY }.toImmutableList() else notices,
-            hero = live.backupReach?.takeIf { empty }?.let(LibraryMapping::hero),
+            hero = if (empty) LibraryMapping.hero() else null,
             // A LIVE_CAPTURE row exists before Stop: only a saved recording or import unlocks the notice.
             backupCard = live.backupReach?.card == true && !searching && rows.any { it.audioKind != AudioKind.LIVE_CAPTURE },
             libraryFilter = if (listing.starredOnly) LibraryFilterUi.STARRED else LibraryFilterUi.ALL,

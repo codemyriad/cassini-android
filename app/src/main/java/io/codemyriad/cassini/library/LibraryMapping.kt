@@ -29,7 +29,6 @@ import io.codemyriad.cassini.ui.format.DayLabel
 import io.codemyriad.cassini.ui.format.TimeLeftUi
 import io.codemyriad.cassini.ui.library.DaySection
 import io.codemyriad.cassini.ui.library.FirstRunHeroUi
-import io.codemyriad.cassini.ui.library.FirstRunPrivacy
 import io.codemyriad.cassini.ui.library.ProgressBannerUi
 import io.codemyriad.cassini.ui.library.ProgressLine
 import io.codemyriad.cassini.ui.library.RecordingPillUi
@@ -221,18 +220,9 @@ object LibraryMapping {
     }
 
     /**
-     * The first-run hero for the automatic copies that can leave the phone (PARITY Wave 6 contract, Android table):
-     * the backup qualifier and the backup-qualified privacy line while cloud backup is on; with cloud off, the
-     * processing-only line while transfer can still copy the audio, and "never leaves it" only when neither can.
+     * The first-run hero (D105): always-true copy regardless of backup state.
      */
-    fun hero(reach: BackupReach): FirstRunHeroUi = FirstRunHeroUi(
-        cloudBackup = reach.cloud,
-        privacy = when {
-            reach.cloud -> FirstRunPrivacy.WITH_BACKUP
-            reach.transfer -> FirstRunPrivacy.PROCESSING
-            else -> FirstRunPrivacy.PHONE_ONLY
-        },
-    )
+    fun hero(): FirstRunHeroUi = FirstRunHeroUi
 
     /**
      * The transcription banner while a job runs or a standalone download runs (features.md section 1, item 4). The

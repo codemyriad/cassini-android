@@ -5,6 +5,7 @@ package io.codemyriad.cassini.ui.library
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -129,6 +130,10 @@ fun LibraryScreen(
     state.dialog?.let { LibraryDialogWindow(it, onEvent) }
 }
 
+private val LibraryUiState.heroAtBottom: Boolean
+    get() = hero != null && !loading && results == null && sections.isEmpty() &&
+        banners.isEmpty() && imports.isEmpty() && recording == null && progress == null
+
 @Composable
 private fun LibraryList(
     state: LibraryUiState,
@@ -142,6 +147,7 @@ private fun LibraryList(
             modifier = Modifier.weight(1f).fillMaxWidth().testTag("library-list"),
             state = rememberLazyListState(),
             contentPadding = PaddingValues(bottom = listBottom),
+            verticalArrangement = if (state.heroAtBottom) Arrangement.Bottom else Arrangement.Top,
         ) {
             if (tools != null) item(key = "transfers", contentType = "transfers") { tools() }
             if (state.query.isNotBlank()) {
@@ -155,8 +161,8 @@ private fun LibraryList(
             }
             activity(state, onEvent)
             imports(state.imports, onEvent)
-            state.hero?.takeIf { !state.loading }?.let { hero ->
-                item(key = "first-run-hero", contentType = "hero") { FirstRunHero(hero) }
+            state.hero?.takeIf { !state.loading }?.let {
+                item(key = "first-run-hero", contentType = "hero") { FirstRunHero() }
             }
             if (!state.loading) {
                 val results = state.results
