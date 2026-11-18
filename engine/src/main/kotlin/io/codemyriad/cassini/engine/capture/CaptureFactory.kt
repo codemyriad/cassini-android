@@ -31,15 +31,13 @@ object CaptureFactory {
         create(context, file, null, onError)
 
     /** AAC uses MediaRecorder and exposes no PCM tap. Close the feed immediately on that path. */
-    fun create(context: Context, file: File, live: LiveMicrophonePcm?, onError: () -> Unit): MicrophoneCapture =
+    fun create(context: Context, file: File, live: LiveMicrophonePcm?, onError: () -> Unit): MicrophoneCapture {
+        var opusStarted = false
         try {
-            if (file.extension == "opus") OpusCapture(file, live, onError)
-            else {
-                live?.finish()
-                AacCapture(context, file, onError)
-            }
-        } catch (error: Exception) {
-            live?.finish()
-            throw error
+            if (file.extension != "opus") return AacCapture(context, file, onError)
+            return OpusCapture(file, live, onError).also { opusStarted = true }
+        } finally {
+            if (!opusStarted) live?.finish()
         }
+    }
 }
