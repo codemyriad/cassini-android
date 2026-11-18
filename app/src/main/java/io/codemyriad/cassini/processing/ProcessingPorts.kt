@@ -58,14 +58,16 @@ class TranscriptionJobFactory(private val graph: AppGraph) : ProcessingJobFactor
         }
         val source = catalogue.jobStorage.audioFile(noteId)
         val engines = graph.jobEngines(model, source)
+        val choices = graph.settings.speakerChoices.first()
         val job = TranscriptionJob(
             noteId,
             catalogue.jobStorage,
             catalogue.jobVoices,
-            SelectedModelAccess(graph.modelAccess, graph.settings.speakerChoices.first()),
+            SelectedModelAccess(graph.modelAccess, choices),
             engines,
             graph.jobEnvironment,
             model,
+            autoNameVoices = choices.autoName,
         )
         return object : ProcessingJob {
             override val noteId: String = noteId

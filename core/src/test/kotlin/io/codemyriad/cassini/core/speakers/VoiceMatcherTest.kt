@@ -79,4 +79,14 @@ class VoiceMatcherTest {
         val excluded = mapOf("a" to emptySet(), "x" to setOf("anna"))
         assertEquals(plain, VoiceMatcher.match(speakers, voices, "m", t, excluded))
     }
+
+    @Test fun disablingAutoMatchDowngradesStrongMatchesToSuggested() {
+        val voices = listOf(voice("anna", axis(0)))
+        val speakers = mapOf("s" to near(0.90f))
+        assertEquals(Match.State.AUTO, VoiceMatcher.match(speakers, voices, "m", t)["s"]?.state)
+        assertEquals(
+            Match.State.SUGGESTED,
+            VoiceMatcher.match(speakers, voices, "m", t, allowAuto = false)["s"]?.state,
+        )
+    }
 }

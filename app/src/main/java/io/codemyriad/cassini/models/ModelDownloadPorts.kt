@@ -83,7 +83,12 @@ class GraphModelDownloadPorts(
 
     override suspend fun recordConsent(parts: Set<ModelPart>) = graph.models.recordConsent(parts)
 
-    override suspend fun recordDeclined() = graph.models.recordDeclined()
+    override suspend fun recordDeclined() {
+        graph.models.recordDeclined()
+        if (noteId == null && (part == ModelPart.SPEAKERS || part == ModelPart.VOICES)) {
+            graph.settings.setSpeakerChoice(part, false)
+        }
+    }
 
     override suspend fun transcribe(noteId: String): TranscribeOutcome {
         if (speakerRemediation && graph.awaitCatalogue().database.notes().note(noteId)?.documentState !=

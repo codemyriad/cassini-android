@@ -44,7 +44,6 @@ class BackupSectionTest {
 
     @Test fun defaultsShowThreeAccessibleSwitchesAllOn() {
         show(BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false))
-        assertCloudAnswer()
         rule.onNode(hasText("Encrypted cloud backup") and isToggleable()).performScrollTo().assertIsOn().performClick()
         rule.onNodeWithText("Move to a new phone").performScrollTo().assertIsOn().performClick()
         rule.onNodeWithText("Back up saved voices").performScrollTo().assertIsOn().performClick()
@@ -54,13 +53,15 @@ class BackupSectionTest {
         )
         // A switch changes only when the stored choice does.
         rule.onNode(hasText("Encrypted cloud backup") and isToggleable()).assertIsOn()
-        rule.onNodeWithText(BODY_ON, substring = true).assertExists()
+        rule.onNodeWithText(
+            "Voiceprints of people you’ve named, so a new or restored phone keeps recognising them.",
+            substring = true,
+        ).assertExists()
         rule.onAllNodesWithText(PHONE_ONLY).assertCountEquals(0)
     }
 
     @Test fun cloudOnTransferOffSaysCloudRestoreStillBringsMeetingsBack() {
         show(BackupSettingsUi(transfer = false, transferAvailable = true, quotaExceeded = false))
-        assertCloudAnswer()
         rule.onNodeWithText("Move to a new phone").assertIsOff()
         rule.onNodeWithText(
             "Nothing is copied directly to a new phone. Meetings in your cloud backup come back when you restore it on a new phone.",
@@ -71,7 +72,6 @@ class BackupSectionTest {
     @Test fun cloudOffTransferOnMakesNoPhoneOnlyClaim() {
         show(BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false, cloud = false))
         rule.onNode(hasText("Encrypted cloud backup") and isToggleable()).assertIsOff()
-        rule.onNodeWithText("Your meetings move with you to a new phone").assertExists()
         rule.onNodeWithText(CLOUD_OFF).assertExists()
         rule.onAllNodesWithText(PHONE_ONLY).assertCountEquals(0)
     }
@@ -82,14 +82,14 @@ class BackupSectionTest {
         rule.onNodeWithText("Saved voices stay on this phone only", substring = true).assertExists()
     }
 
-    @Test fun detailsOpensWhatMovesAndReturnsToBackup() {
+    @Test fun detailsOpensWhatIncludedAndReturnsToBackup() {
         show(BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false))
-        rule.onNodeWithText("What moves").performScrollTo().performClick()
-        rule.onNodeWithText("WHAT MOVES").assertExists()
+        rule.onNodeWithText("What’s included and who can read it").performScrollTo().performClick()
+        rule.onNodeWithText("WHAT’S INCLUDED").assertExists()
         rule.onNodeWithText("Android cloud backup").assertExists()
         rule.onNodeWithText("A ZIP you export").assertExists()
         rule.onNodeWithContentDescription("Back").performClick()
-        assertCloudAnswer()
+        rule.onNode(hasText("Encrypted cloud backup") and isToggleable()).assertExists()
     }
 
     @Test fun cloudQuotaFailureNamesTheAndroidLimit() {
@@ -113,8 +113,7 @@ class BackupSectionTest {
             "Nothing is copied to a new phone. If this phone is lost or replaced, your meetings are gone unless you exported them.",
         ).assertExists()
         rule.onNodeWithText(CLOUD_OFF).assertExists()
-        rule.onNodeWithText(PHONE_ONLY).assertExists()
-        rule.onNodeWithText("Save every meeting to a folder, a drive or another app.").assertExists()
+        rule.onNodeWithText("Save every meeting to a folder or app.").assertExists()
     }
 
     @Test fun beforeAndroid9NoChannelCanBeToggledAndEachExplainsWhy() {
@@ -131,13 +130,6 @@ class BackupSectionTest {
         rule.onNodeWithText("Back up saved voices").assertIsNotEnabled().assertIsOff()
         assertNoQuotaWarning()
         rule.onAllNodesWithText("Choosing this needs Android 9 or newer.").assertCountEquals(3)
-        rule.onNodeWithText(PHONE_ONLY).assertExists()
-    }
-
-    private fun assertCloudAnswer() {
-        rule.onAllNodesWithText("Encrypted cloud backup").assertCountEquals(2)
-        rule.onAllNodesWithText(BODY_ON, substring = true).assertCountEquals(1)
-        rule.onAllNodesWithText("Your meetings move with you to a new phone").assertCountEquals(0)
     }
 
     private fun assertNoQuotaWarning() {
@@ -167,7 +159,6 @@ class BackupSectionTest {
     }
 
     private companion object {
-        const val BODY_ON = "Meetings are included in your phone’s backups"
         const val CLOUD_OFF = "Meetings are not added to cloud backups. Turning this off stops future backups; " +
             "it does not delete backups already stored in your cloud account."
         const val PHONE_ONLY = "Meetings and saved voices stay on this phone only. They are not backed up or copied " +

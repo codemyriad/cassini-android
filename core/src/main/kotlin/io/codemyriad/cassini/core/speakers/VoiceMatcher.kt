@@ -12,6 +12,7 @@ object VoiceMatcher {
         model: String,
         t: Thresholds,
         excluded: Map<String, Set<String>> = emptyMap(),
+        allowAuto: Boolean = true,
     ): Map<String, Match> {
         val usable = voices.filter { it.model == model }
         val scores = speakers.flatMap { (id, print) ->
@@ -24,7 +25,7 @@ object VoiceMatcher {
             if (score < t.suggest || speaker in result || voice in taken) continue
             // Automatic only when neither another person for this speaker nor another speaker for this person comes close.
             val rival = scores.filter { (s, v, _) -> (s == speaker) != (v == voice) && (s == speaker || v == voice) }.maxOfOrNull { it.third }
-            val auto = score >= t.auto && (rival == null || score - rival >= t.margin)
+            val auto = allowAuto && score >= t.auto && (rival == null || score - rival >= t.margin)
             result[speaker] = Match(voice, score, if (auto) Match.State.AUTO else Match.State.SUGGESTED)
             taken.add(voice)
         }

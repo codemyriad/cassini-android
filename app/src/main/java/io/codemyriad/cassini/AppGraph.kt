@@ -526,6 +526,7 @@ class AppGraph(context: Context, val config: Config) {
             defaultTitle = ::defaultTitle,
             clock = config.clock,
             timing = hooks.timing,
+            transcribeRightAway = { settings.transcribeRightAway.first() },
         )
         return RecordingController(parts)
     }

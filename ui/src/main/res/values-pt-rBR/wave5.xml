@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit. -->
+<!-- Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e; do not edit. -->
 <resources>
     <string name="ui_hero_title">Cada palavra transcrita.</string>
-    <string name="ui_privacy_phone_only">Transcrito neste celular. O áudio nunca sai dele.</string>
-    <string name="ui_privacy_with_backup">Transcrito neste celular. Nunca é enviado, exceto para o seu backup criptografado na nuvem.</string>
-    <string name="ui_privacy_processing">A transcrição é feita neste celular.</string>
 </resources>

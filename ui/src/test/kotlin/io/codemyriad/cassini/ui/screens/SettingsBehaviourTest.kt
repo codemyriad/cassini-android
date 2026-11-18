@@ -8,12 +8,9 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertHeightIsEqualTo
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelectable
@@ -23,6 +20,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performFirstLinkClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
@@ -84,10 +82,10 @@ class SettingsBehaviourTest {
         val events = mutableListOf<ModelDownloadEvent>()
         setThemed { ModelDownloadScreen(BoardFixtures.modelDownload, onEvent = { events += it }) }
         rule.onNodeWithContentDescription("Close").performClick()
-        rule.onNodeWithText("Where the models come from").performClick()
+        rule.onNodeWithText("Where do the files come from?", substring = true).performFirstLinkClick()
         rule.onNodeWithText("Download and transcribe").performClick()
-        rule.onNodeWithText("Not now").performClick()
-        rule.onNodeWithText("Your recording is kept either way.").assertExists()
+        rule.onNodeWithText("Not now — keep the audio").performClick()
+        rule.onAllNodesWithText("Your recording is kept either way.").assertCountEquals(0)
         // The figure keeps its unit on its line with a no-break space.
         rule.onNodeWithText("730\u00A0MB", substring = true).assertExists()
         rule.runOnIdle {
@@ -103,13 +101,10 @@ class SettingsBehaviourTest {
         }
     }
 
-    /** L-04: Model download draws the cassini.talk Saturn (saturn-mid, 86 x 56 dp), not the line-art logo. */
-    @Test fun modelDownloadShowsTheSaturnMidMark() {
+    /** D106 (L-61): No Cassini mark on Model download; the title leads. */
+    @Test fun modelDownloadOmitsSaturnMidMark() {
         setThemed { ModelDownloadScreen(BoardFixtures.modelDownload, onEvent = {}) }
-        rule.onNodeWithTag("saturn-mid", useUnmergedTree = true)
-            .assertIsDisplayed()
-            .assertWidthIsEqualTo(86.dp)
-            .assertHeightIsEqualTo(56.dp)
+        rule.onNodeWithTag("saturn-mid", useUnmergedTree = true).assertDoesNotExist()
     }
 
     /** features.md section 0: the body total is the sum of the rounded rows (640 + 62), not the rounded byte sum (700). */

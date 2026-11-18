@@ -51,7 +51,7 @@ class Wave5StringsTest(unittest.TestCase):
 
     def test_wave5_catalog_names_its_own_commit(self):
         entry = self.pin['files'][WAVE5.SOURCE]
-        self.assertEqual('277c65423909ec6f696836eeefede6d4ac5e4c84', entry['commit'])
+        self.assertEqual('160fb923944422c5c4ff01aa777bb572e2a6e96e', entry['commit'])
         del entry['commit']
         self.pin_path.write_text(json.dumps(self.pin))
         with self.assertRaisesRegex(ValueError, 'own commit'):

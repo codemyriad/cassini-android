@@ -22,6 +22,8 @@ data class SettingsUiState(
     val tellSpeakersApart: Boolean = true,
     val recogniseVoices: Boolean = true,
     val rememberVoices: Boolean = true,
+    val autoNameVoices: Boolean = false,
+    val transcribeRightAway: Boolean = true,
     val speakerSaving: Boolean = false,
     val speakerError: Boolean = false,
     val copyrightYear: String = "2026",

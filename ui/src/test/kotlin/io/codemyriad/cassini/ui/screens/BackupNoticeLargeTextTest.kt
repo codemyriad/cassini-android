@@ -30,9 +30,9 @@ class BackupNoticeLargeTextTest : BoardTest() {
         assertTrue(cutTexts().toString(), cutTexts().isEmpty())
         val context = ApplicationProvider.getApplicationContext<Context>()
         rule.mainClock.autoAdvance = true
-        rule.onNodeWithText(context.getString(R.string.ui_backup_card_dismiss)).performScrollTo().performClick()
+        rule.onNodeWithText(context.getString(R.string.ui_backup_notice_keep)).performScrollTo().performClick()
         rule.onNode(
-            hasText(context.getString(R.string.ui_backup_card_action)) and hasClickAction(),
+            hasText(context.getString(R.string.ui_backup_notice_phone_only)) and hasClickAction(),
         ).performScrollTo().performClick()
         assertEquals(listOf(LibraryEvent.DismissBackupCard, LibraryEvent.KeepOnPhoneOnly), events)
     }

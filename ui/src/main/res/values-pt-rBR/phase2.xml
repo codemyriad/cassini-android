@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit. -->
+<!-- Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Vozes salvas</string>
     <string name="ui_settings_trash">Lixeira</string>
@@ -45,7 +45,6 @@
     <string name="ui_speaker_on">Ativado</string>
     <string name="ui_setting_off">Desativado</string>
     <string name="ui_settings_backup">Backup</string>
-    <string name="ui_backup_answer_transfer">Celular novo</string>
     <string name="ui_settings_language_label">Idioma</string>
     <string name="ui_settings_about_subtitle">Sobre, privacidade e ajuda</string>
     <string name="ui_transcription_for_new">Para novas reuniões</string>
@@ -63,29 +62,30 @@
     <string name="ui_speakers_tell_apart">Distinguir locutores</string>
     <string name="ui_speakers_tell_apart_short">Locutor 1, Locutor 2 e assim por diante.</string>
     <string name="ui_speakers_recognise">Reconhecer vozes salvas</string>
-    <string name="ui_speakers_recognise_short">Dá nome às pessoas que você salvou assim que elas falam.</string>
+    <string name="ui_speakers_recognise_short">Dá nome às pessoas que você salvou.</string>
+    <string name="ui_speakers_auto_name">Nomear pessoas automaticamente</string>
+    <string name="ui_speakers_auto_name_subtitle">Só quando o Cassini tem certeza. As correspondências podem estar erradas, por isso vem desativado.</string>
     <string name="ui_speakers_on_device">Os dois funcionam neste celular, depois da transcrição.</string>
     <string name="ui_backup_cloud_title">Backup criptografado na nuvem</string>
     <string name="ui_backup_cloud_body_on">As reuniões são incluídas nos backups do seu celular e quando você muda para um novo celular. Os modelos de voz baixados não entram no backup; o novo celular os baixa novamente.</string>
     <string name="ui_backup_cloud_body_off">As reuniões não são adicionadas aos backups na nuvem. Desativar esta opção interrompe os próximos backups, mas não exclui os backups já guardados na sua conta na nuvem.</string>
-    <string name="ui_backup_phone_only_body">As reuniões e as vozes salvas ficam apenas neste celular. Elas não entram em backups nem são copiadas para um novo celular; para guardar uma cópia, use “Exportar tudo como ZIP”.</string>
     <string name="ui_backup_voices_title">Fazer backup das vozes salvas</string>
     <string name="ui_backup_voices_subtitle">As vozes salvas são impressões de voz criadas no aparelho para as pessoas que você nomeou, para que um celular novo ou restaurado continue reconhecendo cada uma automaticamente. Desative esta opção para manter as impressões de voz apenas neste celular.</string>
     <string name="ui_backup_voices_subtitle_off">As vozes salvas ficam apenas neste celular: elas não entram em backups nem são copiadas para um novo celular. Em um celular novo ou restaurado, você precisará nomear os locutores novamente.</string>
     <string name="ui_backup_info_android_heading">Backup na nuvem do Android</string>
     <string name="ui_backup_info_android_body">Quando o backup do Android (Google ou Seedvault) está ativado, os backups seguem a criptografia do seu celular e os ajustes do provedor de backup. O Android limita o backup na nuvem de cada aplicativo a 25 MB; para bibliotecas maiores, use “Exportar tudo como ZIP”.</string>
     <string name="ui_backup_info_over_quota">Suas reuniões ultrapassam o limite de 25 MB do backup na nuvem do Android. Use “Exportar tudo como ZIP” para guardar uma cópia completa.</string>
-    <string name="ui_backup_card_title">Manter apenas neste celular</string>
-    <string name="ui_backup_card_body">Suas reuniões e vozes salvas são incluídas no backup criptografado na nuvem e copiadas quando você muda para um novo celular, para que você não as perca se este celular for perdido ou substituído.</string>
-    <string name="ui_backup_card_action">Manter apenas neste celular</string>
-    <string name="ui_backup_card_dismiss">Manter o backup ativado</string>
+    <string name="ui_backup_notice_title">Reuniões nos seus backups</string>
+    <string name="ui_backup_notice_body">Se este celular faz backup, suas reuniões e vozes salvas vão para o backup criptografado dele e passam com você para um celular novo.</string>
+    <string name="ui_backup_notice_keep">Manter no backup</string>
+    <string name="ui_backup_notice_phone_only">Só neste celular</string>
     <string name="ui_backup_card_close">Fechar aviso de backup</string>
     <string name="ui_settings_transfer_body_off_backup_on">Nada é copiado diretamente para um novo celular. As reuniões do seu backup na nuvem voltam quando você o restaura em um novo celular.</string>
-    <string name="ui_backup_page_transfer">Suas reuniões vão com você para um celular novo</string>
     <string name="ui_backup_meetings_subtitle">Áudio, transcrições e quem falou.</string>
-    <string name="ui_backup_voices_why">Uma voz pertence a outra pessoa, então é uma escolha à parte.</string>
+    <string name="ui_backup_voices_description">As impressões de voz das pessoas que você nomeou, para que um celular novo ou restaurado continue a reconhecê-las. Uma voz pertence a outra pessoa, então esta é uma escolha à parte.</string>
     <string name="ui_backup_more_detail">Em mais detalhes</string>
-    <string name="ui_backup_moves">O que é transferido</string>
+    <string name="ui_backup_more_detail_row">O que está incluído e quem pode ler</string>
+    <string name="ui_backup_included_heading">O que está incluído</string>
     <string name="ui_backup_who">Quem pode ler</string>
     <string name="ui_backup_meetings">Reuniões</string>
     <string name="ui_backup_meetings_detail">Áudio, transcrições e quem falou</string>
@@ -94,15 +94,15 @@
     <string name="ui_backup_voices_with_meetings">Copiadas com suas reuniões</string>
     <string name="ui_backup_models">Modelos de voz</string>
     <string name="ui_backup_models_detail">Baixados de novo no celular novo</string>
-    <string name="ui_backup_copied">Copiado</string>
-    <string name="ui_backup_not_copied">Não copiado</string>
+    <string name="ui_backup_included">Incluído</string>
+    <string name="ui_backup_not_included">Não incluído</string>
     <string name="ui_backup_new_phone">O celular novo</string>
     <string name="ui_backup_new_phone_detail">Copiado de celular para celular, por cabo ou Wi-Fi. Nada vai para uma conta na nuvem.</string>
     <string name="ui_backup_zip">Um ZIP que você exporta</string>
     <string name="ui_backup_zip_detail">Quem puder acessar o local onde você o colocar.</string>
     <string name="ui_backup_never">O próprio Cassini nunca envia nem lê suas reuniões.</string>
     <string name="ui_backup_own_copy">Sua própria cópia</string>
-    <string name="ui_backup_zip_subtitle">Salve todas as reuniões em uma pasta, uma unidade ou outro app.</string>
+    <string name="ui_backup_zip_subtitle">Salve todas as reuniões em uma pasta ou app.</string>
     <string name="ui_backup_export_all">Exportar tudo como ZIP…</string>
     <string name="ui_settings_transfer_title">Transferir para um novo celular</string>
     <string name="ui_about_title">Sobre</string>
@@ -147,11 +147,15 @@
     <string name="ui_part_speech">Reconhecimento de fala</string>
     <string name="ui_part_speakers">Separação de locutores</string>
     <string name="ui_part_voices">Reconhecimento de vozes salvas</string>
-    <string name="ui_models_space_needed">Precisa de cerca de %1$s livres durante a instalação. Cada arquivo é verificado antes de ser usado.</string>
+    <string name="ui_models_space_needed">Precisa de cerca de %1$s livres para instalar. Cada arquivo é verificado antes de ser usado.</string>
+    <string name="ui_models_where_from_link">De onde vêm os arquivos?</string>
     <string name="ui_models_download_and_transcribe">Baixar e transcrever</string>
-    <string name="ui_models_recording_kept">Sua gravação é mantida de qualquer forma.</string>
+    <string name="ui_models_not_now">Agora não — manter o áudio</string>
     <string name="ui_hero_subtitle_phone">Aqui mesmo, neste celular.</string>
     <string name="ui_first_run_how_to_phone">Grave algo ou importe um arquivo de áudio.</string>
     <string name="ui_first_run_privacy_phone">Transcrito neste celular.</string>
     <string name="ui_first_run_privacy_backups">Os backups seguem as configurações do seu celular.</string>
+    <string name="ui_setting_on">Ativado</string>
+    <string name="ui_transcription_right_away">Transcrever na hora</string>
+    <string name="ui_transcription_right_away_subtitle">Quando estiver desativado, o Cassini guarda o áudio e você escolhe quando transcrever.</string>
 </resources>

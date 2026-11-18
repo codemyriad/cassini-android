@@ -69,6 +69,7 @@ class RecordingController(private val parts: Parts) {
         val defaultTitle: (Long) -> String,
         val clock: () -> Long = System::currentTimeMillis,
         val timing: Timing = Timing(),
+        val transcribeRightAway: suspend () -> Boolean = { true },
     )
 
     /** The intervals of architecture 5.8; tests shorten [tickMs]. */
@@ -497,6 +498,7 @@ class RecordingController(private val parts: Parts) {
         var next = AfterFinish.AUDIO_ONLY
         if (durationMs > Limits.MAX_TRANSCRIBE_MS) return next
         guarded("hand the recording to processing") {
+            if (!parts.transcribeRightAway()) return@guarded
             next = when {
                 parts.consent.consented() ->
                     if (parts.handoff.handOff(noteId)) AfterFinish.TRANSCRIBE else AfterFinish.AUDIO_ONLY

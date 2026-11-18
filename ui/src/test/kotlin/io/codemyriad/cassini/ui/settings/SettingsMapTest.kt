@@ -5,11 +5,11 @@ import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.format.ModelPartUi
 import io.codemyriad.cassini.ui.theme.CassiniTheme
@@ -39,11 +39,13 @@ class SettingsMapTest {
         rule.onNodeWithText("Speakers").performClick()
         rule.onNodeWithText("Tell speakers apart").assertIsOn().performClick()
         rule.onNodeWithText("Recognise saved voices").assertIsOff().performClick()
+        rule.onNodeWithText("Name people automatically").assertIsOff().performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(
                     SettingsEvent.SpeakerChoice(ModelPartUi.SPEAKERS, false),
                     SettingsEvent.SpeakerChoice(ModelPartUi.VOICES, true),
+                    SettingsEvent.AutoNameVoices(true),
                 ),
                 events,
             )
@@ -87,15 +89,15 @@ class SettingsMapTest {
         }
     }
 
-    @Test fun privacyIsQualifiedForEveryTransportAndUnknownState() {
+    @Test fun topPageShowsFirstRunPrivacyLineAndOnOrOffBackupAnswer() {
         val base = BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false)
-        assertEquals(R.string.ui_privacy_processing, settingsPrivacy(null))
-        assertEquals(R.string.ui_privacy_with_backup, settingsPrivacy(base))
-        assertEquals(R.string.ui_privacy_processing, settingsPrivacy(base.copy(cloud = false)))
-        assertEquals(R.string.ui_privacy_phone_only, settingsPrivacy(base.copy(cloud = false, transfer = false)))
-        assertEquals(
-            R.string.ui_privacy_phone_only,
-            settingsPrivacy(base.copy(cloudAvailable = false, transferAvailable = false)),
-        )
+        val backup = mutableStateOf(base)
+        rule.setContent {
+            CassiniTheme { SettingsScreen(BoardFixtures.settings.copy(backup = backup.value), {}) }
+        }
+        rule.onNodeWithText("Transcribed on this phone. Backups follow your phone’s settings.").assertExists()
+        rule.onNode(hasText("Backup") and hasText("On")).assertExists()
+        rule.runOnIdle { backup.value = base.copy(cloud = false, transfer = false) }
+        rule.onNode(hasText("Backup") and hasText("Off")).assertExists()
     }
 }

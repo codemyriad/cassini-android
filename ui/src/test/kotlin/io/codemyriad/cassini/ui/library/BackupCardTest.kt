@@ -25,11 +25,11 @@ class BackupCardTest {
 
     @Test fun theCardOffersPhoneOnlyKeepBackupOnAndANamedCloseButton() {
         rule.setContent { CassiniTheme { BackupCard(events::add) } }
-        rule.onNodeWithText("Keep them on this phone only").assertExists()
-        rule.onNodeWithText("Your meetings and saved voices are included in encrypted cloud backup", substring = true)
+        rule.onNodeWithText("Meetings in your backups").assertExists()
+        rule.onNodeWithText("If this phone backs up, your meetings and saved voices go into its encrypted backup", substring = true)
             .assertExists()
-        rule.onNodeWithText("Keep on this phone only").performClick()
-        rule.onNodeWithText("Keep backup on").performClick()
+        rule.onNodeWithText("This phone only").performClick()
+        rule.onNodeWithText("Keep in backup").performClick()
         rule.onNodeWithContentDescription("Dismiss backup notice").performClick()
         assertEquals(
             listOf(LibraryEvent.KeepOnPhoneOnly, LibraryEvent.DismissBackupCard, LibraryEvent.DismissBackupCard),
@@ -39,7 +39,7 @@ class BackupCardTest {
 
     @Test fun theLibraryShowsTheCardOnlyWhenAsked() {
         rule.setContent { CassiniTheme { LibraryScreen(LibraryUiState(backupCard = true), events::add) } }
-        rule.onNodeWithText("Keep them on this phone only").assertExists()
+        rule.onNodeWithText("Meetings in your backups").assertExists()
         val notice = rule.onNodeWithTag("backup-notice").fetchSemanticsNode().boundsInRoot
         val record = rule.onNodeWithText("Record", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("notice stays above the bottom actions", notice.bottom <= record.top)

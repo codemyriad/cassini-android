@@ -3,7 +3,6 @@
 
 package io.codemyriad.cassini.ui.models
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -23,15 +21,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.Banner
@@ -47,11 +45,11 @@ import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 
 /**
- * The Model download screen (board 05, features.md section 5; ui.md section 8). A Column on bg with the board's
- * padding 16/20/24 inside the safe drawing insets: Close, then the content (weight 1, scrolls, gap 20): the logo, the
- * title, the body with the bold total, the card of missing parts, the footnote and the added "Where the models come
- * from" link (D103, L-61). At the bottom: the banner when there is one, the large primary button ("Download and
- * transcribe" with a meeting, else "Download"), "Not now" and the "Your recording is kept either way." caption.
+ * The Model download screen (board 05, features.md section 5; ui.md section 8; D106 L-61). A Column on bg with the
+ * board's padding 16/20/24 inside the safe drawing insets: Close, then the content (weight 1, scrolls, gap 20): the
+ * title, the body with the bold total, the card of missing parts, and the footnote with the inline "Where do the files
+ * come from?" link. At the bottom: the banner when there is one, the large primary button ("Download and transcribe"
+ * with a meeting, else "Download"), and "Not now — keep the audio".
  *
  * The board's Close is a 44 dp visual at margin -10; its 48 dp layout sits 2 dp higher and 12 dp to the start, and
  * the content's top padding takes the 4 dp back (22 instead of 24), so no pixel moves.
@@ -86,12 +84,6 @@ fun ModelDownloadScreen(
                 .padding(top = 22.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            // L-04: the cassini.talk Saturn, saturn-mid above header size, 56 dp tall as the board's logo.
-            Image(
-                painterResource(R.drawable.ui_saturn_mid),
-                contentDescription = null,
-                modifier = Modifier.size(86.dp, 56.dp).testTag("saturn-mid"),
-            )
             // Android lays a 28 sp line out about 2 dp taller than its 32.2 dp line box (it never goes below the
             // font's own height); 1 dp less above and below the title keeps it and the body on the board's pixels.
             Text(
@@ -118,19 +110,29 @@ fun ModelDownloadScreen(
     }
 }
 
-/** The free-space caption and the "Where the models come from" link under the parts (D103, L-61). */
+/** The free-space caption ending with the "Where do the files come from?" link (D106, L-61). */
 @Composable
 private fun ModelDownloadFootnote(state: ModelDownloadUiState, onEvent: (ModelDownloadEvent) -> Unit) {
+    val c = CassiniTheme.colors
+    val spaceNeeded = stringResource(R.string.ui_models_space_needed, Sizes.storage(state.requiredFreeBytes))
+    val linkLabel = stringResource(R.string.ui_models_where_from_link)
     Text(
-        text = stringResource(R.string.ui_models_space_needed, Sizes.storage(state.requiredFreeBytes)),
-        style = CassiniTheme.type.body14,
-        color = CassiniTheme.colors.text2,
-    )
-    TextButton(
-        text = stringResource(R.string.ui_models_where_from),
-        onClick = { onEvent(ModelDownloadEvent.OpenSources) },
-        // The text lines up with the content: the button's own 14 dp padding goes to the start.
-        modifier = Modifier.offset(x = (-14).dp),
+        text = buildAnnotatedString {
+            append(spaceNeeded)
+            append(' ')
+            withLink(
+                LinkAnnotation.Clickable(
+                    tag = "sources",
+                    styles = TextLinkStyles(SpanStyle(color = c.accentInk, fontWeight = FontWeight.SemiBold)),
+                ) {
+                    onEvent(ModelDownloadEvent.OpenSources)
+                },
+            ) {
+                append(linkLabel)
+            }
+        },
+        style = CassiniTheme.type.caption.copy(lineHeight = CassiniTheme.type.caption.fontSize * 1.45f),
+        color = c.text2,
     )
 }
 
@@ -187,8 +189,7 @@ private fun PartRow(part: ModelPartSizeUi) {
 }
 
 /**
- * The bottom column (gap 10): the banner, the primary button, "Not now" and under it "Your recording is kept either
- * way." (`models.offer.recordingKept`, D103), which replaces "Not now — keep the audio".
+ * The bottom column (gap 10): the banner, the primary button, and "Not now — keep the audio" (`models.offer.notNow`, D106).
  */
 @Composable
 private fun ModelDownloadActions(state: ModelDownloadUiState, onEvent: (ModelDownloadEvent) -> Unit) {
@@ -216,16 +217,10 @@ private fun ModelDownloadActions(state: ModelDownloadUiState, onEvent: (ModelDow
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             TextButton(
-                text = stringResource(R.string.ui_action_not_now),
+                text = stringResource(R.string.ui_models_not_now),
                 onClick = { onEvent(ModelDownloadEvent.NotNow) },
                 size = TextButtonSize.Tall,
                 enabled = !state.busy,
-            )
-            Text(
-                text = stringResource(R.string.ui_models_recording_kept),
-                style = CassiniTheme.type.caption,
-                color = CassiniTheme.colors.text2,
-                textAlign = TextAlign.Center,
             )
         }
     }

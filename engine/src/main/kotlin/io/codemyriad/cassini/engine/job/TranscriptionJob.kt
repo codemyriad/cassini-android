@@ -93,6 +93,7 @@ class TranscriptionJob(
     private val engines: JobEngines,
     private val env: JobEnvironment,
     private val speechModel: SpeechModel = SpeechModel.PARAKEET,
+    private val autoNameVoices: Boolean = true,
 ) {
     private val channel = Channel<JobEvent>(Channel.UNLIMITED)
     private val stopReason = AtomicReference<PauseReason?>(null)
@@ -452,7 +453,14 @@ class TranscriptionJob(
             val thresholds = Voiceprints.THRESHOLDS.getValue(JobProvenance.PRINT_MODEL)
             val excluded = names.excluded(open.keys)
             val people = people(run.prepared)
-            val matches = VoiceMatcher.match(open, people.voices, JobProvenance.PRINT_MODEL, thresholds, excluded)
+            val matches = VoiceMatcher.match(
+                open,
+                people.voices,
+                JobProvenance.PRINT_MODEL,
+                thresholds,
+                excluded,
+                allowAuto = autoNameVoices,
+            )
             storage.mutateNames(noteId) { it.applyLive(matches, people.names) }
         }
     }
@@ -589,7 +597,14 @@ class TranscriptionJob(
         val embeddings = computed.mapValues { it.value.first }
         val excluded = draft.names.excluded(computed.keys)
         val people = withContext(env.io) { savedVoices(prepared) }
-        val matches = VoiceMatcher.match(embeddings, people.voices, JobProvenance.PRINT_MODEL, thresholds, excluded)
+        val matches = VoiceMatcher.match(
+            embeddings,
+            people.voices,
+            JobProvenance.PRINT_MODEL,
+            thresholds,
+            excluded,
+            allowAuto = autoNameVoices,
+        )
         return Matched(computed, matches)
     }
 

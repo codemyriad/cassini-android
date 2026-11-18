@@ -44,12 +44,12 @@ class Phase2StringsTest(unittest.TestCase):
                 if name.startswith('notif_') or name == 'rec_default_title':
                     self.assertIsNone(LEGACY_NOUN.search(text or ''), (directory, name, text))
 
-    def test_backup_notice_keeps_d98_copy_after_catalog_migration(self):
+    def test_backup_notice_uses_d106_copy(self):
         expected = {
-            'backup_card_title': 'backup.phoneOnlyCard.title',
-            'backup_card_body': 'backup.phoneOnlyCard.body',
-            'backup_card_action': 'backup.phoneOnlyCard.action',
-            'backup_card_dismiss': 'backup.phoneOnlyCard.dismiss',
+            'backup_notice_title': 'backup.notice.title',
+            'backup_notice_body': 'backup.notice.body.phone',
+            'backup_notice_keep': 'backup.notice.keep',
+            'backup_notice_phone_only': 'backup.notice.phoneOnly',
             'backup_card_close': 'backup.phoneOnlyCard.close.a11y',
         }
         for name, identifier in expected.items():

@@ -53,6 +53,12 @@ enum class Glyph(internal val parts: List<GlyphPart>, val filled: Boolean = fals
         listOf(GlyphPart.Rect(3f, 5f, 8f, 14f, 2f), GlyphPart.Rect(13f, 5f, 8f, 14f, 2f)) +
             paths("M9.5 12h5M13 10l2 2-2 2"),
     ),
+    CloudBackup(
+        paths(
+            "M7 18.5h10.5a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.6 9.6 4.5 4.5 0 0 0 7 18.5z",
+            "M12 16v-5.5M9.6 12.6L12 10.2l2.4 2.4",
+        ),
+    ),
     Wave(paths("M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2")),
     People(
         listOf(circle(9f, 7f, 3f), circle(17f, 8f, 2f)) + paths("M3 20v-2a6 6 0 0 1 12 0v2M17 13a4 4 0 0 1 4 4v3"),
