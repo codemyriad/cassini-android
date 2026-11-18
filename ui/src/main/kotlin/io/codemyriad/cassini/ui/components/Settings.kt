@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.format.LocalFormat
 import io.codemyriad.cassini.ui.theme.CassiniIcon
@@ -42,11 +43,16 @@ import io.codemyriad.cassini.ui.theme.colors
  * [first]), bottom 6; a heading.
  */
 @Composable
-fun SectionHeader(text: String, modifier: Modifier = Modifier, first: Boolean = false) {
+fun SectionHeader(
+    text: String,
+    modifier: Modifier = Modifier,
+    first: Boolean = false,
+    topPadding: Dp = if (first) 16.dp else 22.dp,
+) {
     Text(
         text = text.uppercase(LocalFormat.current.locale),
         modifier = modifier
-            .padding(start = 20.dp, end = 20.dp, top = if (first) 16.dp else 22.dp, bottom = 6.dp)
+            .padding(start = 20.dp, end = 20.dp, top = topPadding, bottom = 6.dp)
             .semantics { heading() },
         style = CassiniTheme.type.section,
         color = CassiniTheme.colors.text2,
@@ -185,7 +191,9 @@ fun SettingsRow(
         val height = maxOf(titlePlaceable.height, end?.height ?: 0).coerceAtLeast(constraints.minHeight)
         layout(width, height) {
             titlePlaceable.place(0, (height - titlePlaceable.height) / 2)
-            end?.place(width - end.width, (height - end.height) / 2)
+            // Multi-line rows align trailing items to the first line; one-line rows stay centred.
+            val endY = if (subtitle != null) 0 else (height - (end?.height ?: 0)) / 2
+            end?.place(width - end.width, endY)
         }
     }
 }

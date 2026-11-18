@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit. -->
+<!-- Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Voci salvate</string>
     <string name="ui_settings_trash">Cestino</string>
@@ -45,7 +45,6 @@
     <string name="ui_speaker_on">Attivo</string>
     <string name="ui_setting_off">Disattivato</string>
     <string name="ui_settings_backup">Backup</string>
-    <string name="ui_backup_answer_transfer">Nuovo telefono</string>
     <string name="ui_settings_language_label">Lingua</string>
     <string name="ui_settings_about_subtitle">Informazioni, privacy e aiuto</string>
     <string name="ui_transcription_for_new">Per le nuove riunioni</string>
@@ -63,29 +62,30 @@
     <string name="ui_speakers_tell_apart">Distingui le voci</string>
     <string name="ui_speakers_tell_apart_short">Voce 1, Voce 2 e così via.</string>
     <string name="ui_speakers_recognise">Riconosci le voci salvate</string>
-    <string name="ui_speakers_recognise_short">Dà il nome alle persone salvate appena parlano.</string>
+    <string name="ui_speakers_recognise_short">Dà il nome alle persone che hai salvato.</string>
+    <string name="ui_speakers_auto_name">Assegna i nomi automaticamente</string>
+    <string name="ui_speakers_auto_name_subtitle">Solo quando Cassini è sicuro. Le corrispondenze possono essere sbagliate, quindi è disattivato per impostazione predefinita.</string>
     <string name="ui_speakers_on_device">Entrambi funzionano su questo telefono, dopo la trascrizione.</string>
     <string name="ui_backup_cloud_title">Backup crittografato nel cloud</string>
     <string name="ui_backup_cloud_body_on">Le riunioni sono incluse nei backup del telefono e vengono copiate quando passi a un nuovo telefono. I modelli vocali scaricati non sono inclusi nel backup: il nuovo telefono li scarica di nuovo.</string>
     <string name="ui_backup_cloud_body_off">Le riunioni non vengono aggiunte ai backup nel cloud. Disattivare questa opzione ferma i backup futuri, ma non elimina quelli già salvati nel tuo account cloud.</string>
-    <string name="ui_backup_phone_only_body">Le riunioni e le voci salvate restano solo su questo telefono. Non vengono incluse nei backup né copiate su un nuovo telefono; per conservarne una copia, usa “Esporta tutto come ZIP”.</string>
     <string name="ui_backup_voices_title">Esegui il backup delle voci salvate</string>
     <string name="ui_backup_voices_subtitle">Le voci salvate sono impronte vocali create sul dispositivo per le persone a cui hai dato un nome, così un telefono nuovo o ripristinato continua a riconoscerle automaticamente. Disattiva questa opzione per tenere le impronte vocali solo su questo telefono.</string>
     <string name="ui_backup_voices_subtitle_off">Le voci salvate restano solo su questo telefono: non vengono incluse nei backup né copiate su un nuovo telefono. Su un telefono nuovo o ripristinato dovrai dare di nuovo un nome alle voci.</string>
     <string name="ui_backup_info_android_heading">Backup nel cloud Android</string>
     <string name="ui_backup_info_android_body">Quando il backup di Android (Google o Seedvault) è attivo, i backup seguono la crittografia del telefono e le impostazioni del servizio di backup. Android limita i backup cloud delle app a 25 MB; per librerie più grandi, usa “Esporta tutto come ZIP”.</string>
     <string name="ui_backup_info_over_quota">Le tue riunioni superano il limite di 25 MB del backup cloud di Android. Usa “Esporta tutto come ZIP” per conservare una copia completa.</string>
-    <string name="ui_backup_card_title">Mantieni solo su questo telefono</string>
-    <string name="ui_backup_card_body">Le tue riunioni e le voci salvate sono incluse nel backup crittografato nel cloud e vengono copiate quando passi a un nuovo telefono, così non le perdi se questo telefono viene perso o sostituito.</string>
-    <string name="ui_backup_card_action">Mantieni solo su questo telefono</string>
-    <string name="ui_backup_card_dismiss">Lascia il backup attivo</string>
+    <string name="ui_backup_notice_title">Riunioni nei tuoi backup</string>
+    <string name="ui_backup_notice_body">Se questo telefono fa il backup, le riunioni e le voci salvate finiscono nel suo backup crittografato e ti seguono su un nuovo telefono.</string>
+    <string name="ui_backup_notice_keep">Tieni nel backup</string>
+    <string name="ui_backup_notice_phone_only">Solo su questo telefono</string>
     <string name="ui_backup_card_close">Chiudi avviso sul backup</string>
     <string name="ui_settings_transfer_body_off_backup_on">Nulla viene copiato direttamente su un nuovo telefono. Le riunioni nel tuo backup nel cloud tornano quando lo ripristini su un nuovo telefono.</string>
-    <string name="ui_backup_page_transfer">Le tue riunioni ti seguono su un nuovo telefono</string>
     <string name="ui_backup_meetings_subtitle">Audio, trascrizioni e chi ha parlato.</string>
-    <string name="ui_backup_voices_why">Una voce appartiene a un’altra persona, quindi è una scelta a parte.</string>
+    <string name="ui_backup_voices_description">Le impronte vocali delle persone a cui hai dato un nome, così un telefono nuovo o ripristinato continua a riconoscerle. Una voce appartiene a qualcun altro, quindi è una scelta a parte.</string>
     <string name="ui_backup_more_detail">Più nel dettaglio</string>
-    <string name="ui_backup_moves">Cosa viene trasferito</string>
+    <string name="ui_backup_more_detail_row">Cosa è incluso e chi può leggerlo</string>
+    <string name="ui_backup_included_heading">Cosa è incluso</string>
     <string name="ui_backup_who">Chi può leggerlo</string>
     <string name="ui_backup_meetings">Riunioni</string>
     <string name="ui_backup_meetings_detail">Audio, trascrizioni e chi ha parlato</string>
@@ -94,15 +94,15 @@
     <string name="ui_backup_voices_with_meetings">Copiate con le tue riunioni</string>
     <string name="ui_backup_models">Modelli vocali</string>
     <string name="ui_backup_models_detail">Si scaricano di nuovo sul nuovo telefono</string>
-    <string name="ui_backup_copied">Copiato</string>
-    <string name="ui_backup_not_copied">Non copiato</string>
+    <string name="ui_backup_included">Incluso</string>
+    <string name="ui_backup_not_included">Non incluso</string>
     <string name="ui_backup_new_phone">Il nuovo telefono</string>
     <string name="ui_backup_new_phone_detail">Copiato da telefono a telefono, via cavo o Wi-Fi. Niente va su un account cloud.</string>
     <string name="ui_backup_zip">Uno ZIP che esporti</string>
     <string name="ui_backup_zip_detail">Chiunque abbia accesso a dove lo salvi.</string>
     <string name="ui_backup_never">Cassini non carica né legge mai le tue riunioni.</string>
     <string name="ui_backup_own_copy">La tua copia</string>
-    <string name="ui_backup_zip_subtitle">Salva tutte le riunioni in una cartella, un’unità o un’altra app.</string>
+    <string name="ui_backup_zip_subtitle">Salva tutte le riunioni in una cartella o in un’app.</string>
     <string name="ui_backup_export_all">Esporta tutto come ZIP…</string>
     <string name="ui_settings_transfer_title">Trasferisci su un nuovo telefono</string>
     <string name="ui_about_title">Informazioni</string>
@@ -147,11 +147,15 @@
     <string name="ui_part_speech">Riconoscimento vocale</string>
     <string name="ui_part_speakers">Distinzione delle voci</string>
     <string name="ui_part_voices">Riconoscimento delle voci salvate</string>
-    <string name="ui_models_space_needed">Servono circa %1$s liberi durante l’installazione. Ogni file viene verificato prima dell’uso.</string>
+    <string name="ui_models_space_needed">Servono circa %1$s liberi per l’installazione. Ogni file viene verificato prima dell’uso.</string>
+    <string name="ui_models_where_from_link">Da dove arrivano i file?</string>
     <string name="ui_models_download_and_transcribe">Scarica e trascrivi</string>
-    <string name="ui_models_recording_kept">La registrazione viene conservata in ogni caso.</string>
+    <string name="ui_models_not_now">Non ora — tieni l’audio</string>
     <string name="ui_hero_subtitle_phone">Proprio qui, su questo telefono.</string>
     <string name="ui_first_run_how_to_phone">Registra qualcosa o importa un file audio.</string>
     <string name="ui_first_run_privacy_phone">Trascritto su questo telefono.</string>
     <string name="ui_first_run_privacy_backups">I backup seguono le impostazioni del telefono.</string>
+    <string name="ui_setting_on">Attivo</string>
+    <string name="ui_transcription_right_away">Trascrivi subito</string>
+    <string name="ui_transcription_right_away_subtitle">Quando è disattivato, Cassini conserva l’audio e scegli tu quando trascrivere.</string>
 </resources>

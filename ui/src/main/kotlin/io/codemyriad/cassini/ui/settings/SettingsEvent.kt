@@ -35,6 +35,12 @@ sealed interface SettingsEvent {
     /** "Remember people I name" (D103): the default of "Remember this voice" in Name a speaker. */
     data class RememberVoices(val enabled: Boolean) : SettingsEvent
 
+    /** "Name people automatically" (D106, L-58): off by default. */
+    data class AutoNameVoices(val enabled: Boolean) : SettingsEvent
+
+    /** "Transcribe right away" (D106, L-58): on by default. */
+    data class TranscribeRightAway(val enabled: Boolean) : SettingsEvent
+
     data object OpenPrivacy : SettingsEvent
 
     data object OpenSources : SettingsEvent

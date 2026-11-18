@@ -126,14 +126,17 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     private val totals = combine(
         ports.meetings().guarded("meetings"),
         ports.audioDuration().onStart { emit(0L) }.catch { emit(0L) },
-    ) { count, duration ->
-        count to duration.coerceAtLeast(0L)
+        ports.transcribeRightAway,
+    ) { count, duration, rightAway ->
+        Triple(count, duration.coerceAtLeast(0L), rightAway)
     }
     val state: StateFlow<SettingsUiState> = combine(baseState, speakerState, totals) { base, speakers, totals ->
         base.copy(
             tellSpeakersApart = speakers.first.tellApart,
             recogniseVoices = speakers.first.recognise,
             rememberVoices = speakers.first.remember,
+            autoNameVoices = speakers.first.autoName,
+            transcribeRightAway = totals.third,
             speakerSaving = speakers.second,
             speakerError = speakers.third,
             meetings = totals.first,
@@ -166,6 +169,16 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             is SettingsEvent.OpenModel -> openModel(event)
             is SettingsEvent.SpeakerChoice -> speakerChoice(event)
             is SettingsEvent.RememberVoices -> saveSpeakerChoice { ports.setRememberVoices(event.enabled) }
+            is SettingsEvent.AutoNameVoices -> saveSpeakerChoice { ports.setAutoNameVoices(event.enabled) }
+            is SettingsEvent.TranscribeRightAway -> viewModelScope.launch {
+                try {
+                    ports.setTranscribeRightAway(event.enabled)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                    Log.w(TAG, "Cannot save the transcribe right away choice", error)
+                }
+            }
             SettingsEvent.OpenPrivacy -> emit(SettingsEffect.Open(LicenseDetailKey(LicenseEntry.PRIVACY.name)))
             SettingsEvent.OpenSources -> emit(SettingsEffect.Open(LicenseDetailKey(LicenseEntry.MODEL_SOURCES.name)))
             SettingsEvent.OpenHelp -> emit(SettingsEffect.OpenUrl("https://cassini.talk/help"))

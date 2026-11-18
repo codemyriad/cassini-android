@@ -48,7 +48,13 @@ data class Settings(
  * I name" (D103, L-60): the default of "Remember this voice" when a speaker is named. It is on until the voices
  * question or Settings › Speakers turns it off.
  */
-data class SpeakerChoices(val tellApart: Boolean = true, val recognise: Boolean = true, val remember: Boolean = true) {
+data class SpeakerChoices(
+    val tellApart: Boolean = true,
+    val recognise: Boolean = true,
+    val remember: Boolean = true,
+    /** "Name people automatically" (D106, L-58): off by default. */
+    val autoName: Boolean = false,
+) {
     fun enabled(part: ModelPart): Boolean = when (part) {
         ModelPart.SPEECH -> true
         ModelPart.SPEAKERS -> tellApart
@@ -72,6 +78,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             it[Keys.TELL_SPEAKERS_APART] ?: true,
             it[Keys.RECOGNISE_VOICES] ?: true,
             it[Keys.REMEMBER_VOICES] ?: true,
+            it[Keys.AUTO_NAME_VOICES] ?: false,
         )
     }.distinctUntilChanged()
 
@@ -99,6 +106,16 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         require(part != ModelPart.SPEECH)
         set(if (part == ModelPart.SPEAKERS) Keys.TELL_SPEAKERS_APART else Keys.RECOGNISE_VOICES, enabled)
     }
+
+    /** "Name people automatically" in Settings › Speakers (D106, L-58); off by default. */
+    suspend fun setAutoNameVoices(enabled: Boolean) = set(Keys.AUTO_NAME_VOICES, enabled)
+
+    /** "Transcribe right away" in Settings › Transcription (D106, L-58); on by default. */
+    val transcribeRightAway: Flow<Boolean> = preferences.map {
+        it[Keys.TRANSCRIBE_RIGHT_AWAY] ?: true
+    }.distinctUntilChanged()
+
+    suspend fun setTranscribeRightAway(enabled: Boolean) = set(Keys.TRANSCRIBE_RIGHT_AWAY, enabled)
 
     /** Every setting at once. */
     val settings: Flow<Settings> = preferences.map(::settings).distinctUntilChanged()
@@ -278,7 +295,9 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     object Keys {
         val TELL_SPEAKERS_APART = booleanPreferencesKey("speakers.tellApart")
         val RECOGNISE_VOICES = booleanPreferencesKey("speakers.recognise")
+        val AUTO_NAME_VOICES = booleanPreferencesKey("speakers.autoName")
         val REMEMBER_VOICES = booleanPreferencesKey("voices.rememberDefault")
+        val TRANSCRIBE_RIGHT_AWAY = booleanPreferencesKey("transcription.rightAway")
         val VOICES_QUESTION_ASKED = booleanPreferencesKey("voices.questionAsked")
         val PARAKEET_DEFAULT_NOTICE = booleanPreferencesKey("notices.parakeetDefault")
         val FIRST_WHISTLE_NOTE = stringPreferencesKey("recognition.firstWhistleNote")

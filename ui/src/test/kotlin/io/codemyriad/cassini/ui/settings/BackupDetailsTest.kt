@@ -48,10 +48,10 @@ class BackupDetailsTest {
         for (choice in cases) {
             val (transfer, cloud, voices) = Triple(choice.transfer, choice.cloud, choice.voices)
             rule.runOnIdle { state.value = choice }
-            row("Settings", "Not copied")
-            row("Speech models", "Not copied")
-            row("Meetings", if (cloud || transfer) "Copied" else "Not copied")
-            row("Saved voices", if ((cloud || transfer) && voices) "Copied" else "Not copied")
+            row("Settings", "Not included")
+            row("Speech models", "Not included")
+            row("Meetings", if (cloud || transfer) "Included" else "Not included")
+            row("Saved voices", if ((cloud || transfer) && voices) "Included" else "Not included")
             visible("Android cloud backup", cloud)
             visible("The new phone", transfer)
             visible("Copied with your meetings", voices && (cloud || transfer))

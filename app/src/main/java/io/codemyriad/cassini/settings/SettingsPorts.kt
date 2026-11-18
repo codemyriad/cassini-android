@@ -58,6 +58,13 @@ interface SettingsPorts {
     /** "Remember people I name" (D103); it also answers the voices question. */
     suspend fun setRememberVoices(enabled: Boolean) { error("Speaker choices are unavailable") }
 
+    /** "Name people automatically" (D106, L-58); off by default. */
+    suspend fun setAutoNameVoices(enabled: Boolean) { error("Speaker choices are unavailable") }
+
+    val transcribeRightAway: Flow<Boolean> get() = flowOf(true)
+
+    suspend fun setTranscribeRightAway(enabled: Boolean) { error("Transcription choices are unavailable") }
+
     fun meetings(): Flow<Int> = flowOf(0)
 
     fun audioDuration(): Flow<Long> = flowOf(0L)
@@ -112,6 +119,12 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
         graph.settings.setSpeakerChoice(part, enabled)
 
     override suspend fun setRememberVoices(enabled: Boolean) = graph.settings.setRememberVoices(enabled)
+
+    override suspend fun setAutoNameVoices(enabled: Boolean) = graph.settings.setAutoNameVoices(enabled)
+
+    override val transcribeRightAway: Flow<Boolean> get() = graph.settings.transcribeRightAway
+
+    override suspend fun setTranscribeRightAway(enabled: Boolean) = graph.settings.setTranscribeRightAway(enabled)
 
     override fun meetings(): Flow<Int> = flow { emitAll(graph.awaitCatalogue().notes.counts()) }.map { it.live }
 

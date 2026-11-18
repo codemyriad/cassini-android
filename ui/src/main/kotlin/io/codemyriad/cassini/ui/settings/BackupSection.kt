@@ -3,16 +3,12 @@
 package io.codemyriad.cassini.ui.settings
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,8 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.HelperText
@@ -32,7 +26,7 @@ import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 
-/** D103 L-59 ordering, with the three independent D98 choices and truthful channel-specific copy. */
+/** D106 L-58/L-59 Backup settings: switches say what is backed up, no top banner. */
 @Composable
 internal fun BackupSection(
     state: BackupSettingsUi,
@@ -41,10 +35,8 @@ internal fun BackupSection(
     exportEnabled: Boolean,
     onExport: () -> Unit,
 ) {
-    BackupAnswer(state)
-    Spacer(Modifier.height(18.dp))
     val voicesAvailable = state.cloudAvailable || state.transferAvailable
-    SettingsGroup {
+    SettingsGroup(Modifier.padding(top = 8.dp)) {
         BackupSwitch(
             stringResource(R.string.ui_backup_cloud_title),
             stringResource(R.string.ui_backup_meetings_subtitle),
@@ -64,17 +56,20 @@ internal fun BackupSection(
     SettingsGroup(Modifier.padding(top = 12.dp)) {
         BackupSwitch(
             stringResource(R.string.ui_backup_voices_title),
-            stringResource(R.string.ui_backup_voices_why),
+            stringResource(R.string.ui_backup_voices_description),
             voicesAvailable && state.voices,
             !state.saving && voicesAvailable,
         ) { onEvent(SettingsEvent.IncludeVoices(it)) }
     }
-    HelperText(stringResource(voicesBody(state, voicesAvailable)))
+    if (!voicesAvailable || !state.voices) HelperText(stringResource(voicesBody(state, voicesAvailable)))
     BackupWarnings(state)
     SectionHeader(stringResource(R.string.ui_backup_more_detail))
     SettingsGroup {
-        SettingsRow(stringResource(R.string.ui_backup_moves), trailing = SettingsTrailing.Chevron, onClick = onDetails)
-        SettingsRow(stringResource(R.string.ui_backup_who), trailing = SettingsTrailing.Chevron, onClick = onDetails)
+        SettingsRow(
+            stringResource(R.string.ui_backup_more_detail_row),
+            trailing = SettingsTrailing.Chevron,
+            onClick = onDetails,
+        )
     }
     SectionHeader(stringResource(R.string.ui_backup_own_copy))
     SettingsGroup {
@@ -93,41 +88,6 @@ internal fun BackupSection(
         }
     }
     HelperText(stringResource(R.string.ui_backup_zip_subtitle))
-}
-
-/** The answer follows the Settings map: cloud first, then transfer, then phone-only. */
-@Composable
-private fun BackupAnswer(state: BackupSettingsUi) {
-    val title = when {
-        state.cloudOn -> R.string.ui_backup_cloud_title
-        state.transferOn -> R.string.ui_backup_page_transfer
-        else -> R.string.ui_setting_off
-    }
-    val body = when {
-        state.cloudOn -> R.string.ui_backup_cloud_body_on
-        state.transferOn -> R.string.ui_settings_transfer_body
-        else -> R.string.ui_backup_phone_only_body
-    }
-    Row(
-        Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            .background(CassiniTheme.colors.accentTint, RoundedCornerShape(20.dp)).padding(18.dp),
-    ) {
-        CassiniIcon(Glyph.PhoneTransfer, 24.dp, 1.7f, CassiniTheme.colors.accentInk, null)
-        Column(Modifier.weight(1f).padding(start = 14.dp)) {
-            Text(
-                stringResource(title),
-                Modifier.semantics { heading() },
-                style = CassiniTheme.type.button,
-                color = CassiniTheme.colors.ink,
-            )
-            Text(
-                stringResource(body),
-                Modifier.padding(top = 4.dp),
-                style = CassiniTheme.type.body14,
-                color = CassiniTheme.colors.text2,
-            )
-        }
-    }
 }
 
 @StringRes
@@ -162,7 +122,7 @@ internal fun BackupWarnings(state: BackupSettingsUi) {
 @Composable
 internal fun BackupSwitch(
     title: String,
-    body: String,
+    body: String?,
     checked: Boolean,
     enabled: Boolean,
     onChange: (Boolean) -> Unit,
@@ -171,11 +131,11 @@ internal fun BackupSwitch(
     Row(
         Modifier.fillMaxWidth().toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
             .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = if (body != null) Alignment.Top else Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, style = CassiniTheme.type.button, color = colors.ink)
-            Text(body, style = CassiniTheme.type.caption, color = colors.text2)
+            if (body != null) Text(body, style = CassiniTheme.type.caption, color = colors.text2)
         }
         Switch(checked, onCheckedChange = null, enabled = enabled)
     }

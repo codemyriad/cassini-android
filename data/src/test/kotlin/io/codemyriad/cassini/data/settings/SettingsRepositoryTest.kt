@@ -82,6 +82,19 @@ class SettingsRepositoryTest {
         }
     }
 
+    @Test fun autoNameIsOffByDefaultAndTranscribeRightAwayIsOnByDefault() = runTest {
+        withStore { store ->
+            assertFalse(store.speakerChoices.first().autoName)
+            assertTrue(store.transcribeRightAway.first())
+            store.setAutoNameVoices(true)
+            store.setTranscribeRightAway(false)
+        }
+        withStore { store ->
+            assertTrue(store.speakerChoices.first().autoName)
+            assertFalse(store.transcribeRightAway.first())
+        }
+    }
+
     @Test fun singlePartConsentSurvivesReopenWithoutAuthorizingAnyOtherPart() = runTest {
         withStore { store -> store.recordConsent(100, setOf(ModelPart.VOICES)) }
         withStore { store ->

@@ -93,6 +93,7 @@ class TranscriptionJob(
     private val engines: JobEngines,
     private val env: JobEnvironment,
     private val speechModel: SpeechModel = SpeechModel.PARAKEET,
+    private val autoNameVoices: Boolean = true,
 ) {
     private val channel = Channel<JobEvent>(Channel.UNLIMITED)
     private val stopReason = AtomicReference<PauseReason?>(null)
@@ -193,28 +194,52 @@ class TranscriptionJob(
         resumed?.let { requireWordsFit(it.recognition.chunks.words) }
         // Transcribe again over a document that can neither take a version nor be replaced stops here, before any work.
         val existing = storage.existingDocumentBlocking(noteId)?.also(::requireReplaceable)?.takeIf(::extendable)
-        val noteVoices = existing?.let { noteVoices(it, saved) }.orEmpty()
-        Prepared(resumed, storage.audioFile(noteId), noteVoices, generation, knownMs, env.lowMemory(knownMs))
+        val (noteVoices, carriedVoiceIds) = existing?.let { carryOver(it, saved) } ?: (emptyList<Voice>() to emptySet())
+        Prepared(
+            resumed,
+            storage.audioFile(noteId),
+            noteVoices,
+            carriedVoiceIds,
+            generation,
+            knownMs,
+            env.lowMemory(knownMs),
+        )
     }
 
     /**
-     * Named speakers of the note's sealed transcript as note-local voices ([CheckpointNames.NOTE_VOICE_PREFIX]), so a
-     * Transcribe again carries their names over even when they were not remembered (0.1.0 `voicesForRecognition`).
-     * Only an `ok` [document] counts: any other state gets a fresh document, whose names start over.
+     * Established identities of the note's sealed transcript: note-local voices ([CheckpointNames.NOTE_VOICE_PREFIX])
+     * for speakers not bound to a saved person, plus saved voice ids that already carried identity in that version,
+     * so Transcribe again preserves them even when [autoNameVoices] is off (0.1.0 `voicesForRecognition`). Only an `ok`
+     * [document] counts: any other state gets a fresh document, whose names start over.
      */
-    private fun noteVoices(document: CassiniDocument, saved: List<Voice>): List<Voice> {
+    private fun carryOver(document: CassiniDocument, saved: List<Voice>): Pair<List<Voice>, Set<String>> {
         val savedIds = saved.mapTo(HashSet()) { it.id }
-        return voices.noteVoicesBlocking(noteId).mapNotNull { (id, print) ->
+        val noteVoices = ArrayList<Voice>()
+        val carriedIds = HashSet<String>()
+        for ((id, print) in voices.noteVoicesBlocking(noteId)) {
             val label = document.speakerLabel(id)
             val named = label != null && !DefaultLabels.isDefault(id, label)
-            val usable = named && print.match?.state != Match.State.REJECTED && print.match?.voiceId !in savedIds
-            if (usable) {
-                val voiceId = CheckpointNames.NOTE_VOICE_PREFIX + id
-                Voice(voiceId, label, JobProvenance.PRINT_MODEL, print.embedding, 1, print.seconds, 0, 0)
+            val match = print.match
+            if (!named || match?.state == Match.State.REJECTED) continue
+            val voiceId = match?.voiceId
+            if (voiceId != null && voiceId in savedIds) {
+                if (match.state == Match.State.AUTO || match.state == Match.State.CONFIRMED) {
+                    carriedIds += voiceId
+                }
             } else {
-                null
+                noteVoices += Voice(
+                    CheckpointNames.NOTE_VOICE_PREFIX + id,
+                    label,
+                    JobProvenance.PRINT_MODEL,
+                    print.embedding,
+                    1,
+                    print.seconds,
+                    0,
+                    0,
+                )
             }
         }
+        return noteVoices to carriedIds
     }
 
     // Step 2 ----------------------------------------------------------------------------------------------------
@@ -449,7 +474,8 @@ class TranscriptionJob(
                 run.livePrints[id] = print.first
             }
             val open = run.livePrints.filterKeys(names::openForLive)
-            val thresholds = Voiceprints.THRESHOLDS.getValue(JobProvenance.PRINT_MODEL)
+            val baseThresholds = Voiceprints.THRESHOLDS.getValue(JobProvenance.PRINT_MODEL)
+            val thresholds = if (autoNameVoices) baseThresholds else baseThresholds.copy(auto = Float.POSITIVE_INFINITY)
             val excluded = names.excluded(open.keys)
             val people = people(run.prepared)
             val matches = VoiceMatcher.match(open, people.voices, JobProvenance.PRINT_MODEL, thresholds, excluded)
@@ -589,7 +615,18 @@ class TranscriptionJob(
         val embeddings = computed.mapValues { it.value.first }
         val excluded = draft.names.excluded(computed.keys)
         val people = withContext(env.io) { savedVoices(prepared) }
-        val matches = VoiceMatcher.match(embeddings, people.voices, JobProvenance.PRINT_MODEL, thresholds, excluded)
+        val rawMatches = VoiceMatcher.match(embeddings, people.voices, JobProvenance.PRINT_MODEL, thresholds, excluded)
+        val matches = if (autoNameVoices) {
+            rawMatches
+        } else {
+            rawMatches.mapValues { (_, match) ->
+                if (match.state == Match.State.AUTO && !prepared.carriesIdentity(match.voiceId)) {
+                    match.copy(state = Match.State.SUGGESTED)
+                } else {
+                    match
+                }
+            }
+        }
         return Matched(computed, matches)
     }
 
@@ -834,10 +871,14 @@ class TranscriptionJob(
         val resumed: CheckpointState?,
         val audioFile: File,
         val noteVoices: List<Voice>,
+        val carriedVoiceIds: Set<String>,
         val generation: Long,
         val knownMs: Long?,
         val lowMemory: Boolean,
-    )
+    ) {
+        fun carriesIdentity(voiceId: String): Boolean =
+            voiceId.startsWith(CheckpointNames.NOTE_VOICE_PREFIX) || voiceId in carriedVoiceIds
+    }
 
     /** The voices one match runs against, and their names by voice id. */
     private class People(val voices: List<Voice>) {

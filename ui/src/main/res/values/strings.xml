@@ -533,4 +533,5 @@
     <string name="ui_search_filter_date_month">Past 30 days</string>
     <string name="ui_progress_downloading_models">Downloading models</string>
     <string name="ui_progress_getting_ready">Getting ready to transcribe %1$s</string>
+    <string name="ui_transcription_after_recording">After recording</string>
 </resources>

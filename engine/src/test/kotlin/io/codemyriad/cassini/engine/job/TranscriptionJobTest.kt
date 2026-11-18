@@ -535,56 +535,83 @@ class TranscriptionJobTest {
     }
 
     @Test fun theJobNeverWritesDocumentOpus() = runBlocking {
-        val h = Harness(source = "document.opus")
-        // Transcribe again: the note's audio is a sealed document whose speaker "old_a" the user called Anna.
-        val document = oldDocument("document.tmp", anna = true)
-        File(temp.root, "document.tmp").copyTo(h.audio, overwrite = true)
-        h.audio.setLastModified(1_700_000_000_000L)
-        h.storage.existing = document
-        h.voices.noteVoices = mapOf("old_a" to SpeakerPrint(axis(1), 30.0, null))
-        val before = sha256(h.audio) to h.audio.lastModified()
+        for (autoName in listOf(true, false)) {
+            val h = Harness(source = "document.opus", autoNameVoices = autoName)
+            // Transcribe again: the note's audio is a sealed document whose speaker "old_a" the user called Anna.
+            val document = oldDocument("document.tmp", anna = true)
+            File(temp.root, "document.tmp").copyTo(h.audio, overwrite = true)
+            h.audio.setLastModified(1_700_000_000_000L)
+            h.storage.existing = document
+            h.voices.noteVoices = mapOf("old_a" to SpeakerPrint(axis(1), 30.0, null))
+            val before = sha256(h.audio) to h.audio.lastModified()
 
-        assertEquals(JobOutcome.Done, h.run().first)
+            assertEquals(JobOutcome.Done, h.run().first)
 
-        assertEquals(before, sha256(h.audio) to h.audio.lastModified())
-        val sealed = h.sealed()
-        assertEquals(2, sealed.variants.size)
-        val meeting = { doc: CassiniDocument -> doc.manifest!!.getJSONObject("meeting").getString("id") }
-        assertEquals(meeting(document), meeting(sealed))
-        // The name carries over through the note-local voice; that match is stored as no match, never a live name.
-        assertEquals("Anna", sealed.speakerLabel(sp1))
-        assertEquals("Anna", h.storage.adoptions.single().labels[sp1])
-        assertNull(h.voices.pending.single().prints.getValue(sp1).match)
-        assertTrue(h.storage.jobNames.none { sp1 in it.automatic || sp1 in it.live })
+            assertEquals(before, sha256(h.audio) to h.audio.lastModified())
+            val sealed = h.sealed()
+            assertEquals(2, sealed.variants.size)
+            val meeting = { doc: CassiniDocument -> doc.manifest!!.getJSONObject("meeting").getString("id") }
+            assertEquals(meeting(document), meeting(sealed))
+            // The name carries over through the note-local voice; that match is stored as no match, never a live name.
+            assertEquals("Anna", sealed.speakerLabel(sp1))
+            assertEquals("Anna", h.storage.adoptions.single().labels[sp1])
+            assertNull(h.voices.pending.single().prints.getValue(sp1).match)
+            assertTrue(h.storage.jobNames.none { sp1 in it.automatic || sp1 in it.live })
+        }
     }
 
     @Test fun freshRunIdsKeepNoteLocalAndSavedVoiceSlots() = runBlocking {
-        for (saved in listOf(false, true)) {
-            val oldPrefix = "diar_${java.util.UUID.randomUUID()}_"
-            val oldId = oldPrefix + "2"
-            val prefix = "diar_${java.util.UUID.randomUUID()}_"
-            val h = Harness(runPrefix = prefix)
-            val target = temp.newFile()
-            val words = listOf(Word(oldPrefix + "1", 0, 500, "first"), Word(oldId, 1000, 1500, "hello"))
-            val old = CassiniDocument.create(
-                FIXTURE_OPUS,
-                Transcript(words),
-                "Meeting",
-                JSONObject().put("x-speakerDiarization", JSONObject()),
-                null,
-                mapOf(oldId to "Anna"),
-                target,
-            )
-            target.copyTo(h.audio, overwrite = true)
-            h.storage.existing = old
-            val match = if (saved) Match("saved-anna", 1f, Match.State.CONFIRMED) else null
-            h.voices.noteVoices = mapOf(oldId to SpeakerPrint(axis(1), 30.0, match))
-            if (saved) h.voices.people = listOf(voice("saved-anna", "Anna", axis(1)))
-            assertEquals(JobOutcome.Done, h.run().first)
-            assertEquals("Anna", h.sealed().speakerLabel(prefix + "1"))
-            assertEquals(1L, h.sealed().speakerColourIndex(prefix + "1"))
-            assertEquals(2L, h.sealed().speakerColourIndex(prefix + "2"))
+        for (autoName in listOf(true, false)) {
+            for (saved in listOf(false, true)) {
+                val oldPrefix = "diar_${java.util.UUID.randomUUID()}_"
+                val oldId = oldPrefix + "2"
+                val prefix = "diar_${java.util.UUID.randomUUID()}_"
+                val h = Harness(runPrefix = prefix, autoNameVoices = autoName)
+                val target = temp.newFile()
+                val words = listOf(Word(oldPrefix + "1", 0, 500, "first"), Word(oldId, 1000, 1500, "hello"))
+                val old = CassiniDocument.create(
+                    FIXTURE_OPUS,
+                    Transcript(words),
+                    "Meeting",
+                    JSONObject().put("x-speakerDiarization", JSONObject()),
+                    null,
+                    mapOf(oldId to "Anna"),
+                    target,
+                )
+                target.copyTo(h.audio, overwrite = true)
+                h.storage.existing = old
+                val match = if (saved) Match("saved-anna", 1f, Match.State.CONFIRMED) else null
+                h.voices.noteVoices = mapOf(oldId to SpeakerPrint(axis(1), 30.0, match))
+                if (saved) h.voices.people = listOf(voice("saved-anna", "Anna", axis(1)))
+                assertEquals(JobOutcome.Done, h.run().first)
+                assertEquals("Anna", h.sealed().speakerLabel(prefix + "1"))
+                assertEquals(1L, h.sealed().speakerColourIndex(prefix + "1"))
+                assertEquals(2L, h.sealed().speakerColourIndex(prefix + "2"))
+            }
         }
+    }
+
+    @Test fun autoNameOffSuggestsNewSavedVoicesWithoutDroppingCarriedNames() = runBlocking {
+        val fresh = Harness(autoNameVoices = false)
+        fresh.voices.people = listOf(voice("saved-anna", "Anna", axis(1)))
+        assertEquals(JobOutcome.Done, fresh.run().first)
+        assertEquals("Speaker 1", fresh.sealed().speakerLabel(sp1))
+        assertEquals(Match.State.SUGGESTED, fresh.voices.pending.single().prints.getValue(sp1).match?.state)
+        assertEquals("saved-anna", fresh.voices.pending.single().prints.getValue(sp1).match?.voiceId)
+
+        val rerun = Harness(source = "document.opus", autoNameVoices = false)
+        val old = oldDocument("document-suggest.tmp", anna = true)
+        File(temp.root, "document-suggest.tmp").copyTo(rerun.audio, overwrite = true)
+        rerun.storage.existing = old
+        rerun.voices.noteVoices = mapOf("old_a" to SpeakerPrint(axis(1), 30.0, null))
+        rerun.voices.people = listOf(voice("saved-bob", "Bob", axis(2)))
+        assertEquals(JobOutcome.Done, rerun.run().first)
+        assertEquals("Anna", rerun.sealed().speakerLabel(sp1))
+        assertEquals("Speaker 2", rerun.sealed().speakerLabel(sp2))
+        assertNull(rerun.voices.pending.single().prints.getValue(sp1).match)
+        val bobMatch = rerun.voices.pending.single().prints.getValue(sp2).match
+        assertEquals("saved-bob", bobMatch?.voiceId)
+        assertEquals(Match.State.SUGGESTED, bobMatch?.state)
     }
 
     @Test fun firstSeparationAndRerunMergesUseOriginalRunOffsetsWithFreshIds() = runBlocking {
@@ -1010,6 +1037,7 @@ class TranscriptionJobTest {
         private val maxDurationMs: Long = Limits.MAX_TRANSCRIBE_MS,
         private val maxBodyBytes: Long = WordBodyBudget.MAX_BYTES,
         private val runPrefix: String = "diar_test_",
+        private val autoNameVoices: Boolean = true,
     ) {
         val noteDir: File = temp.newFolder("notes-$source-${System.nanoTime()}", "note-1")
         val audio = File(noteDir, source)
@@ -1062,6 +1090,7 @@ class TranscriptionJobTest {
                 maxBodyBytes = maxBodyBytes,
             ),
             speechModel,
+            autoNameVoices,
         )
 
         suspend fun run(job: TranscriptionJob = job()): Pair<JobOutcome, List<JobEvent>> {

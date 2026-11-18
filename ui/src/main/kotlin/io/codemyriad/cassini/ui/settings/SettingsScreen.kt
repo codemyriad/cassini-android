@@ -111,7 +111,10 @@ private fun SettingsMap(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit
             onEvent(SettingsEvent.OpenVoices)
         }
     }
-    HelperText(stringResource(settingsPrivacy(state.backup)))
+    HelperText(
+        stringResource(R.string.ui_first_run_privacy_phone) + " " +
+            stringResource(R.string.ui_first_run_privacy_backups),
+    )
     SectionHeader(stringResource(R.string.ui_settings_meetings))
     SettingsGroup {
         MapRow(stringResource(R.string.ui_settings_backup), backupAnswer(state.backup), Glyph.Shield) {
@@ -144,19 +147,10 @@ private fun SettingsMap(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit
     AboutRow(state.version) { open(SettingsPage.ABOUT) }
 }
 
-/** Unknown backup state makes only the processing claim; transfer alone also rules out “never leaves”. */
-internal fun settingsPrivacy(backup: BackupSettingsUi?): Int = when {
-    backup == null -> R.string.ui_privacy_processing
-    backup.cloudOn -> R.string.ui_privacy_with_backup
-    backup.transferOn -> R.string.ui_privacy_processing
-    else -> R.string.ui_privacy_phone_only
-}
-
 @Composable
 private fun backupAnswer(backup: BackupSettingsUi?): String = when {
     backup == null -> stringResource(R.string.ui_settings_model_checking)
-    backup.cloudOn -> stringResource(R.string.ui_backup_cloud_title)
-    backup.transferOn -> stringResource(R.string.ui_backup_answer_transfer)
+    backup.cloudOn || backup.transferOn -> stringResource(R.string.ui_setting_on)
     else -> stringResource(R.string.ui_setting_off)
 }
 

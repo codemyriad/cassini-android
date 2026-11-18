@@ -509,4 +509,5 @@
     <string name="ui_search_filter_date_month">Últimos 30 días</string>
     <string name="ui_progress_downloading_models">Descargando modelos</string>
     <string name="ui_progress_getting_ready">Preparando la transcripción de %1$s</string>
+    <string name="ui_transcription_after_recording">Después de grabar</string>
 </resources>

@@ -77,6 +77,7 @@ class GlyphMarkupTest {
             "glyphs without a board",
             listOf(
                 Glyph.PhoneTransfer,
+                Glyph.CloudBackup,
                 Glyph.Wave,
                 Glyph.People,
                 Glyph.Language,

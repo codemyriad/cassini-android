@@ -39,6 +39,7 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -516,8 +517,20 @@ class SettingsViewModelTest {
         assertEquals(0, ports.transferWrites)
     }
 
+    @Test fun autoNameIsOffByDefaultAndTranscribeRightAwayIsOnByDefault() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        assertFalse(viewModel.now().autoNameVoices)
+        assertTrue(viewModel.now().transcribeRightAway)
+        viewModel.onEvent(SettingsEvent.AutoNameVoices(true))
+        viewModel.onEvent(SettingsEvent.TranscribeRightAway(false))
+        advanceUntilIdle()
+        assertTrue(viewModel.now().autoNameVoices)
+        assertFalse(viewModel.now().transcribeRightAway)
+    }
+
     private class FakeSettingsPorts : SettingsPorts {
         override val speakers = MutableStateFlow(SpeakerChoices())
+        override val transcribeRightAway = MutableStateFlow(true)
         var speakerFailure = false
         override suspend fun setSpeakerChoice(part: ModelPart, enabled: Boolean) {
             if (speakerFailure) throw IOException("write failed")
@@ -526,6 +539,13 @@ class SettingsViewModelTest {
                 ModelPart.VOICES -> speakers.value.copy(recognise = enabled)
                 else -> error("not optional")
             }
+        }
+        override suspend fun setAutoNameVoices(enabled: Boolean) {
+            if (speakerFailure) throw IOException("write failed")
+            speakers.value = speakers.value.copy(autoName = enabled)
+        }
+        override suspend fun setTranscribeRightAway(enabled: Boolean) {
+            transcribeRightAway.value = enabled
         }
         val meetingCount = MutableStateFlow(0)
         val duration = MutableStateFlow(0L)

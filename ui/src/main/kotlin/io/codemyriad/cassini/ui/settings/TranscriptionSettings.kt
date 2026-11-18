@@ -39,7 +39,17 @@ internal fun TranscriptionSettings(state: SettingsUiState, onEvent: (SettingsEve
         SpeechChoiceRow(state, SpeechModelUi.PARAKEET, onEvent)
     }
     HelperText(stringResource(R.string.ui_models_keep_transcript))
-    SectionHeader(stringResource(R.string.ui_transcription_online_heading))
+    SectionHeader(stringResource(R.string.ui_transcription_after_recording), topPadding = 30.dp)
+    SettingsGroup {
+        BackupSwitch(
+            stringResource(R.string.ui_transcription_right_away),
+            body = null,
+            checked = state.transcribeRightAway,
+            enabled = true,
+        ) { onEvent(SettingsEvent.TranscribeRightAway(it)) }
+    }
+    HelperText(stringResource(R.string.ui_transcription_right_away_subtitle))
+    SectionHeader(stringResource(R.string.ui_transcription_online_heading), topPadding = 30.dp)
     SettingsGroup {
         SettingsRow(
             stringResource(R.string.ui_models_where_from),

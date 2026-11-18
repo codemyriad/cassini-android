@@ -282,6 +282,15 @@ class RecordingControllerTest {
         assertEquals(AudioKind.PLAIN, row(asked.noteId)?.audioKind)
     }
 
+    @Test fun transcribeRightAwayOffKeepsAudioWithoutHandingOffOrAskingConsent() = runBlocking {
+        graph.settings.setTranscribeRightAway(false)
+        val recorded = startRecording("Saved only")
+        controller.finish()
+        assertEquals(RecordingOutcome.Saved(AfterFinish.AUDIO_ONLY), awaitEnded().outcome)
+        assertTrue(handoffs.isEmpty())
+        assertEquals(AudioKind.PLAIN, row(recorded.noteId)?.audioKind)
+    }
+
     // Pauses. -----------------------------------------------------------------------------------------------------
 
     @Test fun aSilencedCaptureStaysPausedUntilTheUserResumes() = runBlocking {

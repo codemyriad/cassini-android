@@ -43,6 +43,13 @@ internal fun SpeakerSettings(state: SettingsUiState, onEvent: (SettingsEvent) ->
             state.rememberVoices,
             !state.speakerSaving,
         ) { onEvent(SettingsEvent.RememberVoices(it)) }
+        // D106 (L-58): "Name people automatically"; off by default.
+        BackupSwitch(
+            stringResource(R.string.ui_speakers_auto_name),
+            stringResource(R.string.ui_speakers_auto_name_subtitle),
+            state.autoNameVoices,
+            !state.speakerSaving,
+        ) { onEvent(SettingsEvent.AutoNameVoices(it)) }
         MapRow(
             stringResource(R.string.ui_settings_voices),
             Counts.plural(R.plurals.ui_settings_people, state.voices),

@@ -155,4 +155,24 @@ class GraphModelDownloadPortsTest {
             graph.close()
         }
     }
+
+    @Test fun decliningStandaloneSpeakerModelTurnsTheSwitchBackOff() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val graph = AppGraph(
+            context,
+            AppGraph.Config(paths = AppPaths(folder.root, folder.newFolder("models"))),
+        )
+        try {
+            graph.awaitCatalogue()
+            graph.settings.setSpeakerChoice(ModelPart.SPEAKERS, true)
+            graph.settings.setSpeakerChoice(ModelPart.VOICES, true)
+            GraphModelDownloadPorts(graph, context, noteId = null, part = ModelPart.SPEAKERS).recordDeclined()
+            assertFalse(graph.settings.speakerChoices.first().tellApart)
+            assertTrue(graph.settings.speakerChoices.first().recognise)
+            GraphModelDownloadPorts(graph, context, noteId = null, part = ModelPart.VOICES).recordDeclined()
+            assertFalse(graph.settings.speakerChoices.first().recognise)
+        } finally {
+            graph.close()
+        }
+    }
 }

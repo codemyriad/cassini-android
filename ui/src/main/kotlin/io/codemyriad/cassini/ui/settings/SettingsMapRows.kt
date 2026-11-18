@@ -50,7 +50,7 @@ internal fun MapRow(
     Row(
         Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).heightIn(min = 56.dp)
             .padding(horizontal = 16.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = if (subtitle != null) Alignment.Top else Alignment.CenterVertically,
     ) {
         Box(Modifier.size(30.dp).background(c.accentTint, CircleShape), contentAlignment = Alignment.Center) {
             CassiniIcon(glyph, 18.dp, 1.9f, c.accentInk, null)
