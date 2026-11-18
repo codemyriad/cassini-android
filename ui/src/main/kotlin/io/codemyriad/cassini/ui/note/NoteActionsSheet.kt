@@ -222,14 +222,15 @@ private data class ExportFormatRow(
 @Composable
 private fun ExportRow(ui: NoteActionsUi, row: ExportFormatRow, onAction: (NoteAction) -> Unit) {
     val text = stringResource(row.label)
+    val ext = stringResource(row.extension)
     SheetActionRow(
         label = text,
         glyph = row.glyph,
         onClick = { onAction(row.save) },
-        extension = stringResource(row.extension),
+        extension = ext,
         subtitle = stringResource(row.body),
         busy = ui.busyRow == row.save,
-        share = rowShare(text) { onAction(row.share) },
+        share = rowShare("$text $ext") { onAction(row.share) },
     )
 }
 

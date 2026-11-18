@@ -645,6 +645,25 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun actionsSheetLoadsDocumentBytesOnlyForDocumentNotes() = runTest(dispatcher) {
+        ports.documentBytesValue = 24L * 1024 * 1024
+        ports.add(docRow("d", DocumentState.OK, words = 3))
+        ports.add(libraryRow("p", audioKind = AudioKind.PLAIN))
+        val viewModel = viewModel()
+
+        viewModel.onEvent(LibraryEvent.LongPress("d"))
+        advanceUntilIdle()
+        assertEquals(24L * 1024 * 1024, (viewModel.now().sheet as LibrarySheet.Actions).ui.documentBytes)
+
+        viewModel.onEvent(LibraryEvent.DismissSheet)
+        advanceUntilIdle()
+
+        viewModel.onEvent(LibraryEvent.LongPress("p"))
+        advanceUntilIdle()
+        assertNull((viewModel.now().sheet as LibrarySheet.Actions).ui.documentBytes)
+    }
+
+    @Test
     fun exportRowsOpenTheNoteScreenWithTheRowToStart() = runTest(dispatcher) {
         ports.add(docRow("d", DocumentState.OK, words = 3))
         val viewModel = viewModel()

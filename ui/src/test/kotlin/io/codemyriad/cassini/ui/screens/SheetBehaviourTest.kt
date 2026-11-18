@@ -15,7 +15,6 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -232,11 +231,11 @@ class SheetBehaviourTest {
         val actions = mutableListOf<NoteAction>()
         setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = { actions += it }) }
         rule.onNodeWithContentDescription("Share Cassini file").performClick()
-        rule.onNodeWithContentDescription("Share Markdown").performClick()
+        rule.onNodeWithContentDescription("Share Markdown .md").performClick()
         rule.onNodeWithText("More formats").performClick()
-        rule.onNodeWithContentDescription("Share Plain text").performScrollTo().performClick()
-        rule.onAllNodes(hasContentDescription("Share Subtitles"))[0].performScrollTo().performClick()
-        rule.onAllNodes(hasContentDescription("Share Subtitles"))[1].performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Share Plain text .txt").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Share Subtitles .srt").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Share Subtitles .vtt").performScrollTo().performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(
@@ -305,7 +304,7 @@ class SheetBehaviourTest {
 
     @Test fun aBusyRowCannotShare() {
         setThemed { NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-busy"), onAction = {}) }
-        rule.onNodeWithContentDescription("Share Plain text").assertIsNotEnabled()
+        rule.onNodeWithContentDescription("Share Plain text .txt").assertIsNotEnabled()
         rule.onNodeWithContentDescription("Share Cassini file").assertIsEnabled()
     }
 

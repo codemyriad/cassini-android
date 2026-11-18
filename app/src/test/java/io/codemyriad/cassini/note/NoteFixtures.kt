@@ -178,6 +178,11 @@ internal class FakeNotePorts : NotePorts {
         )
     }
 
+    var documentBytesValue: Long? = null
+
+    override suspend fun documentBytes(id: String): Long? =
+        if (details.value?.note?.audioKind == AudioKind.DOCUMENT) documentBytesValue else null
+
     override fun note(id: String): Flow<NoteDetails?> = details
 
     var onRefresh: () -> Unit = {}

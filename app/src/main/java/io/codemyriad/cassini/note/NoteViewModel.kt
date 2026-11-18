@@ -846,10 +846,10 @@ class NoteViewModel(
 
     private fun openSheet(kind: SheetKind) {
         local.update { it.copy(sheet = kind) }
-        if (kind == SheetKind.ACTIONS && local.value.actionsBytes == null) {
+        if (kind == SheetKind.ACTIONS) {
             launch {
                 val bytes = ports.documentBytes(noteId)
-                if (bytes != null) local.update { it.copy(actionsBytes = bytes) }
+                local.update { it.copy(actionsBytes = bytes) }
             }
         }
     }
@@ -861,7 +861,7 @@ class NoteViewModel(
 
     private fun closeSheet() {
         saved[KEY_NAME_SHEET] = null
-        local.update { it.copy(sheet = null, naming = null, busyRow = null) }
+        local.update { it.copy(sheet = null, naming = null, busyRow = null, actionsBytes = null) }
     }
 
     // The voices question (D103, L-60). ---------------------------------------------------------------------------

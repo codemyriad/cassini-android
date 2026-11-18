@@ -1184,6 +1184,25 @@ class NoteViewModelTest {
         assertEquals(10.0, info.realtimeFactor!!, 0.001)
     }
 
+    @Test
+    fun actionsSheetLoadsDocumentBytesForDocumentNotesAndRefreshesOnReopen() = runTest(dispatcher) {
+        ports.documentBytesValue = 12L * 1024 * 1024
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.More)
+        assertEquals(12L * 1024 * 1024, (viewModel.now().sheet as NoteSheet.Actions).ui.documentBytes)
+
+        send(viewModel, NoteEvent.DismissSheet)
+        ports.documentBytesValue = 18L * 1024 * 1024
+        send(viewModel, NoteEvent.More)
+        assertEquals(18L * 1024 * 1024, (viewModel.now().sheet as NoteSheet.Actions).ui.documentBytes)
+
+        send(viewModel, NoteEvent.DismissSheet)
+        ports.details.value = documentNote(audioKind = AudioKind.PLAIN)
+        advanceUntilIdle()
+        send(viewModel, NoteEvent.More)
+        assertNull((viewModel.now().sheet as NoteSheet.Actions).ui.documentBytes)
+    }
+
     private fun progress() = RunningProgress(
         headline = EngineHeadline.FINDING_WORDS,
         rangeStartMs = 0,
