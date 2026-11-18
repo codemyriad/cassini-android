@@ -16,29 +16,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 
-/** The two privacy lines: [Library] under the search field and [SavedVoices] under the Saved voices top bar. */
+/** The two privacy lines: [Library] on first run and [SavedVoices] under the Saved voices top bar. */
 enum class PrivacyLineStyle { Library, SavedVoices }
 
 /**
- * A teal shield and a privacy statement. [PrivacyLineStyle.Library]: shield 14/2, gap 6, `caption` in text2,
- * padding start/end 4 and top 10 (inside the 16 dp search column). [PrivacyLineStyle.SavedVoices]: shield 18/2
- * top-aligned 2 dp down, gap 10, `about` in text3, margins 8 top, 20 horizontal, 16 bottom.
+ * A shield and a privacy statement. [PrivacyLineStyle.Library]: accent shield 14/2 aligned to the first line, gap 6,
+ * `caption` in text2 (D105 §5). [PrivacyLineStyle.SavedVoices]: teal shield 18/2 top-aligned 2 dp down, gap 10, `about`
+ * in text3, margins 8 top, 20 horizontal, 16 bottom.
  */
 @Composable
 fun PrivacyLine(text: String, modifier: Modifier = Modifier, style: PrivacyLineStyle = PrivacyLineStyle.Library) {
     val c = CassiniTheme.colors
     if (style == PrivacyLineStyle.Library) {
         Row(
-            modifier = modifier.padding(start = 4.dp, end = 4.dp, top = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = modifier,
+            verticalAlignment = Alignment.Top,
         ) {
-            CassiniIcon(Glyph.Shield, 14.dp, 2f, c.teal, null)
+            CassiniIcon(Glyph.Shield, 14.dp, 2f, c.accent, null, Modifier.padding(top = 2.dp))
             Spacer(Modifier.width(6.dp))
-            Text(text = text, style = CassiniTheme.type.caption, color = c.text2)
+            Text(text = text, style = CassiniTheme.type.caption.copy(lineHeight = 1.4.em), color = c.text2)
         }
     } else {
         Row(

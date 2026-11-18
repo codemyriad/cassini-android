@@ -25,7 +25,6 @@ import io.codemyriad.cassini.ui.format.StageUi
 import io.codemyriad.cassini.ui.format.TimeLeftUi
 import io.codemyriad.cassini.ui.library.DaySection
 import io.codemyriad.cassini.ui.library.FirstRunHeroUi
-import io.codemyriad.cassini.ui.library.FirstRunPrivacy
 import io.codemyriad.cassini.ui.library.LibraryDialog
 import io.codemyriad.cassini.ui.library.LibrarySheet
 import io.codemyriad.cassini.ui.library.LibraryUiState
@@ -132,13 +131,10 @@ internal object VariantFixtures {
 
     val library: Map<String, LibraryUiState> = mapOf(
         "library-loading" to LibraryUiState(loading = true),
-        // L-27 first-run hero (D-975): cloud backup off with transfer on, and the D98 default (backup on), where the
-        // once-only backup notice waits until the first meeting is saved (D103).
-        "library-empty" to LibraryUiState(hero = FirstRunHeroUi(false, FirstRunPrivacy.PROCESSING)),
-        "library-empty-backup" to LibraryUiState(
-            hero = FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP),
-        ),
-        "library-empty-phone-only" to LibraryUiState(hero = FirstRunHeroUi(false, FirstRunPrivacy.PHONE_ONLY)),
+        // L-70, L-71 first-run hero (D105): identical in every backup state.
+        "library-empty" to LibraryUiState(hero = FirstRunHeroUi),
+        "library-empty-backup" to LibraryUiState(hero = FirstRunHeroUi),
+        "library-empty-phone-only" to LibraryUiState(hero = FirstRunHeroUi),
         "library-no-results" to b.library.copy(
             query = "invoice",
             progress = null,

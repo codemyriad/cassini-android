@@ -1,10 +1,10 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "dd06a62dc881034fed417b000f47004e577a3fb0",
+  "commit": "277c65423909ec6f696836eeefede6d4ac5e4c84",
   "files": {
     "strings.json": {
       "source": "strings/strings.json",
-      "sha256": "37be394321da842424ad25402c864ee1221db87821972dede85eaf916b4ce260"
+      "sha256": "a735381a6c7cbe8b1d4bd57cc4ac811d99939036b2e457b120fe19cdb7a7bc4b"
     },
     "brand/tokens.json": {
       "source": "brand/tokens.json",
@@ -60,11 +60,11 @@
     },
     "contract/HARMONY.md": {
       "source": "contract/HARMONY.md",
-      "sha256": "a971a2a922fbd8cc249778c3c2fd2b498086d0c2d17a352f1c0ff93c4123b693"
+      "sha256": "e58675bf720e2111ffd13e8b6c590250be9592f7ad260252e963cc01299815d0"
     },
     "strings/strings.json": {
       "source": "strings/strings.json",
-      "sha256": "37be394321da842424ad25402c864ee1221db87821972dede85eaf916b4ce260"
+      "sha256": "a735381a6c7cbe8b1d4bd57cc4ac811d99939036b2e457b120fe19cdb7a7bc4b"
     },
     "contract/import-types.json": {
       "source": "contract/import-types.json",
@@ -73,13 +73,13 @@
     },
     "wave5/strings.json": {
       "source": "strings/strings.json",
-      "commit": "dd06a62dc881034fed417b000f47004e577a3fb0",
-      "sha256": "37be394321da842424ad25402c864ee1221db87821972dede85eaf916b4ce260"
+      "commit": "277c65423909ec6f696836eeefede6d4ac5e4c84",
+      "sha256": "a735381a6c7cbe8b1d4bd57cc4ac811d99939036b2e457b120fe19cdb7a7bc4b"
     },
     "phase2/strings.json": {
       "source": "strings/strings.json",
-      "commit": "dd06a62dc881034fed417b000f47004e577a3fb0",
-      "sha256": "37be394321da842424ad25402c864ee1221db87821972dede85eaf916b4ce260"
+      "commit": "277c65423909ec6f696836eeefede6d4ac5e4c84",
+      "sha256": "a735381a6c7cbe8b1d4bd57cc4ac811d99939036b2e457b120fe19cdb7a7bc4b"
     }
   }
 }

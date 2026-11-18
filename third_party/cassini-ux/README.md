@@ -1,10 +1,11 @@
 # Shared Phase 1 contract
 
 The catalog, tokens, Saturn marks (nav, mid), contracts and vectors come from
-cassini-ux commit `dd06a62dc881034fed417b000f47004e577a3fb0` (bumped from `5e0c34e` to `5e4f0bf` for L-10,
+cassini-ux commit `277c65423909ec6f696836eeefede6d4ac5e4c84` (bumped from `5e0c34e` to `5e4f0bf` for L-10,
 `docs/design/phase2-d1035.md`, then to the reviewed catalog `c28b724` for D-1075, where only the catalog and
 `contract/HARMONY.md` changed bytes, then to `dd06a62` for D-1090, where only the catalog changed:
-`about.licenceLine.phone` names "Codemyriad OÜ", `docs/design/phase2-d1090.md`). `UPSTREAM.json`
+`about.licenceLine.phone` names "Codemyriad OÜ", `docs/design/phase2-d1090.md`, then to `277c654` for D-1100 / D105:
+new first run and "transcribe" for the process). `UPSTREAM.json`
 records source paths and SHA-256 values. `scripts/check-ux-pin.py` verifies every
 input, requires the Phase 1 inputs and rejects per-file commit drift.
 

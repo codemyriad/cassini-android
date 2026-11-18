@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit. -->
+<!-- Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Vozes guardadas</string>
     <string name="ui_settings_trash">Lixo</string>
@@ -133,7 +133,6 @@
     <string name="ui_about_name_version">Cassini talk %1$s</string>
     <string name="ui_about_version">Versão %1$s</string>
     <string name="ui_about_licence_line">Software livre ao abrigo da GPLv3. © %1$s Codemyriad OÜ e colaboradores.</string>
-    <string name="ui_first_run_how_to">Carregue em Gravar quando a reunião começar e em Parar quando terminar. O Cassini transcreve tudo.</string>
     <string name="ui_voices_setup_title">Reconhecer as pessoas a quem der nome?</string>
     <string name="ui_voices_setup_body">Quando dá nome a um orador, o Cassini pode memorizar a voz e dar-lhe nome por si nas reuniões seguintes.</string>
     <string name="ui_voices_setup_privacy">As impressões vocais são criadas neste telemóvel e nunca são incluídas nos ficheiros exportados ou partilhados. Nas definições, pode escolher se são incluídas nas cópias de segurança.</string>
@@ -151,4 +150,8 @@
     <string name="ui_models_space_needed">Precisa de cerca de %1$s livres durante a instalação. Cada ficheiro é verificado antes de ser usado.</string>
     <string name="ui_models_download_and_transcribe">Transferir e transcrever</string>
     <string name="ui_models_recording_kept">A sua gravação é mantida de qualquer forma.</string>
+    <string name="ui_hero_subtitle_phone">Aqui mesmo, neste telemóvel.</string>
+    <string name="ui_first_run_how_to_phone">Grave algo ou importe um ficheiro de áudio.</string>
+    <string name="ui_first_run_privacy_phone">Transcrito neste telemóvel.</string>
+    <string name="ui_first_run_privacy_backups">As cópias de segurança seguem as definições do seu telemóvel.</string>
 </resources>

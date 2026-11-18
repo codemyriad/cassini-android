@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit. -->
+<!-- Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Voix mémorisées</string>
     <string name="ui_settings_trash">Corbeille</string>
@@ -133,7 +133,6 @@
     <string name="ui_about_name_version">Cassini talk %1$s</string>
     <string name="ui_about_version">Version %1$s</string>
     <string name="ui_about_licence_line">Logiciel libre sous licence GPLv3. © %1$s Codemyriad OÜ et contributeurs.</string>
-    <string name="ui_first_run_how_to">Appuyez sur Enregistrer quand la réunion commence et sur Arrêter quand elle se termine. Cassini transcrit tout.</string>
     <string name="ui_voices_setup_title">Reconnaître les personnes que vous nommez ?</string>
     <string name="ui_voices_setup_body">Quand vous nommez un intervenant, Cassini peut mémoriser sa voix et le nommer pour vous dans les réunions suivantes.</string>
     <string name="ui_voices_setup_privacy">Les empreintes vocales sont créées sur ce téléphone et ne sont jamais écrites dans les fichiers exportés ou partagés. Vous pouvez choisir dans les réglages si les sauvegardes les incluent.</string>
@@ -151,4 +150,8 @@
     <string name="ui_models_space_needed">Il faut environ %1$s d’espace libre pendant l’installation. Chaque fichier est vérifié avant d’être utilisé.</string>
     <string name="ui_models_download_and_transcribe">Télécharger et transcrire</string>
     <string name="ui_models_recording_kept">Votre enregistrement est conservé dans tous les cas.</string>
+    <string name="ui_hero_subtitle_phone">Ici même, sur ce téléphone.</string>
+    <string name="ui_first_run_how_to_phone">Enregistrez quelque chose ou importez un fichier audio.</string>
+    <string name="ui_first_run_privacy_phone">Transcrit sur ce téléphone.</string>
+    <string name="ui_first_run_privacy_backups">Les sauvegardes suivent les paramètres de votre téléphone.</string>
 </resources>

@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit. -->
+<!-- Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit. -->
 <resources>
     <string name="ui_hero_title">Chaque mot transcrit.</string>
-    <string name="ui_hero_subtitle">Rien n’est mis en ligne.</string>
-    <string name="ui_hero_backup_qualifier">(sauf pour la sauvegarde cloud chiffrée)</string>
-    <string name="ui_hero_subtitle_backup">Rien n’est mis en ligne. (sauf pour la sauvegarde cloud chiffrée)</string>
     <string name="ui_privacy_phone_only">Transcrit sur ce téléphone. L’audio n’en sort jamais.</string>
     <string name="ui_privacy_with_backup">Transcrit sur ce téléphone. Jamais mis en ligne, sauf dans votre sauvegarde cloud chiffrée.</string>
     <string name="ui_privacy_processing">La transcription se fait sur ce téléphone.</string>

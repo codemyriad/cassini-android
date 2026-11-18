@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit. -->
+<!-- Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit. -->
 <resources>
     <string name="ui_hero_title">Cada palavra transcrita.</string>
-    <string name="ui_hero_subtitle">Nada é enviado.</string>
-    <string name="ui_hero_backup_qualifier">(exceto para a cópia de segurança encriptada na nuvem)</string>
-    <string name="ui_hero_subtitle_backup">Nada é enviado. (exceto para a cópia de segurança encriptada na nuvem)</string>
     <string name="ui_privacy_phone_only">Transcrito neste telemóvel. O áudio nunca sai dele.</string>
     <string name="ui_privacy_with_backup">Transcrito neste telemóvel. Nunca é enviado, exceto para a sua cópia de segurança encriptada na nuvem.</string>
     <string name="ui_privacy_processing">A transcrição é feita neste telemóvel.</string>
