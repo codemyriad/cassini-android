@@ -157,9 +157,10 @@ class GraphModelDownloadPortsTest {
     }
 
     @Test fun decliningStandaloneSpeakerModelTurnsTheSwitchBackOff() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
         val graph = AppGraph(
             context,
-            AppGraph.Config(paths = AppPaths(temp.root, temp.newFolder("models"))),
+            AppGraph.Config(paths = AppPaths(folder.root, folder.newFolder("models"))),
         )
         try {
             graph.awaitCatalogue()
