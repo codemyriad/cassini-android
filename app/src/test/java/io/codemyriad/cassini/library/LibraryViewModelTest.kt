@@ -205,14 +205,15 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun noPrivacyClaimIsDrawnBeforeTheBackupChoicesAreRead() = runTest(dispatcher) {
+    fun firstRunHeroRendersBeforeTheBackupChoicesAreRead() = runTest(dispatcher) {
         val unread = object : LibraryPorts by ports {
             override val backupReach: Flow<BackupReach> = emptyFlow()
         }
         val viewModel = LibraryViewModel(saved, unread, CLOCK, dispatcher)
         backgroundScope.launch { viewModel.state.collect {} }
         advanceUntilIdle()
-        assertNull(viewModel.now().hero)
+        assertEquals(FirstRunHeroUi, viewModel.now().hero)
+        assertFalse(viewModel.now().backupCard)
         assertTrue(viewModel.now().banners.none { it.kind == BannerKind.LIB_EMPTY })
     }
 

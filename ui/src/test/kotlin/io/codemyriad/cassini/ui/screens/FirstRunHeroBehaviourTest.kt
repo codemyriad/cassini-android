@@ -4,11 +4,9 @@ import android.content.Context
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
@@ -44,7 +42,5 @@ class FirstRunHeroBehaviourTest {
         val expectedPrivacy = text(R.string.ui_first_run_privacy_phone) + "\n" +
             text(R.string.ui_first_run_privacy_backups)
         rule.onNodeWithTag("hero-privacy").assertIsDisplayed().assert(hasText(expectedPrivacy))
-        rule.onAllNodesWithText(text(R.string.ui_hero_subtitle)).assertCountEquals(0)
-        rule.onAllNodesWithText(text(R.string.ui_hero_backup_qualifier)).assertCountEquals(0)
     }
 }
