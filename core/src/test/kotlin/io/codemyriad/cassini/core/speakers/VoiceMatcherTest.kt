@@ -86,7 +86,7 @@ class VoiceMatcherTest {
         assertEquals(Match.State.AUTO, VoiceMatcher.match(speakers, voices, "m", t)["s"]?.state)
         assertEquals(
             Match.State.SUGGESTED,
-            VoiceMatcher.match(speakers, voices, "m", t, allowAuto = false)["s"]?.state,
+            VoiceMatcher.match(speakers, voices, "m", t.copy(auto = Float.POSITIVE_INFINITY))["s"]?.state,
         )
     }
 }

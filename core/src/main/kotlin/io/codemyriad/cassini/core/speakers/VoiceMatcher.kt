@@ -6,14 +6,12 @@ object VoiceMatcher {
      * The best saved voice for each speaker. [excluded] lists, per speaker, the voices the user said it is not ("Not
      * Luca"): those pairs are removed before the assignment and before the rival check.
      */
-    @Suppress("LongParameterList") // Thresholds, excluded map and allowAuto are independent caller inputs.
     fun match(
         speakers: Map<String, FloatArray>,
         voices: List<Voice>,
         model: String,
         t: Thresholds,
         excluded: Map<String, Set<String>> = emptyMap(),
-        allowAuto: Boolean = true,
     ): Map<String, Match> {
         val usable = voices.filter { it.model == model }
         val scores = speakers.flatMap { (id, print) ->
@@ -26,7 +24,7 @@ object VoiceMatcher {
             if (score < t.suggest || speaker in result || voice in taken) continue
             // Automatic only when neither another person for this speaker nor another speaker for this person comes close.
             val rival = scores.filter { (s, v, _) -> (s == speaker) != (v == voice) && (s == speaker || v == voice) }.maxOfOrNull { it.third }
-            val auto = allowAuto && score >= t.auto && (rival == null || score - rival >= t.margin)
+            val auto = score >= t.auto && (rival == null || score - rival >= t.margin)
             result[speaker] = Match(voice, score, if (auto) Match.State.AUTO else Match.State.SUGGESTED)
             taken.add(voice)
         }

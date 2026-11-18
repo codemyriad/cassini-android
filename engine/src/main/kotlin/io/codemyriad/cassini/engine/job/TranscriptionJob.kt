@@ -450,17 +450,11 @@ class TranscriptionJob(
                 run.livePrints[id] = print.first
             }
             val open = run.livePrints.filterKeys(names::openForLive)
-            val thresholds = Voiceprints.THRESHOLDS.getValue(JobProvenance.PRINT_MODEL)
+            val baseThresholds = Voiceprints.THRESHOLDS.getValue(JobProvenance.PRINT_MODEL)
+            val thresholds = if (autoNameVoices) baseThresholds else baseThresholds.copy(auto = Float.POSITIVE_INFINITY)
             val excluded = names.excluded(open.keys)
             val people = people(run.prepared)
-            val matches = VoiceMatcher.match(
-                open,
-                people.voices,
-                JobProvenance.PRINT_MODEL,
-                thresholds,
-                excluded,
-                allowAuto = autoNameVoices,
-            )
+            val matches = VoiceMatcher.match(open, people.voices, JobProvenance.PRINT_MODEL, thresholds, excluded)
             storage.mutateNames(noteId) { it.applyLive(matches, people.names) }
         }
     }
@@ -593,18 +587,12 @@ class TranscriptionJob(
             emptyMap()
         }
         onInference { checkActive() }
-        val thresholds = Voiceprints.THRESHOLDS.getValue(JobProvenance.PRINT_MODEL)
+        val baseThresholds = Voiceprints.THRESHOLDS.getValue(JobProvenance.PRINT_MODEL)
+        val thresholds = if (autoNameVoices) baseThresholds else baseThresholds.copy(auto = Float.POSITIVE_INFINITY)
         val embeddings = computed.mapValues { it.value.first }
         val excluded = draft.names.excluded(computed.keys)
         val people = withContext(env.io) { savedVoices(prepared) }
-        val matches = VoiceMatcher.match(
-            embeddings,
-            people.voices,
-            JobProvenance.PRINT_MODEL,
-            thresholds,
-            excluded,
-            allowAuto = autoNameVoices,
-        )
+        val matches = VoiceMatcher.match(embeddings, people.voices, JobProvenance.PRINT_MODEL, thresholds, excluded)
         return Matched(computed, matches)
     }
 
