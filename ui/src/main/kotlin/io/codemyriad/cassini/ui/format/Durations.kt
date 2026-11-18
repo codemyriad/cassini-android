@@ -97,10 +97,6 @@ object Durations {
     /** "Speaks for 3 min 12 s in this meeting" (Name a speaker header). */
     fun speaksFor(res: Resources, ms: Long): String = res.getString(R.string.ui_sp_talk_time, compact(res, ms))
 
-    /** "22 min confirmed speech", "under 1 min confirmed speech" (Saved voices rows). */
-    fun confirmedSpeech(res: Resources, ms: Long): String =
-        res.getString(R.string.ui_voices_confirmed_speech, roughMinutes(res, ms))
-
     /** The Recording caption with the space limit: "Keeps recording … Space for about 31 h more." */
     fun spaceHint(res: Resources, ms: Long): String =
         res.getString(
@@ -155,10 +151,6 @@ object Durations {
     @Composable
     @ReadOnlyComposable
     fun speaksFor(ms: Long): String = speaksFor(resources(), ms)
-
-    @Composable
-    @ReadOnlyComposable
-    fun confirmedSpeech(ms: Long): String = confirmedSpeech(resources(), ms)
 
     @Composable
     @ReadOnlyComposable

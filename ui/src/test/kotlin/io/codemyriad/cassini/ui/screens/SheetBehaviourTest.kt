@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -183,15 +184,27 @@ class SheetBehaviourTest {
         rule.runOnIdle { assertEquals(listOf(NameSheetEvent.ShowAll, NameSheetEvent.NotName), events) }
     }
 
+    @Test fun exportShowsHeadingSizeAndOneLineDescriptions() {
+        setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = {}) }
+        rule.onNodeWithText("Export").assertExists()
+        rule.onNodeWithText(".opus (24 MB)", substring = true).assertExists()
+        rule.onNodeWithText("Audio and transcript in one file").assertExists()
+        rule.onNodeWithText("Transcript with speakers and times").assertExists()
+        rule.onNodeWithText("More formats").performClick()
+        rule.onNodeWithText("Transcript only, no formatting").performScrollTo().assertExists()
+        rule.onNodeWithText("For video players and editors").performScrollTo().assertExists()
+        rule.onNodeWithText("With speaker names, for web video").performScrollTo().assertExists()
+    }
+
     @Test fun noteActionRowsSendTheirAction() {
         val actions = mutableListOf<NoteAction>()
         setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = { actions += it }) }
-        rule.onNodeWithText("Cassini file").performClick()
+        rule.onNodeWithText("Cassini file", substring = true).performClick()
         rule.onNodeWithText("Markdown", substring = true).performClick()
         rule.onNodeWithText("More formats").performClick()
         rule.onNodeWithText("Plain text", substring = true).performScrollTo().performClick()
-        rule.onNodeWithText("Subtitles (SRT)", substring = true).performScrollTo().performClick()
-        rule.onNodeWithText("Subtitles (WebVTT)", substring = true).performScrollTo().performClick()
+        rule.onNodeWithText(".srt", substring = true).performScrollTo().performClick()
+        rule.onNodeWithText(".vtt", substring = true).performScrollTo().performClick()
         rule.onNodeWithText("Rename").performScrollTo().performClick()
         rule.onNodeWithText("Transcribe again").performScrollTo().performClick()
         rule.onNodeWithText("Document info").performScrollTo().performClick()
@@ -222,8 +235,8 @@ class SheetBehaviourTest {
         rule.onNodeWithContentDescription("Share Markdown").performClick()
         rule.onNodeWithText("More formats").performClick()
         rule.onNodeWithContentDescription("Share Plain text").performScrollTo().performClick()
-        rule.onNodeWithContentDescription("Share Subtitles (SRT)").performScrollTo().performClick()
-        rule.onNodeWithContentDescription("Share Subtitles (WebVTT)").performScrollTo().performClick()
+        rule.onAllNodes(hasContentDescription("Share Subtitles"))[0].performScrollTo().performClick()
+        rule.onAllNodes(hasContentDescription("Share Subtitles"))[1].performScrollTo().performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(
@@ -242,11 +255,11 @@ class SheetBehaviourTest {
     @Test fun moreFormatsStartsClosedAndToggles() {
         setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = {}) }
         rule.onNodeWithText("Plain text", substring = true).assertDoesNotExist()
-        rule.onNodeWithText("Subtitles (SRT)", substring = true).assertDoesNotExist()
+        rule.onNodeWithText(".srt", substring = true).assertDoesNotExist()
         rule.onNodeWithText("More formats").assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand))
         rule.onNodeWithText("More formats").performClick()
         rule.onNodeWithText("Plain text", substring = true).assertExists()
-        rule.onNodeWithText("Subtitles (WebVTT)", substring = true).assertExists()
+        rule.onNodeWithText(".vtt", substring = true).assertExists()
         rule.onNodeWithText("More formats").assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Collapse))
         rule.onNodeWithText("More formats").performClick()
         rule.onNodeWithText("Plain text", substring = true).assertDoesNotExist()
@@ -273,10 +286,10 @@ class SheetBehaviourTest {
                 onAction = { actions += it },
             )
         }
-        rule.onNodeWithText("Original audio").performClick()
+        rule.onNodeWithText("Original audio", substring = true).performClick()
         val body = "The audio exactly as it was imported, without a transcript."
         rule.onNodeWithText(body, substring = true).assertExists()
-        rule.onNodeWithText("Cassini file").assertDoesNotExist()
+        rule.onNodeWithText("Cassini file", substring = true).assertDoesNotExist()
         rule.onNodeWithText("No transcript yet, so only the audio can be exported.").assertExists()
         rule.runOnIdle { assertEquals(listOf(NoteAction.SAVE_DOCUMENT), actions) }
     }
@@ -285,7 +298,7 @@ class SheetBehaviourTest {
         setThemed {
             NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-unreadable"), onAction = {})
         }
-        rule.onNodeWithText("Cassini file").assertIsEnabled()
+        rule.onNodeWithText("Cassini file", substring = true).assertIsEnabled()
         rule.onNodeWithText("Not available for this transcript").assertExists()
         rule.onNodeWithText("More formats").assertDoesNotExist()
     }
@@ -301,7 +314,7 @@ class SheetBehaviourTest {
         setThemed {
             NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-plain"), onAction = { actions += it })
         }
-        rule.onNodeWithText("Audio file").assertIsEnabled()
+        rule.onNodeWithText("Audio file", substring = true).assertIsEnabled()
         rule.onNode(hasText("Plain text", substring = true).and(hasClickAction())).assertDoesNotExist()
         rule.onNodeWithText("Document info").assertDoesNotExist()
         rule.onNodeWithText("Transcribe").performClick()

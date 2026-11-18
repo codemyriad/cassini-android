@@ -23,11 +23,8 @@ LABELS = {
     'settings_transfer_body_off': ('settings.transfer.body.off', None),
     'settings_transfer_too_large': ('settings.transfer.tooLarge', None),
     'count_notes': ('format.searchCount.meetings', 'n'),
-    'voices_stale': ('savedVoices.row.stale', None),
-    'voices_footnote': ('savedVoices.howToAdd.short', None),
     'voices_options': ('savedVoices.row.options.a11y', 'name'),
     'voices_forget': ('savedVoices.row.forgetEllipsis', None),
-    'voices_forget_body': ('android.savedVoices.forget.body', None),
     'voices_forget_everyone_body': ('android.savedVoices.forgetEveryone.body', 'n'),
     'trash_intro': ('trash.phone.intro', None),
     'trash_delete_body': ('android.trash.delete.body', None),
@@ -145,6 +142,26 @@ LABELS = {
     'setting_on': ('settings.answer.on', None),
     'transcription_right_away': ('settings.phone.transcription.rightAway', None),
     'transcription_right_away_subtitle': ('settings.phone.transcription.rightAway.subtitle', None),
+    # D106 Export (L-62) and Saved voices redesign (L-63).
+    'export_heading': ('export.heading', None),
+    'export_cassini_file_short': ('export.cassiniFile.description.short', None),
+    'export_markdown_short': ('export.markdown.description.short', None),
+    'export_plain_text_short': ('export.plainText.description.short', None),
+    'export_subtitles': ('export.subtitles.label', None),
+    'export_srt_short': ('export.srt.description.short', None),
+    'export_vtt_short': ('export.vtt.description.short', None),
+    'export_type_with_size': ('export.typeWithSize', ('type', 'size')),
+    'voices_footnote_made_on': ('savedVoices.footnote.madeOn.phone', None),
+    'voices_footnote_names_only': ('savedVoices.footnote.namesOnly', None),
+    'voices_stale_title': ('savedVoices.stale.title', 'n'),
+    'voices_stale_body': ('savedVoices.stale.body', 'name'),
+    'voices_needs_naming': ('savedVoices.row.needsNaming', None),
+    'voices_caption': ('savedVoices.caption', None),
+    'voices_empty': ('savedVoices.empty', None),
+    'voices_empty_body': ('savedVoices.empty.body', None),
+    'voices_forget_title': ('confirm.deleteVoiceProfile.title', 'name'),
+    'voices_forget_body': ('confirm.deleteVoiceProfile.body', 'name'),
+    'voices_forget_action': ('confirm.deleteVoiceProfile.primary', None),
 }
 
 
@@ -166,8 +183,11 @@ def generated(root):
                 raise ValueError(f'String is not for Android: {identifier}')
             translation = entry if locale == 'en' else entry['l10n'][locale]
             if 'plural' in entry:
+                forms = dict(translation['plural'])
+                if locale != 'en' and 'many' not in forms and 'other' in forms:
+                    forms['many'] = forms['other']
                 lines.append(f'    <plurals name="ui_{name}">')
-                for quantity, text in translation['plural'].items():
+                for quantity, text in forms.items():
                     value = phase1.android_text(text, argument, literal=quantity != 'other')
                     lines.append(f'        <item quantity="{quantity}">{value}</item>')
                 lines.append('    </plurals>')

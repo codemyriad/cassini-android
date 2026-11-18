@@ -62,7 +62,7 @@ fun SavedVoicesDialogContent(dialog: SavedVoicesDialog, onEvent: (SavedVoicesEve
 private fun forgetSpec(dialog: SavedVoicesDialog): ConfirmSpec = when (dialog) {
     is SavedVoicesDialog.Forget -> ConfirmSpec(
         title = stringResource(R.string.ui_voices_forget_title, dialog.name),
-        body = stringResource(R.string.ui_voices_forget_body),
+        body = stringResource(R.string.ui_voices_forget_body, dialog.name),
         confirm = stringResource(R.string.ui_voices_forget_action),
         destructive = true,
     )

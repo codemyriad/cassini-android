@@ -42,6 +42,7 @@ import io.codemyriad.cassini.ui.format.LocalFormat
 import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
+import io.codemyriad.cassini.ui.theme.sans
 
 /**
  * The three kinds of sheet row (board 06): [Featured] is the highlighted "Cassini document" row, [Plain] an ordinary
@@ -79,56 +80,68 @@ fun SheetActionRow(
     val c = CassiniTheme.colors
     val featured = style == SheetRowStyle.Featured
     val saving = stringResource(R.string.ui_actions_saving)
-    val shape = CassiniTheme.shapes.row
+    val topAligned = featured || subtitle != null || share != null
+    val tint = sheetRowTint(style, c)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .alpha(if (enabled) 1f else DISABLED_ALPHA)
-            .clip(shape)
+            .clip(CassiniTheme.shapes.row)
             .then(if (featured) Modifier.background(c.surfaceWash) else Modifier)
             .clickable(enabled = enabled && !busy, role = Role.Button, onClick = onClick)
-            .then(
-                if (busy) Modifier.semantics { stateDescription = saving } else Modifier,
-            )
-            .then(
-                if (featured) {
-                    Modifier.padding(12.dp)
-                } else {
-                    Modifier
-                        .heightIn(min = 52.dp)
-                        .padding(horizontal = 12.dp)
-                },
-            ),
+            .then(if (busy) Modifier.semantics { stateDescription = saving } else Modifier)
+            .then(if (topAligned) Modifier else Modifier.heightIn(min = 52.dp))
+            .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = if (featured) Alignment.Top else Alignment.CenterVertically,
+        verticalAlignment = if (topAligned) Alignment.Top else Alignment.CenterVertically,
     ) {
-        val tint = when (style) {
-            SheetRowStyle.Featured -> c.accent
-            SheetRowStyle.Plain -> c.ink
-            SheetRowStyle.Destructive -> c.redInk
-        }
-        CassiniIcon(glyph, 24.dp, 1.7f, tint, null)
-        RowTexts(label, extension, subtitle, featured, tint, Modifier.weight(1f))
-        if (busy) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .size(20.dp),
-                color = c.accent,
-                strokeWidth = 2.dp,
-            )
-        }
+        CassiniIcon(
+            glyph = glyph,
+            size = 24.dp,
+            stroke = 1.7f,
+            tint = tint,
+            contentDescription = null,
+            modifier = if (topAligned) Modifier.padding(top = 12.dp) else Modifier,
+        )
+        RowTexts(
+            label = label,
+            extension = extension,
+            subtitle = subtitle,
+            featured = featured,
+            tint = tint,
+            modifier = Modifier
+                .weight(1f)
+                .then(if (topAligned) Modifier.padding(vertical = 10.dp) else Modifier),
+        )
+        if (busy) SheetRowSpinner(topAligned, c.accent)
         if (share != null) {
             IconButton44(
                 glyph = Glyph.Share,
                 contentDescription = share.label,
                 onClick = share.onClick,
-                modifier = Modifier.align(Alignment.CenterVertically),
+                modifier = Modifier.padding(top = 2.dp),
                 tint = tint,
                 enabled = enabled && !busy,
             )
         }
     }
+}
+
+private fun sheetRowTint(style: SheetRowStyle, c: io.codemyriad.cassini.ui.theme.CassiniColors): Color = when (style) {
+    SheetRowStyle.Featured -> c.accent
+    SheetRowStyle.Plain -> c.ink
+    SheetRowStyle.Destructive -> c.redInk
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.SheetRowSpinner(topAligned: Boolean, color: Color) {
+    CircularProgressIndicator(
+        modifier = Modifier
+            .then(if (topAligned) Modifier.padding(top = 14.dp) else Modifier.align(Alignment.CenterVertically))
+            .size(20.dp),
+        color = color,
+        strokeWidth = 2.dp,
+    )
 }
 
 /** The label (and the featured row's caption) of a [SheetActionRow], with the mono [extension]. */
@@ -145,13 +158,11 @@ private fun RowTexts(
     val c = CassiniTheme.colors
     Column(modifier) {
         if (featured) {
-            Text(text = label, style = CassiniTheme.type.rowTitle, color = c.ink)
-            if (subtitle != null || extension != null) {
+            Text(text = withExtension(label, extension, 13, c.text2), style = CassiniTheme.type.rowTitle, color = c.ink)
+            if (subtitle != null) {
                 Text(
-                    text = withExtension(subtitle, extension, 13),
-                    // Board 06 sets the 13 px lines (lh 1.4) inline in the 16 px row title's font, so each line box
-                    // is the 16 px strut's 19.5 dp, not 18.2. Greedy breaking, as the browser does.
-                    style = CassiniTheme.type.caption.copy(lineHeight = 19.5.sp, lineBreak = LineBreak.Simple),
+                    text = subtitle,
+                    style = CassiniTheme.type.body14.copy(lineBreak = LineBreak.Simple),
                     color = c.text2,
                 )
             }
@@ -162,7 +173,7 @@ private fun RowTexts(
                 color = tint,
             )
             if (subtitle != null) {
-                Text(text = subtitle, style = CassiniTheme.type.caption, color = c.text2)
+                Text(text = subtitle, style = CassiniTheme.type.body14, color = c.text2)
             }
         }
     }
@@ -190,15 +201,18 @@ private fun withExtension(
     }
 }
 
-/** A sheet section header: `section` (uppercase) in text2, margins 8 top, 12 horizontal, 4 bottom; a heading. */
+/**
+ * A sheet section header: `section` (uppercase) or sentence-case `14 sp / 20 sp` in text2, margins 8 top,
+ * 12 horizontal, 4 bottom; a heading.
+ */
 @Composable
-fun SheetSection(text: String, modifier: Modifier = Modifier) {
+fun SheetSection(text: String, modifier: Modifier = Modifier, uppercase: Boolean = true) {
     Text(
-        text = text.uppercase(LocalFormat.current.locale),
+        text = if (uppercase) text.uppercase(LocalFormat.current.locale) else text,
         modifier = modifier
             .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp)
             .semantics { heading() },
-        style = CassiniTheme.type.section,
+        style = if (uppercase) CassiniTheme.type.section else sans(14, 500).copy(lineHeight = 20.sp),
         color = CassiniTheme.colors.text2,
     )
 }

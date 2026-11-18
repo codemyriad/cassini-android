@@ -223,8 +223,13 @@ class LibraryViewModel(
         starred,
     )
 
-    private val sheet: Flow<NoteDetails?> = sheetId.flatMapLatest { id ->
-        if (id == null) flowOf(null) else ports.details(id).catch { emit(null) }
+    private val sheet: Flow<Pair<NoteDetails?, Long?>> = sheetId.flatMapLatest { id ->
+        if (id == null) {
+            flowOf(null to null)
+        } else {
+            val bytes = flow { emit(ports.documentBytes(id)) }.catch { emit(null) }
+            combine(ports.details(id).catch { emit(null) }, bytes) { details, size -> details to size }
+        }
     }
 
     private val live: Flow<Live> = combine(
@@ -313,9 +318,10 @@ class LibraryViewModel(
     private fun build(
         listing: Listing,
         live: Live,
-        details: NoteDetails?,
+        sheet: Pair<NoteDetails?, Long?>,
         dialog: LibraryDialog?,
     ): LibraryUiState {
+        val (details, sheetBytes) = sheet
         val now = Instant.now(clock)
         val zone = listing.environment.zone
         val recording = live.recording
@@ -361,7 +367,15 @@ class LibraryViewModel(
             sheet = details?.let {
                 val stopBusy = live.processing.notes[it.note.id]?.phase is JobPhase.Stopping
                 LibrarySheet.Actions(
-                    LibraryMapping.actions(it, context.activeNoteId, now, zone, live.voiceModelReady, stopBusy),
+                    LibraryMapping.actions(
+                        it,
+                        context.activeNoteId,
+                        now,
+                        zone,
+                        live.voiceModelReady,
+                        stopBusy,
+                        sheetBytes,
+                    ),
                 )
             },
             dialog = dialog,

@@ -107,8 +107,8 @@ class NoteFlowTest {
 
         // The transcript exports equal the goldens.
         val text = export(rule.text(UiR.string.ui_export_plain_text), "copy.txt", moreFormats = true).readText()
-        val srt = export(rule.text(UiR.string.ui_export_srt), "copy.srt", moreFormats = true)
-        val vtt = export(rule.text(UiR.string.ui_export_vtt), "copy.vtt", moreFormats = true)
+        val srt = export(rule.text(UiR.string.ui_ext_srt), "copy.srt", moreFormats = true)
+        val vtt = export(rule.text(UiR.string.ui_ext_vtt), "copy.vtt", moreFormats = true)
         val results = listOf(
             golden("fleurs-it-short.txt", normalizeText(text)),
             golden("fleurs-it-short.srt", srt.readText()),
@@ -152,7 +152,7 @@ class NoteFlowTest {
 
     /** Opens the Note actions sheet, unless it is open. */
     private fun openActions() {
-        val section = hasText(rule.text(UiR.string.ui_actions_save_copy), ignoreCase = true)
+        val section = hasText(rule.text(UiR.string.ui_export_heading))
         if (rule.onAllNodes(section).fetchSemanticsNodes().isEmpty()) {
             rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_more_actions))).performClick()
         }
@@ -178,7 +178,7 @@ class NoteFlowTest {
         } finally {
             Background.instrumentation.removeMonitor(monitor)
         }
-        val section = hasText(rule.text(UiR.string.ui_actions_save_copy), ignoreCase = true)
+        val section = hasText(rule.text(UiR.string.ui_export_heading))
         if (rule.onAllNodes(section).fetchSemanticsNodes().isNotEmpty()) Espresso.pressBack()
         rule.waitGone(section)
         return target

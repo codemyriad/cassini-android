@@ -188,7 +188,6 @@ class MarkdownExportTest {
     @Test fun androidHeadingsAndLabelsMatchAllSixPinnedTranslations() {
         val ids = mapOf(
             "ui_actions_markdown" to "export.markdown.label",
-            "ui_markdown_description" to "export.markdown.description",
             "ui_markdown_speakers" to "export.markdown.speakersLine",
             "ui_markdown_transcript" to "export.markdown.transcriptHeading",
             "ui_markdown_notes" to "export.markdown.notesHeading",

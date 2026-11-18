@@ -342,7 +342,7 @@ class AcceptanceWalkTest {
         rule.runOnUiThread { graph.playback.pause() }
 
         rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_more_actions))).performClick()
-        see(rule.text(UiR.string.ui_actions_save_copy), ignoreCase = true)
+        see(rule.text(UiR.string.ui_export_heading))
         see(rule.text(UiR.string.ui_export_cassini_file))
         see(rule.text(UiR.string.ui_actions_document_info))
         shot("06-note-actions-and-export")
@@ -403,7 +403,7 @@ class AcceptanceWalkTest {
         rule.onNode(voices).performScrollTo().performClick()
         see(ANNA)
         see(PAOLO)
-        see(rule.text(UiR.string.ui_voices_privacy_phone))
+        see(rule.text(UiR.string.ui_voices_footnote_made_on))
         shot("07-saved-voices")
         Espresso.pressBack()
 

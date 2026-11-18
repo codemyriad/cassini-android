@@ -287,7 +287,6 @@
     <string name="ui_part_downloading_voices">Baixando reconhecimento de voz — %1$d%%</string>
 
     <!-- Note actions and export (board 06, features.md section 6). -->
-    <string name="ui_actions_save_copy">Salvar uma cópia</string>
     <string name="ui_actions_audio_file">Arquivo de áudio</string>
     <string name="ui_actions_audio_file_body">A gravação como está. Ainda sem transcrição.</string>
     <string name="ui_actions_not_readable">Indisponível para esta transcrição</string>
@@ -339,14 +338,10 @@
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Vozes salvas</string>
-    <string name="ui_voices_confirmed_speech">%1$s de fala confirmada</string>
-    <string name="ui_voices_forget_title">Esquecer %1$s?</string>
-    <string name="ui_voices_forget_action">Esquecer</string>
     <string name="ui_voices_rename_title">Renomear voz salva</string>
     <string name="ui_voices_forget_everyone">Esquecer todos…</string>
     <string name="ui_voices_forget_everyone_title">Esquecer todos?</string>
     <string name="ui_voices_forget_everyone_action">Esquecer todos</string>
-    <string name="ui_voices_empty">Nenhuma voz salva ainda</string>
 
     <!-- Settings (board 08, features.md section 11). -->
     <string name="ui_settings_title">Configurações</string>
@@ -489,7 +484,6 @@
     <string name="ui_turn_crosstalk">Provável sobreposição de vozes</string>
     <!-- cassini-ux b86b7b0: Markdown export, D50.2/D50.3. -->
     <string name="ui_actions_markdown" formatted="false">Markdown</string>
-    <string name="ui_markdown_description" formatted="false">A transcrição como arquivo de texto, com locutores e tempos.</string>
     <string name="ui_markdown_speakers" formatted="false">Locutores: {names}</string>
     <string name="ui_markdown_transcript" formatted="false">Transcrição</string>
     <string name="ui_markdown_notes" formatted="false">Notas</string>

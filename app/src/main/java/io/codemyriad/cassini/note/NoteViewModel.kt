@@ -341,6 +341,7 @@ class NoteViewModel(
         val sheet: SheetKind? = null,
         val naming: NamingState? = null,
         val info: DocumentFacts? = null,
+        val actionsBytes: Long? = null,
         val dialog: NoteDialog? = null,
         val snackbar: SnackbarSpec? = null,
         val busyRow: NoteAction? = null,
@@ -558,7 +559,15 @@ class NoteViewModel(
             SheetKind.ACTIONS -> {
                 val active = activeNoteId(live.recording)
                 val stopBusy = (mode as? NoteMode.Processing)?.stopBusy == true
-                val actions = LibraryMapping.actions(details, active, now, clock.zone, live.voiceModelReady, stopBusy)
+                val actions = LibraryMapping.actions(
+                    details,
+                    active,
+                    now,
+                    clock.zone,
+                    live.voiceModelReady,
+                    stopBusy,
+                    ui.actionsBytes,
+                )
                 NoteSheet.Actions(if (ui.busyRow != null) actions.copy(busyRow = ui.busyRow) else actions)
             }
             SheetKind.VERSIONS -> NoteSheet.Versions(NoteMapping.versions(details, now, clock.zone))
@@ -835,7 +844,15 @@ class NoteViewModel(
 
     // Sheets and dialogs. --------------------------------------------------------------------------------------------
 
-    private fun openSheet(kind: SheetKind) = local.update { it.copy(sheet = kind) }
+    private fun openSheet(kind: SheetKind) {
+        local.update { it.copy(sheet = kind) }
+        if (kind == SheetKind.ACTIONS && local.value.actionsBytes == null) {
+            launch {
+                val bytes = ports.documentBytes(noteId)
+                if (bytes != null) local.update { it.copy(actionsBytes = bytes) }
+            }
+        }
+    }
 
     /** A swipe, scrim tap or back: the voices question counts as asked without an answer. */
     private fun dismissSheet() {

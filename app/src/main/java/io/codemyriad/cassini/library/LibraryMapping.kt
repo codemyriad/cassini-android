@@ -308,6 +308,7 @@ object LibraryMapping {
         zone: ZoneId,
         voiceModelReady: Boolean,
         stopBusy: Boolean = false,
+        documentBytes: Long? = null,
     ): NoteActionsUi {
         val note = details.note
         val selected = details.variants.firstOrNull { it.variantId == note.selectedVariant }
@@ -336,6 +337,7 @@ object LibraryMapping {
             busyRow = NoteAction.STOP.takeIf { stopBusy && details.job?.state == JobState.RUNNING },
             recording = note.audioKind == AudioKind.LIVE_CAPTURE && note.id == activeNoteId,
             starred = details.starred,
+            documentBytes = documentBytes,
         )
     }
 
