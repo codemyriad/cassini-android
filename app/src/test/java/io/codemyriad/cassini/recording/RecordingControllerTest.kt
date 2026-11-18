@@ -283,32 +283,12 @@ class RecordingControllerTest {
     }
 
     @Test fun transcribeRightAwayOffKeepsAudioWithoutHandingOffOrAskingConsent() = runBlocking {
-        var rightAway = false
-        val controller = RecordingController(
-            RecordingController.Parts(
-                scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-                dispatcher = dispatcher,
-                ready = {},
-                notes = { notes },
-                capture = capture,
-                platform = platform,
-                handoff = {
-                    handoffs += it
-                    true
-                },
-                consent = consent,
-                defaultTitle = { "Meeting" },
-                clock = { now },
-                timing = RecordingController.Timing(tickMs = 20, titleDebounceMs = 50, silenceConfirmMs = 50),
-                transcribeRightAway = { rightAway },
-            ),
-        )
-        controller.start()
-        withTimeout(2_000) { controller.state.first { it is RecordingState.Active } }
+        graph.settings.setTranscribeRightAway(false)
+        val recorded = startRecording("Saved only")
         controller.finish()
-        val ended = withTimeout(2_000) { controller.state.first { it is RecordingState.Ended } as RecordingState.Ended }
-        assertEquals(RecordingOutcome.Saved(AfterFinish.AUDIO_ONLY), ended.outcome)
+        assertEquals(RecordingOutcome.Saved(AfterFinish.AUDIO_ONLY), awaitEnded().outcome)
         assertTrue(handoffs.isEmpty())
+        assertEquals(AudioKind.PLAIN, row(recorded.noteId)?.audioKind)
     }
 
     // Pauses. -----------------------------------------------------------------------------------------------------
