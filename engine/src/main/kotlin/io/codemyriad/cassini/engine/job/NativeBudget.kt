@@ -6,6 +6,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -24,6 +25,7 @@ object NativeBudget {
 
     /** Whether someone holds the budget now. */
     val isHeld: Boolean get() = permit.isHeld
+    val isHeldBySavedAudio: Boolean get() = permit.isHeldBySavedAudio
 
     /** Runs [block] while holding the budget; waiting for it can be cancelled. */
     suspend fun <T> withBudget(block: suspend () -> T): T = permit.withBudget(block)
@@ -59,14 +61,18 @@ internal class NativePermit(
 ) {
     /** Whether someone holds the budget now. */
     private val preview = AtomicReference<(() -> Unit)?>(null)
+    private val savedAudioRequests = AtomicInteger()
 
     val isHeld: Boolean get() = mutex.isLocked
+    val isHeldBySavedAudio: Boolean get() = mutex.isLocked && preview.get() == null
 
     fun tryAcquirePreview(revoke: () -> Unit): Boolean {
-        if (!preview.compareAndSet(null, revoke)) return false
+        if (savedAudioRequests.get() != 0 || !preview.compareAndSet(null, revoke)) return false
         val acquired = mutex.tryLock()
         if (!acquired) preview.compareAndSet(revoke, null)
-        return acquired
+        val granted = acquired && savedAudioRequests.get() == 0
+        if (acquired && !granted) releasePreview()
+        return granted
     }
 
     fun releasePreview() {
@@ -76,8 +82,13 @@ internal class NativePermit(
 
     /** Runs [block] while holding the budget; waiting for it can be cancelled. */
     suspend fun <T> withBudget(block: suspend () -> T): T {
-        preview.get()?.invoke()
-        return mutex.withLock { block() }
+        savedAudioRequests.incrementAndGet()
+        try {
+            preview.get()?.invoke()
+            return mutex.withLock { block() }
+        } finally {
+            savedAudioRequests.decrementAndGet()
+        }
     }
 
     /**
@@ -86,13 +97,16 @@ internal class NativePermit(
      */
     fun acquire() {
         if (Thread.currentThread().isInterrupted) throw UserFacingException(Failure.CANCELLED)
-        preview.get()?.invoke()
-        if (mutex.tryLock()) return
+        savedAudioRequests.incrementAndGet()
         try {
+            preview.get()?.invoke()
+            if (mutex.tryLock()) return
             runBlocking(blockingContext) { mutex.lock() }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             throw UserFacingException(Failure.CANCELLED)
+        } finally {
+            savedAudioRequests.decrementAndGet()
         }
     }
 
@@ -102,13 +116,19 @@ internal class NativePermit(
      */
     fun tryAcquire(timeoutMs: Long): Boolean {
         if (Thread.currentThread().isInterrupted) throw UserFacingException(Failure.CANCELLED)
-        preview.get()?.invoke()
-        if (mutex.tryLock()) return true
+        savedAudioRequests.incrementAndGet()
         return try {
-            runBlocking(blockingContext) { withTimeoutOrNull(timeoutMs) { mutex.lock() } != null }
+            preview.get()?.invoke()
+            if (mutex.tryLock()) {
+                true
+            } else {
+                runBlocking(blockingContext) { withTimeoutOrNull(timeoutMs) { mutex.lock() } != null }
+            }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             throw UserFacingException(Failure.CANCELLED)
+        } finally {
+            savedAudioRequests.decrementAndGet()
         }
     }
 

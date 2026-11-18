@@ -37,6 +37,7 @@ object LiveMicrophoneRecognition {
         try {
             for (block in input.blocks) {
                 ensureActive()
+                if (input.endFrame - block.firstFrame > MAX_PREVIEW_LAG_FRAMES) continue
                 if (block.firstFrame != expected) {
                     span?.finish(expected)
                     span?.close()
@@ -48,7 +49,8 @@ object LiveMicrophoneRecognition {
                 expected = block.firstFrame + block.pcm16.size
             }
             if (settleOnStop) span?.finish(expected)
-            if (expected < input.endFrame) events.missing(MissingFrames(expected, input.endFrame))
+            val covered = if (settleOnStop) expected else span?.coveredFrame ?: expected
+            if (covered < input.endFrame) events.missing(MissingFrames(covered, input.endFrame))
         } finally {
             try {
                 span?.close()
@@ -78,6 +80,8 @@ object LiveMicrophoneRecognition {
             whistle = if (model == SpeechModel.INCLUDED) WhistleResampler(CAPTURE_RATE, recognizer::accept) else null
             parakeet = if (whistle == null) StreamingResampler(CAPTURE_RATE, sink = recognizer::accept) else null
         }
+
+        val coveredFrame: Long get() = firstFrame + recognizer.doneMs * CAPTURE_RATE / MS_PER_SECOND
 
         private var closed = false
         private var latest: Update? = null
@@ -118,6 +122,7 @@ object LiveMicrophoneRecognition {
     }
 
     private const val CAPTURE_RATE = 48_000
+    private const val MAX_PREVIEW_LAG_FRAMES = CAPTURE_RATE * 15
     private const val RECOGNIZER_RATE = 16_000
     private const val MIN_FINAL_MS = 300L
     private const val MS_PER_SECOND = 1000L

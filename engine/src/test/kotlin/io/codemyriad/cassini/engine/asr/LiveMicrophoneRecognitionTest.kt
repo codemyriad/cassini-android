@@ -5,9 +5,13 @@ import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.engine.capture.LiveMicrophonePcm
+import io.codemyriad.cassini.engine.job.NativeBudget
 import io.codemyriad.cassini.engine.job.Recognizer
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LiveMicrophoneRecognitionTest {
@@ -31,11 +35,47 @@ class LiveMicrophoneRecognitionTest {
         assertEquals(listOf(100L, 2100L), previews.flatMap { it.words }.map { it.startMs })
     }
 
-    private class Fixture : Recognizer {
+    @Test fun stoppingWithoutSettlingReportsTheUnprocessedTail() = runBlocking {
+        val input = LiveMicrophonePcm()
+        val pcm = ShortArray(48_000)
+        input.offer(0, pcm, pcm.size)
+        input.finish()
+        val skipped = mutableListOf<LiveMicrophoneRecognition.MissingFrames>()
+        LiveMicrophoneRecognition.follow(
+            input,
+            SpeechModel.PARAKEET,
+            { _, _ -> Fixture() },
+            LiveMicrophoneRecognition.Events({ error("No window should have settled") }, skipped::add),
+            settleOnStop = false,
+        )
+        assertEquals(listOf(LiveMicrophoneRecognition.MissingFrames(0, 48_000)), skipped)
+    }
+
+    @Test fun waitingSavedJobPreemptsThePreviewOnItsInferenceThread() = runBlocking {
+        val input = LiveMicrophonePcm()
+        val pcm = ShortArray(48_000)
+        input.offer(0, pcm, pcm.size)
+        val opened = CompletableDeferred<Unit>()
+        val closed = CompletableDeferred<Unit>()
+        val preview = launch {
+            LiveMicrophoneRecognition.follow(
+                input,
+                SpeechModel.PARAKEET,
+                { _, _ -> Fixture { closed.complete(Unit) }.also { opened.complete(Unit) } },
+                LiveMicrophoneRecognition.Events({}, {}),
+            )
+        }
+        opened.await()
+        NativeBudget.withBudget { assertTrue(closed.isCompleted) }
+        preview.join()
+        assertTrue(preview.isCancelled)
+    }
+
+    private class Fixture(private val closed: () -> Unit = {}) : Recognizer {
         override var totalMs = 0L
         override val inferenceMs = 0L
         override var positionSamples = 0L
-        override val doneMs get() = positionSamples / 16
+        override val doneMs = 0L
         override val segmentation = "test"
         override val language = "en"
 
@@ -50,6 +90,6 @@ class LiveMicrophoneRecognitionTest {
         }
 
         override fun checkpoint(): RecognitionState = error("Preview never checkpoints")
-        override fun close() = Unit
+        override fun close() = closed()
     }
 }

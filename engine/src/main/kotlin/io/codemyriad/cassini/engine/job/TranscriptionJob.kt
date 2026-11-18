@@ -267,7 +267,7 @@ class TranscriptionJob(
 
     /** Steps 3 to 5 while holding [NativeBudget]; every native handle is released before it returns. */
     private suspend fun decode(prepared: Prepared): Decoded {
-        if (NativeBudget.isHeld) emit(JobEvent.WaitingForPrevious)
+        if (NativeBudget.isHeldBySavedAudio) emit(JobEvent.WaitingForPrevious)
         return NativeBudget.withBudget { onInference { restoreAndDecode(prepared) } }
     }
 
