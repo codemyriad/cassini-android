@@ -17,6 +17,7 @@ import io.codemyriad.cassini.data.models.ModelRepository
 import io.codemyriad.cassini.data.notes.NoteRepository
 import io.codemyriad.cassini.data.settings.SettingsRepository
 import io.codemyriad.cassini.engine.capture.CaptureFactory
+import io.codemyriad.cassini.engine.capture.LiveMicrophonePcm
 import io.codemyriad.cassini.engine.capture.MicrophoneCapture
 import io.codemyriad.cassini.processing.ProcessingCoordinator
 import io.codemyriad.cassini.processing.ServiceStarter
@@ -39,12 +40,17 @@ interface CaptureSource {
     fun start(file: File, onError: () -> Unit): MicrophoneCapture
 }
 
-class FactoryCaptureSource(context: Context) : CaptureSource {
+class FactoryCaptureSource(context: Context, private val preview: RecordingPreview? = null) : CaptureSource {
     private val app = context.applicationContext
 
     override suspend fun format(): CaptureFormat = CaptureFormat.of(CaptureFactory.extension())
 
-    override fun start(file: File, onError: () -> Unit): MicrophoneCapture = CaptureFactory.create(app, file, onError)
+    override fun start(file: File, onError: () -> Unit): MicrophoneCapture {
+        val feed = if (preview != null && file.extension == "opus") LiveMicrophonePcm() else null
+        return CaptureFactory.create(app, file, feed, onError).also {
+            if (feed != null) preview?.attach(feed)
+        }
+    }
 }
 
 /** Watches for another app that silences the capture; [close] ends the watch. */

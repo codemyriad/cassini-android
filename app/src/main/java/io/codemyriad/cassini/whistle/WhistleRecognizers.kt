@@ -28,5 +28,10 @@ class WhistleRecognizers(private val context: Context, private val replay: Whist
 
     companion object {
         private const val RATE = 16000
+
+        /** Live spans start from fresh PCM and never replay a saved checkpoint. */
+        fun live(context: Context): RecognizerFactory = WhistleRecognizers(context) { _, _ ->
+            error("Live recognition has no checkpoint prefix")
+        }
     }
 }

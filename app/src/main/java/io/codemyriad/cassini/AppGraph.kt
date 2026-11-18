@@ -84,12 +84,14 @@ import io.codemyriad.cassini.recording.RecordingConsent
 import io.codemyriad.cassini.recording.RecordingController
 import io.codemyriad.cassini.recording.RecordingNotes
 import io.codemyriad.cassini.recording.RecordingPlatform
+import io.codemyriad.cassini.recording.RecordingPreview
 import io.codemyriad.cassini.recording.RepositoryRecordingNotes
 import io.codemyriad.cassini.recording.SettingsConsent
 import io.codemyriad.cassini.recording.TranscriptionHandoff
 import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.FormatSettings
 import io.codemyriad.cassini.whistle.WhistleJobs
+import io.codemyriad.cassini.whistle.WhistleRecognizers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -503,6 +505,23 @@ class AppGraph(context: Context, val config: Config) {
         return coordinator
     }
 
+    val liveRecordingPreview: RecordingPreview? by lazy {
+        if (!BuildConfig.DEBUG || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            !java.io.File(app.filesDir, "live-preview").isFile
+        ) {
+            null
+        } else {
+            RecordingPreview(appScope, visibility.visible, speech::selected) { selected ->
+                if (selected == SpeechModel.PARAKEET) {
+                    engines.recognizers
+                } else {
+                    requireUser(speech.included.await(), Failure.INCLUDED_UNAVAILABLE)
+                    WhistleRecognizers.live(app)
+                }
+            }
+        }
+    }
+
     private fun createRecording(): RecordingController {
         val hooks = config.recording
         val handoff = hooks.handoff?.invoke(this) ?: ProcessingHandoff(
@@ -519,7 +538,7 @@ class AppGraph(context: Context, val config: Config) {
                 val catalogue = awaitCatalogue()
                 hooks.notes?.invoke(catalogue) ?: RepositoryRecordingNotes(catalogue.notes, paths::note)
             },
-            capture = hooks.capture ?: FactoryCaptureSource(app),
+            capture = hooks.capture ?: FactoryCaptureSource(app, liveRecordingPreview),
             platform = hooks.platform ?: AndroidRecordingPlatform(app),
             handoff = handoff,
             consent = hooks.consent ?: SettingsConsent(models, settings) { speech.selected() == SpeechModel.INCLUDED },
