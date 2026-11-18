@@ -40,14 +40,14 @@ class RecordingPreview(
         draft.value = Snapshot(id = id)
         active = scope.launch {
             try {
-                if (!visible.value) return@launch
+                if (!visible.value) {
+                    incomplete(id)
+                    return@launch
+                }
                 coroutineScope {
                     val preview = launch {
                         val selected = model()
-                        LiveMicrophoneRecognition.follow(
-                            input,
-                            selected,
-                            recognizer(selected),
+                        val events = LiveMicrophoneRecognition.Events(
                             updated = { revision ->
                                 draft.update { snapshot ->
                                     if (snapshot.id != id) {
@@ -59,13 +59,20 @@ class RecordingPreview(
                             },
                             missing = { incomplete(id) },
                         )
+                        LiveMicrophoneRecognition.follow(input, selected, recognizer(selected), events, settleOnStop = false)
                     }
                     val visibility = launch {
                         visible.first { !it }
                         incomplete(id)
                         preview.cancel()
                     }
+                    val stop = launch {
+                        input.awaitStop()
+                        preview.cancel()
+                    }
                     preview.join()
+                    if (preview.isCancelled) incomplete(id)
+                    stop.cancel()
                     visibility.cancel()
                 }
             } catch (cancelled: CancellationException) {

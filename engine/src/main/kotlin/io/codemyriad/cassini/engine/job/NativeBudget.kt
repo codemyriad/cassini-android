@@ -6,6 +6,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -33,6 +34,10 @@ object NativeBudget {
     /** Blocks for at most [timeoutMs]; interruption is classified as in [acquire]. */
     fun tryAcquire(timeoutMs: Long): Boolean = permit.tryAcquire(timeoutMs)
 
+    /** A preview never queues. Regular native work may ask it to release at the next safe boundary. */
+    internal fun tryAcquirePreview(revoke: () -> Unit): Boolean = permit.tryAcquirePreview(revoke)
+    internal fun releasePreview() = permit.releasePreview()
+
     /** Gives back the budget taken by [acquire] or [tryAcquire]. */
     fun release() = permit.release()
 
@@ -53,10 +58,27 @@ internal class NativePermit(
     private val blockingContext: CoroutineContext = EmptyCoroutineContext,
 ) {
     /** Whether someone holds the budget now. */
+    private val preview = AtomicReference<(() -> Unit)?>(null)
+
     val isHeld: Boolean get() = mutex.isLocked
 
+    fun tryAcquirePreview(revoke: () -> Unit): Boolean {
+        if (!preview.compareAndSet(null, revoke)) return false
+        val acquired = mutex.tryLock()
+        if (!acquired) preview.compareAndSet(revoke, null)
+        return acquired
+    }
+
+    fun releasePreview() {
+        preview.set(null)
+        mutex.unlock()
+    }
+
     /** Runs [block] while holding the budget; waiting for it can be cancelled. */
-    suspend fun <T> withBudget(block: suspend () -> T): T = mutex.withLock { block() }
+    suspend fun <T> withBudget(block: suspend () -> T): T {
+        preview.get()?.invoke()
+        return mutex.withLock { block() }
+    }
 
     /**
      * Blocks the calling thread until the budget is free and takes it, for code that runs on plain threads. An
@@ -64,6 +86,7 @@ internal class NativePermit(
      */
     fun acquire() {
         if (Thread.currentThread().isInterrupted) throw UserFacingException(Failure.CANCELLED)
+        preview.get()?.invoke()
         if (mutex.tryLock()) return
         try {
             runBlocking(blockingContext) { mutex.lock() }
@@ -79,6 +102,7 @@ internal class NativePermit(
      */
     fun tryAcquire(timeoutMs: Long): Boolean {
         if (Thread.currentThread().isInterrupted) throw UserFacingException(Failure.CANCELLED)
+        preview.get()?.invoke()
         if (mutex.tryLock()) return true
         return try {
             runBlocking(blockingContext) { withTimeoutOrNull(timeoutMs) { mutex.lock() } != null }

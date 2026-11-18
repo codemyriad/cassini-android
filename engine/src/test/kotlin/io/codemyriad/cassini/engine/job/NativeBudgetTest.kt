@@ -28,6 +28,19 @@ class NativeBudgetTest {
         assertFalse("A test left the budget held", NativeBudget.isHeld)
     }
 
+    @Test fun aSavedJobRevokesPreviewBeforeEnteringNativeWork() = runBlocking {
+        val permit = NativePermit()
+        val order = mutableListOf<String>()
+        val acquired = permit.tryAcquirePreview {
+            order.add("preview closed")
+            permit.releasePreview()
+        }
+        assertTrue(acquired)
+        permit.withBudget { order.add("saved job started") }
+        assertEquals(listOf("preview closed", "saved job started"), order)
+        assertFalse(permit.isHeld)
+    }
+
     @Test fun acquireAndReleaseOnAPlainThread() {
         NativeBudget.acquire()
         assertTrue(NativeBudget.isHeld)

@@ -23,8 +23,7 @@ class LiveMicrophoneRecognitionTest {
             input,
             SpeechModel.PARAKEET,
             { _, _ -> Fixture() },
-            previews::add,
-            skipped::add,
+            LiveMicrophoneRecognition.Events(previews::add, skipped::add),
         )
 
         assertEquals(listOf(LiveMicrophoneRecognition.MissingFrames(48_000, 96_000)), skipped)

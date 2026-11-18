@@ -46,7 +46,11 @@ class FactoryCaptureSource(context: Context, private val preview: RecordingPrevi
     override suspend fun format(): CaptureFormat = CaptureFormat.of(CaptureFactory.extension())
 
     override fun start(file: File, onError: () -> Unit): MicrophoneCapture {
-        val feed = if (preview != null && file.extension == "opus") LiveMicrophonePcm() else null
+        val feed = if (preview != null && file.extension == "opus") {
+            LiveMicrophonePcm(LiveMicrophonePcm.PREVIEW_BLOCKS)
+        } else {
+            null
+        }
         return CaptureFactory.create(app, file, feed, onError).also {
             if (feed != null) preview?.attach(feed)
         }
