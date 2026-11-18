@@ -117,8 +117,7 @@ LABELS = {
     'about_name_version': ('about.nameVersion', 'version'),
     'about_version': ('about.version', 'version'),
     'about_licence_line': ('about.licenceLine.phone', 'year'),
-    # D103 second pass (L-60, L-61, L-63): first run, the voices question and the model download sheet.
-    'first_run_how_to': ('firstRun.howTo', None),
+    # D103 second pass (L-61, L-63): the voices question and the model download sheet.
     'voices_setup_title': ('voices.setup.title', None),
     'voices_setup_body': ('voices.setup.body.phone', None),
     'voices_setup_privacy': ('voices.setup.privacy.phone', None),

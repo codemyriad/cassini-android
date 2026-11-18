@@ -133,7 +133,6 @@
     <string name="ui_about_name_version">Cassini talk %1$s</string>
     <string name="ui_about_version">Version %1$s</string>
     <string name="ui_about_licence_line">Logiciel libre sous licence GPLv3. © %1$s Codemyriad OÜ et contributeurs.</string>
-    <string name="ui_first_run_how_to">Appuyez sur Enregistrer quand la réunion commence et sur Arrêter quand elle se termine. Cassini transcrit tout.</string>
     <string name="ui_voices_setup_title">Reconnaître les personnes que vous nommez ?</string>
     <string name="ui_voices_setup_body">Quand vous nommez un intervenant, Cassini peut mémoriser sa voix et le nommer pour vous dans les réunions suivantes.</string>
     <string name="ui_voices_setup_privacy">Les empreintes vocales sont créées sur ce téléphone et ne sont jamais écrites dans les fichiers exportés ou partagés. Vous pouvez choisir dans les réglages si les sauvegardes les incluent.</string>

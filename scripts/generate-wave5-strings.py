@@ -14,9 +14,6 @@ LOCALES = {'en': 'values', 'it': 'values-it', 'fr': 'values-fr', 'es': 'values-e
 # Android resource name -> catalog id. None of these carry placeholders (PARITY Wave 6 contract sections 1-2, D98).
 LABELS = {
     'hero_title': 'firstRun.hero.title',
-    'hero_subtitle': 'firstRun.hero.subtitle',
-    'hero_backup_qualifier': 'firstRun.hero.phoneBackupQualifier',
-    'hero_subtitle_backup': 'firstRun.hero.subtitlePhoneNote',
     'privacy_phone_only': 'privacy.onDevice.phone',
     'privacy_with_backup': 'privacy.onDevice.phone.withBackup',
     'privacy_processing': 'android.privacy.processing',

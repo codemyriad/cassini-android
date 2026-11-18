@@ -133,7 +133,6 @@
     <string name="ui_about_name_version">Cassini talk %1$s</string>
     <string name="ui_about_version">Versione %1$s</string>
     <string name="ui_about_licence_line">Software libero con licenza GPLv3. © %1$s Codemyriad OÜ e collaboratori.</string>
-    <string name="ui_first_run_how_to">Premi Registra quando inizia la riunione e Ferma quando finisce. Cassini trascrive tutto.</string>
     <string name="ui_voices_setup_title">Riconoscere le persone a cui dai un nome?</string>
     <string name="ui_voices_setup_body">Quando dai un nome a una voce, Cassini può ricordarla e dare il nome a quella persona nelle riunioni successive.</string>
     <string name="ui_voices_setup_privacy">Le impronte vocali vengono create su questo telefono e non vengono mai scritte nei file esportati o condivisi. Nelle impostazioni puoi scegliere se includerle nei backup.</string>

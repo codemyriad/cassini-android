@@ -126,7 +126,6 @@
     <string name="ui_about_name_version">Cassini talk %1$s</string>
     <string name="ui_about_version">Version %1$s</string>
     <string name="ui_about_licence_line">Free software under GPLv3. © %1$s Codemyriad OÜ and contributors.</string>
-    <string name="ui_first_run_how_to">Press Record when the meeting starts and Stop when it ends. Cassini writes it all down.</string>
     <string name="ui_voices_setup_title">Recognise people you name?</string>
     <string name="ui_voices_setup_body">When you name a speaker, Cassini can remember their voice and name them for you in later meetings.</string>
     <string name="ui_voices_setup_privacy">Voiceprints are created on this phone and are never written into exported or shared files. You can choose in Settings whether backups include them.</string>
