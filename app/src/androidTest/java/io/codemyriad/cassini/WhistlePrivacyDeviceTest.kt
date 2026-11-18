@@ -3,6 +3,7 @@ package io.codemyriad.cassini
 import android.system.Os
 import io.codemyriad.cassini.engine.whistle.WhistleNative
 import io.codemyriad.cassini.test.CiSmoke
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,6 +13,11 @@ import java.nio.ByteBuffer
 @CiSmoke
 class WhistlePrivacyDeviceTest {
     private val flags = mapOf("NEEDLE_TELEMETRY" to "0", "DO_NOT_TRACK" to "1", "ORT_DISABLE_TELEMETRY" to "1")
+
+    @Test
+    fun mainProcessColdStartDisablesOrtTelemetry() {
+        assertEquals("1", Os.getenv("ORT_DISABLE_TELEMETRY"))
+    }
 
     @Test
     fun missingAndWrongPrivacyFlagsFailBeforeAnyModelOrRuntimeAccess() {

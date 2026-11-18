@@ -47,10 +47,11 @@ class CassiniApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Set before either the Whistle worker branch or main-process graph/sherpa initialization can load ORT.
+        Os.setenv("ORT_DISABLE_TELEMETRY", "1", true)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && WhistleProtocol.ownsProcess(packageName, Application.getProcessName())) {
             Os.setenv("NEEDLE_TELEMETRY", "0", true)
             Os.setenv("DO_NOT_TRACK", "1", true)
-            Os.setenv("ORT_DISABLE_TELEMETRY", "1", true)
             return // The private worker must not initialize the main graph or load sherpa's ORT.
         }
         backupDirectory = noBackupFilesDir
