@@ -6,6 +6,7 @@ object VoiceMatcher {
      * The best saved voice for each speaker. [excluded] lists, per speaker, the voices the user said it is not ("Not
      * Luca"): those pairs are removed before the assignment and before the rival check.
      */
+    @Suppress("LongParameterList") // Thresholds, excluded map and allowAuto are independent caller inputs.
     fun match(
         speakers: Map<String, FloatArray>,
         voices: List<Voice>,

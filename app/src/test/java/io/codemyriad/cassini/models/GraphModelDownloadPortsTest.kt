@@ -156,7 +156,7 @@ class GraphModelDownloadPortsTest {
         }
     }
 
-    @Test fun decliningStandaloneSpeakerModelTurnsTheSwitchBackOff() = runTest {
+    @Test fun decliningStandaloneSpeakerModelTurnsTheSwitchBackOff() = runBlocking {
         val graph = AppGraph(
             context,
             AppGraph.Config(paths = AppPaths(temp.root, temp.newFolder("models"))),

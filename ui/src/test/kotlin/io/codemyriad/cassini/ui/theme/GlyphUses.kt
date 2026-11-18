@@ -58,6 +58,7 @@ private fun use(size: Int, stroke: Float, tint: IconTint = IconTint.Ink, onBoard
 internal val GlyphUses: Map<Glyph, List<GlyphUse>> = mapOf(
     // Phase 2 board geometry; the legacy markup parser covers Phase 1 only.
     Glyph.PhoneTransfer to listOf(use(24, 1.7f, IconTint.Accent, onBoard = false)),
+    Glyph.CloudBackup to listOf(use(22, 1.7f, IconTint.Accent, onBoard = false)),
     Glyph.Wave to listOf(use(18, 1.9f, IconTint.Accent, onBoard = false)),
     Glyph.People to listOf(use(18, 1.9f, IconTint.Accent, onBoard = false)),
     Glyph.Language to listOf(use(18, 1.9f, IconTint.Accent, onBoard = false)),

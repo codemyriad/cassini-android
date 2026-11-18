@@ -26,8 +26,10 @@ class BackupCardTest {
     @Test fun theCardOffersPhoneOnlyKeepBackupOnAndANamedCloseButton() {
         rule.setContent { CassiniTheme { BackupCard(events::add) } }
         rule.onNodeWithText("Meetings in your backups").assertExists()
-        rule.onNodeWithText("If this phone backs up, your meetings and saved voices go into its encrypted backup", substring = true)
-            .assertExists()
+        rule.onNodeWithText(
+            "If this phone backs up, your meetings and saved voices go into its encrypted backup",
+            substring = true,
+        ).assertExists()
         rule.onNodeWithText("This phone only").performClick()
         rule.onNodeWithText("Keep in backup").performClick()
         rule.onNodeWithContentDescription("Dismiss backup notice").performClick()

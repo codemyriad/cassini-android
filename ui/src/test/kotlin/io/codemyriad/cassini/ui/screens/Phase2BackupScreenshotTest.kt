@@ -46,7 +46,7 @@ class Phase2BackupScreenshotTest : BoardTest() {
         show(dark) {
             SettingsScreen(BoardFixtures.settings, {}, initialPage = SettingsPage.BACKUP, exportEnabled = true)
         }
-        if (end) scroll("Save every meeting to a folder, a drive or another app.")
+        if (end) scroll("Save every meeting to a folder or app.")
         capture(if (dark) "dark" else "light", "phase2-backup" + if (end) "-end" else "")
     }
 
