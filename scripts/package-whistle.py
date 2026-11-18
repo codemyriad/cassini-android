@@ -46,14 +46,17 @@ def main():
         helper.fetch(cache / name, pin, args.offline)
     includes = args.output / "include"
     includes.mkdir(exist_ok=True)
-    for name, pin in pins["headers"].items():
-        helper.fetch(includes / name, pin, args.offline)
     jni = args.output / "jni/arm64-v8a"
     assets = args.output / "assets/whistle"
     jni.mkdir(parents=True, exist_ok=True)
     assets.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(cache / "ort.aar") as archive:
         ort = archive.read(pins["ortMember"]["name"])
+        for name, pin in pins["headers"].items():
+            header = archive.read(f"headers/{name}")
+            if len(header) != pin["size"] or hashlib.sha256(header).hexdigest() != pin["sha256"]:
+                raise ValueError(f"Private ORT header pin mismatch: {name}")
+            (includes / name).write_bytes(header)
     if len(ort) != pins["ortMember"]["size"] or hashlib.sha256(ort).hexdigest() != pins["ortMember"]["sha256"]:
         raise ValueError("Private ORT member pin mismatch")
     (jni / "libcassini_whistle_ort.so").write_bytes(ort)
