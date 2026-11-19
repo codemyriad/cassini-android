@@ -151,8 +151,13 @@ class RecordingPrecomputerEquivalenceTest {
         }
     }
 
-    private fun trackAudioSource(track: FloatArray, totalSeconds: Int): AudioSource =
-        AudioSource { _, startSample, onSamples, onProgress ->
+    private fun trackAudioSource(track: FloatArray, totalSeconds: Int): AudioSource = object : AudioSource {
+        override fun stream(
+            file: File,
+            startSample: Long,
+            onSamples: (FloatArray, Int) -> Unit,
+            onProgress: (Long, Long?) -> Unit,
+        ): Long {
             onProgress(startSample * 1000L / Limits.ASR_RATE, totalSeconds * 1000L)
             var at = startSample.toInt()
             while (at < track.size) {
@@ -160,8 +165,9 @@ class RecordingPrecomputerEquivalenceTest {
                 onSamples(track.copyOfRange(at, at + n), n)
                 at += n
             }
-            totalSeconds * 1000L
+            return totalSeconds * 1000L
         }
+    }
 
     private fun parakeetEngines(script: Script, track: FloatArray, totalSeconds: Int): JobEngines = JobEngines(
         recognizers = RecognizerFactory { restored, cb -> FakeRecognizer(restored, cb, script) },
@@ -323,15 +329,24 @@ class RecordingPrecomputerEquivalenceTest {
         assertEquals(batchDoc.selected(null)!!.transcript!!.words, preDoc.selected(null)!!.transcript!!.words)
         assertEquals(diarizationCounts(batchDoc), diarizationCounts(preDoc))
         assertEquals(batch.script.diarizers.last().turns, pre.script.diarizers.last().turns)
-        assertEquals(batchDoc.speakerLabels, preDoc.speakerLabels)
+        assertEquals(speakerLabels(batchDoc), speakerLabels(preDoc))
         assertEquals(batch.voices.pendingFile!!.prints.keys, pre.voices.pendingFile!!.prints.keys)
         batch.voices.pendingFile!!.prints.forEach { (speaker, expectedPrint) ->
             assertEquals(expectedPrint.match, pre.voices.pendingFile!!.prints[speaker]!!.match)
         }
     }
 
+    private fun speakerLabels(document: CassiniDocument): Map<String, String> {
+        val speakers = document.manifest?.optJSONArray("speakers") ?: return emptyMap()
+        return (0 until speakers.length()).associate { i ->
+            val speaker = speakers.getJSONObject(i)
+            speaker.getString("id") to speaker.getString("label")
+        }
+    }
+
     private fun diarizationCounts(document: CassiniDocument): Pair<Int, Int> {
-        val diar = document.selected(null)!!.processing!!.getJSONObject("x-speakerDiarization")
+        val speech = document.manifest!!.getJSONObject("provenance").getJSONObject("speechToText")
+        val diar = speech.getJSONObject(document.defaultId!!).getJSONObject("x-speakerDiarization")
         return diar.getInt("turnCount") to diar.getInt("speakerCount")
     }
 

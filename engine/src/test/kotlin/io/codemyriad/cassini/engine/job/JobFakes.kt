@@ -261,9 +261,9 @@ class FakeSink(
 }
 
 /** A note directory with a fake catalogue, names owner and work directory. [log] records the order of writes. */
-class FakeStorage(
+open class FakeStorage(
     noteDir: File,
-    private val audio: File,
+    protected val audio: File,
     private val log: MutableList<String>,
 ) : JobStorage {
     val names = AtomicReference(CheckpointNames(emptyMap(), emptyMap()))

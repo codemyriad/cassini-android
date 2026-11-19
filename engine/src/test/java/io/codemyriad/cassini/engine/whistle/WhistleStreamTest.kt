@@ -9,7 +9,12 @@ import org.junit.Test
 class WhistleStreamTest {
     @Test
     fun invalidInputIsRefusedBeforeVadOrRecognition() {
-        val stream = WhistleStream(16000, { error("VAD must not run") }, { error("ASR must not run") }) { _, _, _ -> }
+        val stream = WhistleStream(
+            rate = 16000,
+            probability = { error("VAD must not run") },
+            transcribe = { error("ASR must not run") },
+            segment = { _, _, _ -> },
+        )
         for (samples in listOf(FloatArray(8193), floatArrayOf(Float.NaN), floatArrayOf(Float.POSITIVE_INFINITY))) {
             assertThrows(IllegalArgumentException::class.java) { stream.accept(samples) }
         }
@@ -19,12 +24,20 @@ class WhistleStreamTest {
     fun rawSegmentsStayExactAcrossMultipleRingWraps() {
         var recognized = FloatArray(0)
         var segments = 0
-        val stream = WhistleStream(16000, { 0.9f }, { recognized = it; byteArrayOf(7) }) { range, json, _ ->
-            val expected = FloatArray((range.endSample - range.startSample).toInt()) { sample(range.startSample + it) }
-            assertArrayEquals(expected, recognized, 0f)
-            assertArrayEquals(byteArrayOf(7), json)
-            segments++
-        }
+        val stream = WhistleStream(
+            rate = 16000,
+            probability = { 0.9f },
+            transcribe = {
+                recognized = it
+                byteArrayOf(7)
+            },
+            segment = { range, json, _ ->
+                val expected = FloatArray((range.endSample - range.startSample).toInt()) { sample(range.startSample + it) }
+                assertArrayEquals(expected, recognized, 0f)
+                assertArrayEquals(byteArrayOf(7), json)
+                segments++
+            },
+        )
         var at = 0L
         val length = 1048701L
         while (at < length) {
