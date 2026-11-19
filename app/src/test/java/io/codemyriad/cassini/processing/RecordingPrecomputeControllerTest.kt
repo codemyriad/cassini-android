@@ -14,7 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -86,16 +86,16 @@ class RecordingPrecomputeControllerTest {
         }
 
         h.recording.value = active(format = CaptureFormat.OPUS)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals("AFTER_STOP must not spawn precompute", 0, starts.get())
 
         h.mode.value = TranscriptionMode.RECORD_ONLY
-        advanceUntilIdle()
+        runCurrent()
         assertEquals("RECORD_ONLY must not spawn precompute", 0, starts.get())
 
         h.mode.value = TranscriptionMode.TRANSCRIBE_WHILE_RECORDING
         h.recording.value = active(format = CaptureFormat.M4A)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals("API 26-28 AAC capture must not spawn precompute", 0, starts.get())
 
         h.controller.close()
@@ -119,35 +119,35 @@ class RecordingPrecomputeControllerTest {
         }
 
         h.recording.value = active()
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(1 to 1, starts.get() to activeNow.get())
 
         h.recording.value = active(pause = RecordingPause.USER)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(0 to 1, activeNow.get() to cancels.get())
         h.recording.value = active(pause = null)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(2 to 1, starts.get() to activeNow.get())
 
         h.visible.value = false
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(0 to 2, activeNow.get() to cancels.get())
         h.visible.value = true
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(3 to 1, starts.get() to activeNow.get())
 
         h.throttled.value = true
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(0 to 3, activeNow.get() to cancels.get())
         h.throttled.value = false
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(4 to 1, starts.get() to activeNow.get())
 
         h.busy.value = true
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(0 to 4, activeNow.get() to cancels.get())
         h.busy.value = false
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(5 to 1, starts.get() to activeNow.get())
 
         h.controller.stopAndJoin()
@@ -169,20 +169,20 @@ class RecordingPrecomputeControllerTest {
         }
 
         h.recording.value = active(noteId = "note-1")
-        advanceUntilIdle()
+        runCurrent()
         firstDone.await()
         assertEquals(1, starts.get())
 
         h.recording.value = active(noteId = "note-1", pause = RecordingPause.USER)
-        advanceUntilIdle()
+        runCurrent()
         h.recording.value = active(noteId = "note-1", pause = null)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(1, starts.get())
 
         h.recording.value = RecordingState.Idle
-        advanceUntilIdle()
+        runCurrent()
         h.recording.value = active(noteId = "note-2")
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(2, starts.get())
 
         h.controller.close()
