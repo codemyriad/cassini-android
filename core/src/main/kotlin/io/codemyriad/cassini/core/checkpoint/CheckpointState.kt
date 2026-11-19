@@ -61,6 +61,8 @@ data class CheckpointState(
     val durationMs: Long,
     val elapsedMs: Long,
     val version: Int = VERSION,
+    val origin: CheckpointOrigin = CheckpointOrigin.BATCH,
+    val committedPrefix: CommittedPrefix? = null,
 ) {
     /** What a checkpoint must match to be resumed: the same source file, models and on-disk lengths. */
     @Suppress("LongParameterList") // One value for each file and identity member that a checkpoint names.
@@ -75,6 +77,16 @@ data class CheckpointState(
         val audioBytes: Long,
         /** Bytes in `words.log`. */
         val wordLogBytes: Long = 0,
+        /** Container prefix kind of the finalized audio file (e.g. `oggOpusCommittedBytes` or `aacM4a`). */
+        val prefixKind: String? = null,
+        /** Total container units of the finalized audio file (file byte length for Ogg Opus). */
+        val finalizedUnitCount: Long? = null,
+        /** SHA-256 of the finalized file's prefix bytes matching `committedPrefix.committedUnitCount`. */
+        val prefixSha256: String? = null,
+        /** Optional SHA-256 of the decoded 16 kHz mono PCM prefix (Whistle resume cross-check). */
+        val decodedPcmSha256: String? = null,
+        /** When true, decoded PCM prefix verification is deferred to the recognizer's replay pass. */
+        val deferDecodedPcmCheck: Boolean = false,
     )
 
     /** One decode and one encode function per member type. */
@@ -88,6 +100,8 @@ data class CheckpointState(
         const val MAX_CLIP_SAMPLES = SpeakerBudget.MAX_SPEAKERS * SpeakerBudget.SECONDS_PER_SPEAKER * Limits.ASR_RATE
 
         private const val WORD_LOG = "wordLog"
+        private const val ORIGIN = "origin"
+        private const val COMMITTED_PREFIX = "committedPrefix"
 
         /** Every member [encode] writes: those of the 0.1.0 checkpoint, then `wordLog`. */
         val KEYS = setOf(
@@ -106,28 +120,70 @@ data class CheckpointState(
         fun signature(file: File?): String = "${file?.length()}:${file?.lastModified()}"
 
         /**
-         * The rules that the 0.1.0 checkpoint loader applies before a checkpoint is resumed. Throws
+         * The rules that the checkpoint loader applies before a checkpoint is resumed. Throws
          * [IllegalArgumentException] (or org.json's exception for a missing member) when one fails.
          */
         fun validate(json: JSONObject, expected: Expected) {
-            validate(
-                json.getInt("version"), json.getString("source"), json.getString("signature"), json.getString("model"),
-                json.getString(
-                    "speakers"
-                ),
-                json.getInt("clipSamples"), json.getLong("positionSamples"), json.getLong("doneMs"),
-                json.optJSONObject("encoder")?.getLong("length"), expected,
-            )
-            require(wordLog(json).bytes <= expected.wordLogBytes)
+            val result = validateWithResult(json, expected)
+            require(result.decision == PrefixDecision.RESUME) {
+                "Checkpoint validation failed: ${result.reason?.token}"
+            }
         }
 
-        fun validate(state: CheckpointState, expected: Expected) = validate(
-            state.version, state.source, state.signature, state.model, state.speakers, state.clipSamples, state.positionSamples,
-            state.doneMs, state.encoder?.length, expected,
+        fun validate(state: CheckpointState, expected: Expected) {
+            val result = validateWithResult(state, expected)
+            require(result.decision == PrefixDecision.RESUME) {
+                "Checkpoint validation failed: ${result.reason?.token}"
+            }
+        }
+
+        /**
+         * Validates [json] against [expected] and returns the structured D109 disposition:
+         * `PRECOMPUTE` failures always yield [PrefixDecision.DISCARD_AND_FULL_DECODE];
+         * `BATCH` failures yield [PrefixDecision.REJECT_BATCH_CHECKPOINT].
+         */
+        fun validateWithResult(json: JSONObject, expected: Expected): PrefixValidationResult {
+            val origin = CheckpointOrigin.of(json.opt(ORIGIN))
+            val result = validateFields(
+                version = json.getInt("version"),
+                source = json.getString("source"),
+                signature = json.getString("signature"),
+                model = json.getString("model"),
+                speakers = json.getString("speakers"),
+                clipSamples = json.getInt("clipSamples"),
+                positionSamples = json.getLong("positionSamples"),
+                doneMs = json.getLong("doneMs"),
+                encoderLength = json.optJSONObject("encoder")?.getLong("length"),
+                origin = origin,
+                committedPrefix = json.opt(COMMITTED_PREFIX) as? JSONObject,
+                expected = expected,
+            )
+            if (result.decision != PrefixDecision.RESUME) return result
+            val log = wordLog(json)
+            return if (log.bytes <= expected.wordLogBytes) {
+                result
+            } else {
+                failValidation(origin, PrefixReason.WORK_FILE_TRUNCATED)
+            }
+        }
+
+        fun validateWithResult(state: CheckpointState, expected: Expected): PrefixValidationResult = validateFields(
+            version = state.version,
+            source = state.source,
+            signature = state.signature,
+            model = state.model,
+            speakers = state.speakers,
+            clipSamples = state.clipSamples,
+            positionSamples = state.positionSamples,
+            doneMs = state.doneMs,
+            encoderLength = state.encoder?.length,
+            origin = state.origin,
+            committedPrefix = state.committedPrefix?.json(),
+            expected = expected,
         )
 
-        @Suppress("LongParameterList")
-        private fun validate(
+        @Suppress("CyclomaticComplexMethod", "LongParameterList", "ReturnCount")
+        private fun validateFields(
             version: Int,
             source: String,
             signature: String,
@@ -137,13 +193,51 @@ data class CheckpointState(
             positionSamples: Long,
             doneMs: Long,
             encoderLength: Long?,
+            origin: CheckpointOrigin,
+            committedPrefix: JSONObject?,
             expected: Expected,
-        ) {
-            require(version == VERSION && source == expected.source && signature == expected.signature)
-            require(model == expected.modelRevision && speakers == expected.speakersSha256)
-            require(clipSamples in 0..MAX_CLIP_SAMPLES && expected.clipsBytes >= clipSamples * FLOAT_BYTES)
-            require(positionSamples in 0..Limits.MAX_SAMPLES && doneMs in 0..Limits.MAX_TRANSCRIBE_MS)
-            encoderLength?.let { require(expected.audioBytes >= it) }
+        ): PrefixValidationResult {
+            if (version != VERSION) return failValidation(origin, PrefixReason.VERSION_MISMATCH)
+            if (source != expected.source) return failValidation(origin, PrefixReason.SOURCE_MISMATCH)
+            if (model != expected.modelRevision) return failValidation(origin, PrefixReason.MODEL_MISMATCH)
+            if (speakers != expected.speakersSha256) return failValidation(origin, PrefixReason.SPEAKERS_MISMATCH)
+
+            val matchMode = if (signature == expected.signature) {
+                PrefixMatchMode.WHOLE_FILE
+            } else {
+                val prefixFailure = PrefixCheckpointValidator.validatePrefixDescriptor(
+                    prefix = committedPrefix,
+                    expectedPrefixKind = expected.prefixKind,
+                    expectedFinalizedUnitCount = expected.finalizedUnitCount,
+                    expectedPrefixSha256 = expected.prefixSha256,
+                    expectedDecodedPcmSha256 = expected.decodedPcmSha256,
+                    deferDecodedPcmCheck = expected.deferDecodedPcmCheck,
+                    doneMs = doneMs,
+                    maxTranscribeMs = Limits.MAX_TRANSCRIBE_MS,
+                )
+                if (prefixFailure != null) return failValidation(origin, prefixFailure)
+                PrefixMatchMode.COMMITTED_PREFIX
+            }
+
+            if (clipSamples !in 0..MAX_CLIP_SAMPLES || expected.clipsBytes < clipSamples * FLOAT_BYTES) {
+                return failValidation(origin, PrefixReason.WORK_FILE_TRUNCATED)
+            }
+            if (positionSamples !in 0..Limits.MAX_SAMPLES || doneMs !in 0..Limits.MAX_TRANSCRIBE_MS) {
+                return failValidation(origin, PrefixReason.INVALID_COUNTERS)
+            }
+            if (encoderLength != null && (encoderLength < 0L || expected.audioBytes < encoderLength)) {
+                return failValidation(origin, PrefixReason.WORK_FILE_TRUNCATED)
+            }
+            return PrefixValidationResult(PrefixDecision.RESUME, matchMode = matchMode, reason = null)
+        }
+
+        private fun failValidation(origin: CheckpointOrigin, reason: PrefixReason): PrefixValidationResult {
+            val decision = if (origin == CheckpointOrigin.PRECOMPUTE) {
+                PrefixDecision.DISCARD_AND_FULL_DECODE
+            } else {
+                PrefixDecision.REJECT_BATCH_CHECKPOINT
+            }
+            return PrefixValidationResult(decision, matchMode = null, reason = reason)
         }
 
         /**
@@ -174,11 +268,14 @@ data class CheckpointState(
             durationMs = json.getLong("durationMs"),
             elapsedMs = json.getLong("elapsedMs"),
             version = json.getInt("version"),
+            origin = CheckpointOrigin.of(json.opt(ORIGIN)),
+            committedPrefix = json.optJSONObject(COMMITTED_PREFIX)?.let(CommittedPrefix::fromJson),
         )
 
         /**
          * The JSON of version 2: the job's members in the order of 0.1.0, then the identity members `save` adds, then
          * [log]. The first `log.count` words are in `words.log`, so `chunks.words` holds only the words after them.
+         * Batch checkpoints without a committed prefix omit `origin` and `committedPrefix` to keep the v2 key set.
          */
         fun encode(state: CheckpointState, log: WordLogRef = WordLogRef.EMPTY): JSONObject = JSONObject()
             .put("recognition", json(state.recognition, log.count))
@@ -198,6 +295,10 @@ data class CheckpointState(
             .put("model", state.model)
             .put("speakers", state.speakers)
             .put(WORD_LOG, log.json())
+            .apply {
+                if (state.origin != CheckpointOrigin.BATCH) put(ORIGIN, state.origin.token)
+                state.committedPrefix?.let { put(COMMITTED_PREFIX, it.json()) }
+            }
 
         fun recognition(json: JSONObject) = RecognitionState(
             json.optLong("inferenceMs"),

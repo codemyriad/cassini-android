@@ -1,7 +1,12 @@
 package io.codemyriad.cassini.data.checkpoint
 
 import android.util.AtomicFile
+import io.codemyriad.cassini.core.checkpoint.CheckpointOrigin
 import io.codemyriad.cassini.core.checkpoint.CheckpointState
+import io.codemyriad.cassini.core.checkpoint.CommittedPrefix
+import io.codemyriad.cassini.core.format.CassiniDocument
+import io.codemyriad.cassini.core.format.OggOpus
+import io.codemyriad.cassini.core.format.OggOpusPrefixScanner
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.data.db.offMain
@@ -21,6 +26,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.util.concurrent.ExecutionException
@@ -350,5 +356,65 @@ class CheckpointRepositoryTest {
         assertEquals(CheckpointLoad.Missing, load())
         assertEquals(NamesStore.EMPTY, repo.draftNames(id).current())
         assertEquals(CheckpointStatus.None, repo.status(id))
+    }
+
+    @Test fun precomputeCommittedOggPrefixResumesOnFinalizedFileAndSilentlyDiscardsOnMismatch() {
+        val capture = File(h.dir(id), "capture.opus")
+        val head = ByteArray(19).also { b ->
+            "OpusHead".toByteArray(Charsets.US_ASCII).copyInto(b, 0)
+            b[8] = 1
+            b[9] = 1
+            b[10] = (312 and 0xff).toByte()
+            b[11] = (312 ushr 8).toByte()
+            OggOpus.put32(b, 12, 48_000)
+        }
+        fun opusPacket(seed: Int) = ByteArray(48) { i -> if (i == 0) 0xfc.toByte() else ((seed + i) and 0xff).toByte() }
+
+        val out = FileOutputStream(capture)
+        val muxer = OggOpus.LiveMuxer(out, head, CassiniDocument.tagsPacket(emptyList()), serial = 77)
+        repeat(10) { muxer.add(opusPacket(it)) }
+        out.flush()
+
+        val scanner = OggOpusPrefixScanner(capture, trailingPagesMargin = 1)
+        scanner.poll()
+        val prefix = CommittedPrefix(
+            kind = CommittedPrefix.KIND_OGG_OPUS_BYTES,
+            committedUnitCount = scanner.committedBytes,
+            prefixSha256 = scanner.committedSha256(),
+        )
+        val precompute = h.checkpoint(id, doneMs = 28_000).copy(
+            origin = CheckpointOrigin.PRECOMPUTE,
+            committedPrefix = prefix,
+            encoder = null,
+        )
+        save(precompute)
+
+        // Append trailing pages + EOS at Stop: length & mtime change, yet committed prefix still matches!
+        repeat(5) { muxer.add(opusPacket(10 + it)) }
+        muxer.finish(312L + 15 * 960L)
+        out.flush()
+        out.close()
+
+        val resumed = load() as CheckpointLoad.Valid
+        assertEquals(28_000L, resumed.state.doneMs)
+        assertEquals(CheckpointOrigin.PRECOMPUTE, resumed.state.origin)
+
+        // Model change on precompute checkpoint silently discards work and returns Missing (never Mismatch).
+        assertEquals(CheckpointLoad.Missing, load(identity.copy(modelRevision = "other-model")))
+        assertFalse(h.paths.work(id).exists())
+
+        // Altered prefix bytes on finalized Ogg file silently discard precompute work (never Mismatch).
+        save(precompute)
+        val bytes = capture.readBytes()
+        bytes[bytes.size / 4] = (bytes[bytes.size / 4].toInt() xor 0xff).toByte()
+        capture.writeBytes(bytes)
+        assertEquals(CheckpointLoad.Missing, load())
+        assertFalse(h.paths.work(id).exists())
+
+        // API 26-28 AAC container with a precompute Ogg prefix silently discards work (never Mismatch).
+        save(precompute)
+        capture.writeBytes(ByteArray(128) { if (it in 4..7) "ftyp"[it - 4].code.toByte() else 0 })
+        assertEquals(CheckpointLoad.Missing, load())
+        assertFalse(h.paths.work(id).exists())
     }
 }

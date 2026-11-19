@@ -14,6 +14,7 @@ import android.os.Process
 import android.os.RemoteException
 import androidx.annotation.RequiresApi
 import io.codemyriad.cassini.core.asr.whistle.WhistleSpeechSegment
+import io.codemyriad.cassini.core.checkpoint.WhistleSegmentCache
 import io.codemyriad.cassini.engine.whistle.WhistleAssets
 import io.codemyriad.cassini.engine.whistle.WhistleNative
 import io.codemyriad.cassini.engine.whistle.WhistleStream
@@ -21,6 +22,7 @@ import java.util.concurrent.Executors
 
 /** Private process; no graph, model-store, network client or system NN runtime. Reclaimed on client unbind. */
 @RequiresApi(Build.VERSION_CODES.Q)
+@Suppress("TooManyFunctions") // Service lifecycle plus one helper per WhistleProtocol command.
 class WhistleService : Service() {
     private val executor = Executors.newSingleThreadExecutor()
     private var assets: WhistleAssets? = null // Retain both read-only mappings until process exit.
@@ -28,6 +30,7 @@ class WhistleService : Service() {
     private var owner: IBinder? = null
     private var busy = false
     private var failed = false
+    private val cachedSegments = HashMap<String, Pair<Int, ByteArray>>()
     private val segments = ArrayList<Bundle>()
     private val main = Handler(Looper.getMainLooper())
     private val incoming = Handler(Looper.getMainLooper()) { receive(it) }
@@ -52,24 +55,7 @@ class WhistleService : Service() {
     private fun execute(reply: Messenger, command: Int, data: Bundle) {
         segments.clear()
         try {
-            val result = when (command) {
-                WhistleProtocol.OPEN -> open(data.getInt("rate"))
-                WhistleProtocol.ACCEPT -> {
-                    requireNotNull(stream).accept(requireNotNull(data.getFloatArray("samples")))
-                    Bundle.EMPTY
-                }
-                WhistleProtocol.FINISH -> {
-                    val hashes = requireNotNull(stream).finish()
-                    Bundle().apply {
-                        putString("rawSha256", hashes.rawSha256)
-                        putString("vadSha256", hashes.vadSha256)
-                        putInt("vadFrames", hashes.frames)
-                        putInt("voicedFrames", hashes.voiced)
-                        putFloat("maxProbability", hashes.maximum)
-                    }
-                }
-                else -> error("Invalid Whistle worker command")
-            }
+            val result = dispatchCommand(command, data)
             val completed = segments.toList()
             main.post {
                 busy = false
@@ -88,8 +74,31 @@ class WhistleService : Service() {
         } catch (_: LinkageError) {
             failure(reply, "Verified Whistle runtime could not load")
         } catch (_: OutOfMemoryError) {
-            failure(reply, "Whistle worker out of memory")
+            failure(reply, "Whistle worker out of memory", WhistleProtocol.ERROR_CODE_OUT_OF_MEMORY)
         }
+    }
+
+    private fun dispatchCommand(command: Int, data: Bundle): Bundle = when (command) {
+        WhistleProtocol.OPEN -> open(data.getInt("rate"))
+        WhistleProtocol.SEED_CACHE -> {
+            seedCache(data)
+            Bundle.EMPTY
+        }
+        WhistleProtocol.ACCEPT -> {
+            requireNotNull(stream).accept(requireNotNull(data.getFloatArray("samples")))
+            Bundle.EMPTY
+        }
+        WhistleProtocol.FINISH -> {
+            val hashes = requireNotNull(stream).finish()
+            Bundle().apply {
+                putString("rawSha256", hashes.rawSha256)
+                putString("vadSha256", hashes.vadSha256)
+                putInt("vadFrames", hashes.frames)
+                putInt("voicedFrames", hashes.voiced)
+                putFloat("maxProbability", hashes.maximum)
+            }
+        }
+        else -> error("Invalid Whistle worker command")
     }
 
     private fun open(rate: Int): Bundle {
@@ -100,10 +109,29 @@ class WhistleService : Service() {
         WhistleNative.bootstrap()
         val verified = requireNotNull(assets)
         WhistleNative.open(verified.needle, verified.ort, verified.model, verified.vad)
-        stream = WhistleStream(rate, ::segment)
+        stream = WhistleStream(rate, ::segment) { hash, count ->
+            cachedSegments[hash]?.takeIf { it.first == count }?.second
+        }
         return Bundle().apply {
             putInt("pid", Process.myPid())
             putInt("uid", Process.myUid())
+        }
+    }
+
+    private fun seedCache(data: Bundle) {
+        val count = data.getInt("count", 0)
+        for (i in 0 until count) {
+            if (cachedSegments.size >= WhistleSegmentCache.MAX_ENTRIES) break
+            seedEntry(data, i)
+        }
+    }
+
+    private fun seedEntry(data: Bundle, index: Int) {
+        val hash = data.getString("hash_$index")
+        val samples = data.getInt("samples_$index", 0)
+        val json = data.getByteArray("json_$index")
+        if (hash != null && json != null && WhistleSegmentCache.isValidEntry(hash, samples, json)) {
+            cachedSegments[hash] = samples to json
         }
     }
 
@@ -118,17 +146,17 @@ class WhistleService : Service() {
         segments.add(message)
     }
 
-    private fun failure(reply: Messenger, message: String) {
+    private fun failure(reply: Messenger, message: String, code: Int = WhistleProtocol.ERROR_CODE_GENERIC) {
         main.post {
             busy = false
             failed = true
-            sendError(reply, message)
+            sendError(reply, message, code)
         }
     }
 
-    private fun sendError(reply: Messenger, message: String) {
+    private fun sendError(reply: Messenger, message: String, code: Int = WhistleProtocol.ERROR_CODE_GENERIC) {
         val response = Message.obtain(null, WhistleProtocol.ERROR).apply {
-            data = Bundle().apply { putString("error", message) }
+            data = WhistleProtocol.errorBundle(message, code)
         }
         send(reply, response)
     }

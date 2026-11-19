@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.asr.TranscriptionMode
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.audio.RecordingPolicy
 import io.codemyriad.cassini.core.library.AudioKind
@@ -285,6 +286,15 @@ class RecordingControllerTest {
     @Test fun transcribeRightAwayOffKeepsAudioWithoutHandingOffOrAskingConsent() = runBlocking {
         graph.settings.setTranscribeRightAway(false)
         val recorded = startRecording("Saved only")
+        controller.finish()
+        assertEquals(RecordingOutcome.Saved(AfterFinish.AUDIO_ONLY), awaitEnded().outcome)
+        assertTrue(handoffs.isEmpty())
+        assertEquals(AudioKind.PLAIN, row(recorded.noteId)?.audioKind)
+    }
+
+    @Test fun recordOnlyModeLeavesStoppedNoteUnqueuedAudioOnly() = runBlocking {
+        graph.settings.setTranscriptionMode(TranscriptionMode.RECORD_ONLY)
+        val recorded = startRecording("Battery saving")
         controller.finish()
         assertEquals(RecordingOutcome.Saved(AfterFinish.AUDIO_ONLY), awaitEnded().outcome)
         assertTrue(handoffs.isEmpty())

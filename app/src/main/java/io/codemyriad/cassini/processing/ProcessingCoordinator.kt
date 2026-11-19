@@ -124,6 +124,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         val battery: BatterySource,
         val placeholderLabel: (Int) -> String,
         val sdkInt: Int = Build.VERSION.SDK_INT,
+        val onPreemptPrecompute: () -> Unit = {},
     )
 
     /**
@@ -190,6 +191,11 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         .map { ProcessingState.foregroundNeed(it, parts.sdkInt) }
         .stateIn(scope, SharingStarted.Eagerly, ForegroundNeed.NONE)
 
+    /** True while any saved-audio transcription or model download owns foreground processing budget. */
+    val hasForegroundWork: StateFlow<Boolean> = state
+        .map { it.running != null || it.queue.isNotEmpty() || it.downloading }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+
     init {
         scope.launch { watchVoices() }
         scope.launch { parts.visibility.visible.collect { visible -> if (visible) onAppStarted() } }
@@ -209,6 +215,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         origin: StartOrigin = StartOrigin.SCREEN,
         startService: Boolean = true,
     ): TranscribeOutcome {
+        parts.onPreemptPrecompute()
         graph.ready.await()
         val catalogue = graph.awaitCatalogue()
         // A job stopped by Android still finishes in the background; its outcome must not overwrite this request.
@@ -235,6 +242,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
 
     /** "Stop" in the notification (rule 6): holds the queue (USER), then stops the running note. */
     suspend fun stopAll() {
+        parts.onPreemptPrecompute()
         settings.setQueueHold(QueueHold.USER)
         active?.job?.stop(PauseReason.USER)
     }
@@ -273,6 +281,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
 
     /** Start over: cancels the job if it runs, discards the checkpoint and the pending prints, then enqueues. */
     suspend fun startOver(noteId: String, origin: StartOrigin = StartOrigin.SCREEN): TranscribeOutcome {
+        parts.onPreemptPrecompute()
         val kind = graph.awaitCatalogue().jobs.job(noteId)?.kind ?: JobKind.TRANSCRIBE
         cancel(noteId, discard = true)
         return transcribe(noteId, kind, origin)
@@ -285,6 +294,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
      * the note was running.
      */
     suspend fun cancel(noteId: String, discard: Boolean): Boolean {
+        parts.onPreemptPrecompute()
         // Startup purge may stop an old RUNNING row before the catalogue is published.
         // A non-discard stop only needs the in-memory active job, never the repositories.
         val catalogue = if (discard) graph.awaitCatalogue() else null
@@ -318,6 +328,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
 
     /** [prepareTrash], then `NoteRepository.moveToTrash` under the queue lock, so the note cannot start meanwhile. */
     suspend fun moveToTrash(noteId: String): Boolean {
+        parts.onPreemptPrecompute()
         val catalogue = graph.awaitCatalogue()
         while (true) {
             prepareTrash(noteId)

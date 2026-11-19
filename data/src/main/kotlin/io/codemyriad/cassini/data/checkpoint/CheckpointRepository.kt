@@ -2,7 +2,11 @@ package io.codemyriad.cassini.data.checkpoint
 
 import androidx.annotation.WorkerThread
 import io.codemyriad.cassini.core.audio.Limits
+import io.codemyriad.cassini.core.checkpoint.CheckpointOrigin
 import io.codemyriad.cassini.core.checkpoint.CheckpointState
+import io.codemyriad.cassini.core.checkpoint.CommittedPrefix
+import io.codemyriad.cassini.core.checkpoint.PrefixDecision
+import io.codemyriad.cassini.core.format.OggOpusPrefixScanner
 import io.codemyriad.cassini.core.format.SpeakerMerges
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.speakersByFirstSpeech
@@ -59,6 +63,9 @@ class CheckpointRepository(
 
     /** `work/clips.pcm`: the selected voice clips, raw 16 kHz f32le, appended by the job. */
     fun clips(noteId: String): File = File(work(noteId), WorkFiles.CLIPS)
+
+    /** `work/whistle-segments.json`: verified per-segment Whistle recognition cache (D-1124). */
+    fun whistleSegments(noteId: String): File = File(work(noteId), WorkFiles.WHISTLE_SEGMENTS)
 
     /** Creates `work/` for a job that starts. The caller has created the job row first (architecture 5.3). */
     @WorkerThread
@@ -132,13 +139,23 @@ class CheckpointRepository(
      */
     suspend fun discard(noteId: String) {
         require(NoteIds.isValid(noteId)) { "Not a note id: $noteId" }
-        locks.withNoteLock(noteId, dispatchers.io) {
-            names.releaseLocked(noteId)
-            wordLog.forget(noteId)
-            val work = work(noteId)
-            if (File(work, WorkFiles.SEALED_MARKER).delete()) NoteFiles.syncDirectory(work)
-            work.deleteRecursively()
-        }
+        locks.withNoteLock(noteId, dispatchers.io) { discardLocked(noteId) }
+    }
+
+    /** [discard] for the inference thread (e.g. silent fallback on a rejected precompute checkpoint). */
+    @WorkerThread
+    fun discardBlocking(noteId: String) {
+        Threads.assertOffMain("CheckpointRepository.discardBlocking")
+        require(NoteIds.isValid(noteId)) { "Not a note id: $noteId" }
+        locks.withNoteLockBlocking(noteId) { discardLocked(noteId) }
+    }
+
+    private fun discardLocked(noteId: String) {
+        names.releaseLocked(noteId)
+        wordLog.forget(noteId)
+        val work = work(noteId)
+        if (File(work, WorkFiles.SEALED_MARKER).delete()) NoteFiles.syncDirectory(work)
+        work.deleteRecursively()
     }
 
     /**
@@ -243,30 +260,76 @@ class CheckpointRepository(
     private fun loadLocked(noteId: String, identity: CheckpointIdentity): CheckpointLoad {
         val work = work(noteId)
         val file = File(work, WorkFiles.CHECKPOINT)
-        return if (WorkFiles.exists(file)) validate(work, file, expected(work, identity)) else CheckpointLoad.Missing
+        return if (WorkFiles.exists(file)) validate(noteId, work, file, identity) else CheckpointLoad.Missing
     }
 
-    private fun expected(work: File, identity: CheckpointIdentity) = CheckpointState.Expected(
-        identity.source,
-        identity.signature,
-        identity.modelRevision,
-        identity.speakersSha256,
-        File(work, WorkFiles.CLIPS).length(),
-        File(work, WorkFiles.AUDIO_PART).length(),
-        WordLogFile.length(work),
-    )
+    private fun expected(work: File, identity: CheckpointIdentity, json: JSONObject): CheckpointState.Expected {
+        var prefixKind: String? = null
+        var finalizedUnitCount: Long? = null
+        var prefixSha256: String? = null
+        val prefixJson = json.optJSONObject("committedPrefix")
+        if (prefixJson != null && json.optString("signature") != identity.signature) {
+            val audioFile = identity.audioFile
+            if (audioFile != null && audioFile.isFile) {
+                val isOpus = OggOpusPrefixScanner.isOggOpusFile(audioFile)
+                prefixKind = if (isOpus) CommittedPrefix.KIND_OGG_OPUS_BYTES else CommittedPrefix.KIND_AAC_M4A
+                finalizedUnitCount = audioFile.length()
+                val committedUnits = prefixJson.optLong("committedUnitCount", -1L)
+                if (isOpus && committedUnits > 0L && finalizedUnitCount >= committedUnits) {
+                    prefixSha256 = OggOpusPrefixScanner.sha256Prefix(audioFile, committedUnits)
+                }
+            }
+        }
+        return CheckpointState.Expected(
+            source = identity.source,
+            signature = identity.signature,
+            modelRevision = identity.modelRevision,
+            speakersSha256 = identity.speakersSha256,
+            clipsBytes = File(work, WorkFiles.CLIPS).length(),
+            audioBytes = File(work, WorkFiles.AUDIO_PART).length(),
+            wordLogBytes = WordLogFile.length(work),
+            prefixKind = prefixKind,
+            finalizedUnitCount = finalizedUnitCount,
+            prefixSha256 = prefixSha256,
+            deferDecodedPcmCheck = true,
+        )
+    }
 
     /**
-     * Reads [file] and its word log and checks them with `CheckpointState.validate`; every failure is a
-     * [CheckpointLoad.Mismatch].
+     * Reads [file] and its word log and checks them with `CheckpointState.validateWithResult`.
+     * Stale or invalid recording-time precompute checkpoints are silently discarded (`Missing`) so post-Stop
+     * batch transcription runs cleanly from frame 0 without ever failing with `CHECKPOINT_MISMATCH` (D109 §5.2).
      */
-    private fun validate(work: File, file: File, expected: CheckpointState.Expected): CheckpointLoad = try {
+    private fun validate(noteId: String, work: File, file: File, identity: CheckpointIdentity): CheckpointLoad = try {
         val json = JSONObject(WorkFiles.read(file))
+        val origin = CheckpointOrigin.of(json.opt("origin"))
+        val expected = expected(work, identity, json)
         try {
-            CheckpointState.validate(json, expected)
-            CheckpointLoad.Valid(CheckpointState.decode(json, WordLogFile.read(work, json)))
+            val result = CheckpointState.validateWithResult(json, expected)
+            when (result.decision) {
+                PrefixDecision.RESUME ->
+                    CheckpointLoad.Valid(CheckpointState.decode(json, WordLogFile.read(work, json)))
+                PrefixDecision.DISCARD_AND_FULL_DECODE -> {
+                    discardLocked(noteId)
+                    CheckpointLoad.Missing
+                }
+                PrefixDecision.REJECT_BATCH_CHECKPOINT ->
+                    CheckpointLoad.Mismatch(reason(json, expected), result.reason?.token)
+            }
         } catch (error: IllegalArgumentException) {
-            CheckpointLoad.Mismatch(reason(json, expected), error.message)
+            if (origin == CheckpointOrigin.PRECOMPUTE) {
+                discardLocked(noteId)
+                CheckpointLoad.Missing
+            } else {
+                CheckpointLoad.Mismatch(reason(json, expected), error.message)
+            }
+        } catch (error: JSONException) {
+            if (origin == CheckpointOrigin.PRECOMPUTE) {
+                discardLocked(noteId)
+                CheckpointLoad.Missing
+            } else {
+                CheckpointLoad.Mismatch(MismatchReason.UNREADABLE, error.message)
+            }
         }
     } catch (error: IOException) {
         CheckpointLoad.Mismatch(MismatchReason.UNREADABLE, error.message)

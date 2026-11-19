@@ -80,6 +80,16 @@
       "source": "strings/strings.json",
       "commit": "160fb923944422c5c4ff01aa777bb572e2a6e96e",
       "sha256": "01e70aee17a107b8f248293e8752dbd98d3457484bc8b6c14946e0b83ec669f9"
+    },
+    "vectors/head-start/transcription-mode-vectors.json": {
+      "source": "vectors/head-start/transcription-mode-vectors.json",
+      "commit": "8cbef9e1cf3365300c3d83535dbacde10c0411f4",
+      "sha256": "30b695bb7fa9e772e9f8013ee3b79d4889c99c3d005c4b7b7c362b1f7d72d166"
+    },
+    "vectors/head-start/mobile-prefix-checkpoint-vectors.json": {
+      "source": "vectors/head-start/mobile-prefix-checkpoint-vectors.json",
+      "commit": "8cbef9e1cf3365300c3d83535dbacde10c0411f4",
+      "sha256": "68959d02d1c473b83934f53b8b72cb96237512bb14079c8ebd57c4143920e939"
     }
   }
 }

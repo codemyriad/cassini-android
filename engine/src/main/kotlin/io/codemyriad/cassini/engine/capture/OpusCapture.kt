@@ -21,11 +21,7 @@ import kotlin.math.abs
  * about every second and the disk about every five, so a killed process loses only the last few seconds.
  * Elapsed time is the captured sample count.
  */
-internal class OpusCapture(
-    override val file: File,
-    private val live: LiveMicrophonePcm?,
-    private val onError: () -> Unit,
-) : MicrophoneCapture {
+internal class OpusCapture(override val file: File, private val onError: () -> Unit) : MicrophoneCapture {
     private val output = FileOutputStream(file)
     private val stream = output.buffered(1 shl 16)
     private val codec = MediaCodec.createEncoderByType("audio/opus")
@@ -93,7 +89,6 @@ internal class OpusCapture(
                 for (i in 0 until n) max = maxOf(max, abs(frame[i] - mean))
                 peak = max
                 queue(frame, n, 0, info)
-                live?.offer(samples, frame, n)
                 samples += n
                 drain(info, 0)
                 val now = SystemClock.elapsedRealtime()
@@ -109,7 +104,6 @@ internal class OpusCapture(
             failure = error
             try { muxer?.finish() } catch (_: Exception) {}
         } finally {
-            live?.finish()
             try { stream.flush(); output.fd.sync() } catch (_: Exception) {}
             try { stream.close() } catch (_: Exception) {}
             try { record.stop() } catch (_: Exception) {}

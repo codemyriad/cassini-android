@@ -2,6 +2,7 @@ package io.codemyriad.cassini.data.settings
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
+import io.codemyriad.cassini.core.asr.TranscriptionMode
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
@@ -92,6 +93,38 @@ class SettingsRepositoryTest {
         withStore { store ->
             assertTrue(store.speakerChoices.first().autoName)
             assertFalse(store.transcribeRightAway.first())
+            assertEquals(TranscriptionMode.RECORD_ONLY, store.transcriptionMode.first())
+        }
+    }
+
+    @Test fun transcriptionModeDefaultsToAfterStopRoundTripsAndFallsBackOnInvalidTokens() = runTest {
+        withStore { store ->
+            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
+            assertTrue(store.transcribeRightAway.first())
+            store.setTranscriptionMode(TranscriptionMode.RECORD_ONLY)
+            assertEquals(TranscriptionMode.RECORD_ONLY, store.transcriptionMode.first())
+            assertFalse(store.transcribeRightAway.first())
+            store.setTranscriptionMode(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING)
+            assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
+            assertTrue(store.transcribeRightAway.first())
+        }
+        withStore { store ->
+            assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
+        }
+        // Invalid stored value deterministically resolves to AFTER_STOP (never enables precompute).
+        val job = Job()
+        try {
+            val raw = PreferenceDataStoreFactory.create(
+                scope = CoroutineScope(Dispatchers.IO + job),
+                produceFile = { paths.settings },
+            )
+            raw.edit { it[SettingsRepository.Keys.TRANSCRIPTION_MODE] = "livePreview" }
+        } finally {
+            job.cancelAndJoin()
+        }
+        withStore { store ->
+            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
+            assertTrue(store.transcribeRightAway.first())
         }
     }
 

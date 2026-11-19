@@ -99,6 +99,10 @@ class RepositoryJobStorage(
         if (!checkpoints.dropSealedBlocking(noteId)) throw IOException("Cannot delete the sealed output of $noteId")
     }
 
+    override fun discardWorkBlocking(noteId: String) = checkpoints.discardBlocking(noteId)
+
+    override fun whistleSegmentCache(noteId: String): File = checkpoints.whistleSegments(noteId)
+
     /**
      * [SealedAdopter.of]: the document, the row and the cache, a dirty title, the pending prints with the draft's
      * Remember choices (`VoiceRepository.adoptPending` enrols them, so [Adoption.remembered] needs no second

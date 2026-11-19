@@ -2,6 +2,7 @@ package io.codemyriad.cassini.adapters
 
 import android.app.ActivityManager
 import android.content.Context
+import android.os.Process
 import android.util.Log
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
@@ -88,7 +89,28 @@ object InstalledEngines {
             placeholderLabel = { number -> speakerLabel(app, number) },
             lowMemory = { durationMs -> lowMemory(app, durationMs) },
             warn = { message, error -> Log.w(TAG, message, error) },
+            runAtBackgroundPriority = ::runAtBackgroundPriority,
         )
+    }
+
+    private fun runAtBackgroundPriority(block: () -> Unit) {
+        val previous = try {
+            Process.getThreadPriority(Process.myTid())
+        } catch (_: RuntimeException) {
+            null
+        }
+        try {
+            if (previous != null) Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+            block()
+        } finally {
+            if (previous != null) {
+                try {
+                    Process.setThreadPriority(previous)
+                } catch (_: RuntimeException) {
+                    // Best-effort restore.
+                }
+            }
+        }
     }
 
     /**

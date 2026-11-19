@@ -5,7 +5,9 @@ import io.codemyriad.cassini.core.asr.IncrementalState
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.audio.PcmAudio
 import io.codemyriad.cassini.core.checkpoint.RecognitionState
+import io.codemyriad.cassini.core.checkpoint.WhistleCachedSegment
 import io.codemyriad.cassini.core.checkpoint.WhistleResume
+import io.codemyriad.cassini.core.checkpoint.WhistleSegmentCache
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.format.WordBodyBudget
@@ -15,6 +17,8 @@ import io.codemyriad.cassini.engine.asr.Parakeet
 import io.codemyriad.cassini.engine.job.RecognitionCheckpointMismatch
 import io.codemyriad.cassini.engine.job.Recognizer
 import org.json.JSONObject
+import java.io.File
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
@@ -22,16 +26,62 @@ import kotlin.math.roundToLong
 
 /** The isolated worker's synchronous, bounded 16 kHz transport. Neither implementation may retain borrowed PCM. */
 interface WhistleTransport : AutoCloseable {
+    /** Seeds verified `(pcmSha256, sampleCount) -> json` entries so replay skips neural ASR on settled segments. */
+    fun seedCache(entries: List<WhistleCachedSegment>) = Unit
     fun accept(samples: FloatArray, count: Int)
     fun finish()
 }
 
 /** One segment from the desktop speech gate, on the 16 kHz track clock; JSON timestamps are segment-relative. */
-data class WhistleResult(val start: Long, val end: Long, val json: ByteArray)
+data class WhistleResult(
+    val start: Long,
+    val end: Long,
+    val json: ByteArray,
+    val pcmSha256: String = "",
+)
 
 /** Reproduces exactly [samples] samples from the track's origin, using the same pinned decoder policy. */
 fun interface WhistleReplay {
     fun prefix(samples: Long, sink: (FloatArray, Int) -> Unit)
+}
+
+/** Persistence seam for verified `(pipeline, segmentPcmSha256, sampleCount) -> segmentJson` entries in `work/`. */
+interface WhistleSegmentStore {
+    fun load(pipeline: String): List<WhistleCachedSegment>
+    fun record(pipeline: String, entry: WhistleCachedSegment)
+    fun flush(pipeline: String)
+}
+
+/** Atomic file-backed [WhistleSegmentStore] stored inside `notes/<id>/work/`. */
+class FileWhistleSegmentStore(private val file: File) : WhistleSegmentStore {
+    private var cache: WhistleSegmentCache? = null
+    private var dirty = false
+
+    override fun load(pipeline: String): List<WhistleCachedSegment> {
+        val loaded = WhistleSegmentCache.readFrom(file, pipeline)
+        cache = loaded
+        dirty = false
+        return loaded.entries()
+    }
+
+    override fun record(pipeline: String, entry: WhistleCachedSegment) {
+        val current = cache?.takeIf { it.pipeline == pipeline } ?: WhistleSegmentCache.readFrom(file, pipeline).also {
+            cache = it
+        }
+        if (current.put(entry.pcmSha256, entry.sampleCount, entry.json)) {
+            dirty = true
+        }
+    }
+
+    override fun flush(pipeline: String) {
+        val current = cache?.takeIf { it.pipeline == pipeline && dirty } ?: return
+        try {
+            current.writeTo(file)
+            dirty = false
+        } catch (_: IOException) {
+            // Segment cache is an optimization only; missing entries fall back cleanly to WhistleNative.transcribe.
+        }
+    }
 }
 
 /**
@@ -50,6 +100,7 @@ class WhistleRecognizer(
     replay: WhistleReplay,
     open: ((WhistleResult) -> Unit) -> WhistleTransport,
     private val nanoTime: () -> Long = System::nanoTime,
+    private val segmentStore: WhistleSegmentStore? = null,
 ) : Recognizer {
     private val raw = FloatArray(RING_SIZE)
     private val words = ArrayList<Word>()
@@ -94,6 +145,10 @@ class WhistleRecognizer(
         try {
             callbacks.checkReplayActive()
             restored?.let {
+                val cached = segmentStore?.load(PIPELINE)
+                    .orEmpty()
+                    .filter { WhistleSegmentCache.isValidEntry(it.pcmSha256, it.sampleCount, it.json) }
+                if (cached.isNotEmpty()) transport.seedCache(cached)
                 val limit = it.chunks.start
                 replay.prefix(limit) { samples, count ->
                     requireSaved(count >= 0 && position + count <= limit, "Replay exceeded saved position")
@@ -160,6 +215,7 @@ class WhistleRecognizer(
 
     override fun checkpoint(): RecognitionState {
         check(!closed && !failed && !replaying)
+        segmentStore?.flush(PIPELINE)
         return RecognitionState(
             inferenceMs,
             IncrementalState(position, position, FloatArray(0), words.toList()),
@@ -185,9 +241,13 @@ class WhistleRecognizer(
                 requireSaved(matches, "Whistle replayed words differ from saved progress")
             }
         } else {
+            val sampleCount = (result.end - result.start).toInt()
+            if (result.pcmSha256.isNotEmpty()) {
+                segmentStore?.record(PIPELINE, WhistleCachedSegment(result.pcmSha256, sampleCount, result.json))
+            }
             val startMs = result.start * MS / RATE
             callbacks.onStage(startMs, result.end * MS / RATE, false)
-            val pcm = FloatArray((result.end - result.start).toInt()) {
+            val pcm = FloatArray(sampleCount) {
                 raw[((result.start + it) and RING_MASK).toInt()]
             }
             val assigned = callbacks.onChunk(PcmAudio(pcm, RATE), startMs, relative)

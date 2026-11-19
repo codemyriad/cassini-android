@@ -4,6 +4,7 @@ import io.codemyriad.cassini.core.ProcessingPaused
 import io.codemyriad.cassini.core.asr.IncrementalState
 import io.codemyriad.cassini.core.checkpoint.CheckpointState
 import io.codemyriad.cassini.core.checkpoint.RecognitionState
+import io.codemyriad.cassini.core.checkpoint.WhistleCachedSegment
 import io.codemyriad.cassini.core.checkpoint.WhistleResume
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
@@ -13,9 +14,13 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.util.concurrent.atomic.AtomicInteger
 
 class WhistleRecognizerTest {
+    @get:Rule val temp = TemporaryFolder()
     private val pcm = FloatArray(4096) { it / 4096f }
     private val chunks = mutableListOf<Pair<Long, Transcript>>()
     private val progress = mutableListOf<List<Word>>()
@@ -286,5 +291,96 @@ class WhistleRecognizerTest {
             }
             assertEquals(1, worker.closes)
         }
+    }
+
+    @Test
+    fun segmentCacheSkipsNeuralTranscribeOnPrefixReplayWhileVerifyingWordsAndPcm() {
+        val cacheFile = temp.newFile("whistle-segments.json")
+        // 22 s at 16 kHz: 0..5s voiced, 5..7s silence (closes segment 1), 7..12s voiced, 12..14s silence (closes segment 2),
+        // 14..18s voiced, 18..22s silence (tail segment 3 after resume at 14s).
+        val totalSamples = 22 * 16_000
+        val track = FloatArray(totalSamples) { i ->
+            val sec = i / 16_000
+            val voiced = sec in 0..4 || sec in 7..11 || sec in 14..17
+            if (voiced) (((i % 389) - 194) / 1024f) else 0f
+        }
+        val splitSample = 14 * 16_000
+
+        fun streamTransport(
+            onResult: (WhistleResult) -> Unit,
+            transcribeCounter: AtomicInteger,
+        ): WhistleTransport {
+            val cache = HashMap<Pair<String, Int>, ByteArray>()
+            var frameIdx = 0
+            val stream = WhistleStream(
+                rate = 16_000,
+                probability = {
+                    val sec = (frameIdx++ * 512) / 16_000
+                    if (sec in 0..4 || sec in 7..11 || sec in 14..17) 0.95f else 0.01f
+                },
+                transcribe = { seg ->
+                    val n = transcribeCounter.incrementAndGet()
+                    val tag = "seg${seg.size}_$n"
+                    """{"words":[{"word":"$tag","start":0.050,"end":0.250}]}""".toByteArray()
+                },
+                segment = { range, json, hash ->
+                    onResult(WhistleResult(range.startSample, range.endSample, json, hash))
+                },
+                cachedSegment = { hash, count -> cache[hash to count] },
+            )
+            return object : WhistleTransport {
+                override fun seedCache(entries: List<WhistleCachedSegment>) {
+                    entries.forEach { cache[it.pcmSha256 to it.sampleCount] = it.json }
+                }
+
+                override fun accept(samples: FloatArray, count: Int) {
+                    stream.accept(if (count == samples.size) samples else samples.copyOf(count))
+                }
+
+                override fun finish() {
+                    stream.finish()
+                }
+
+                override fun close() = Unit
+            }
+        }
+
+        val passthrough = Recognizer.Callbacks({ _, _, t -> t }, { _, _, _ -> }, {})
+        val firstCalls = AtomicInteger()
+        val saved = WhistleRecognizer(
+            restored = null,
+            callbacks = passthrough,
+            replay = { _, _ -> error("Fresh run must not replay") },
+            open = { onResult -> streamTransport(onResult, firstCalls) },
+            segmentStore = FileWhistleSegmentStore(cacheFile),
+        ).use { recognizer ->
+            recognizer.accept(track, splitSample)
+            recognizer.checkpoint()
+        }
+        assertEquals(2, firstCalls.get())
+        assertEquals(2, saved.chunks.words.size)
+
+        // Resume with FileWhistleSegmentStore: the 2 prefix segments MUST have 0 neural transcribe calls,
+        // and only the 1 new tail segment may invoke transcribe!
+        val resumeCalls = AtomicInteger()
+        var prefixCallsAtReplayEnd = -1
+        val resumedTranscript = WhistleRecognizer(
+            restored = saved,
+            callbacks = passthrough,
+            replay = { limit, sink ->
+                sink(track, limit.toInt())
+                prefixCallsAtReplayEnd = resumeCalls.get()
+            },
+            open = { onResult -> streamTransport(onResult, resumeCalls) },
+            segmentStore = FileWhistleSegmentStore(cacheFile),
+        ).use { recognizer ->
+            assertEquals("Zero neural Whistle calls on already-settled prefix segments", 0, resumeCalls.get())
+            recognizer.accept(track.copyOfRange(splitSample, totalSamples), totalSamples - splitSample)
+            recognizer.finish(totalSamples * 1000L / 16_000L)
+        }
+        assertEquals(0, prefixCallsAtReplayEnd)
+        assertEquals("Only the 1 new tail segment after Stop should run neural ASR", 1, resumeCalls.get())
+        assertEquals(3, resumedTranscript.words.size)
+        assertEquals(saved.chunks.words, resumedTranscript.words.take(2))
     }
 }
