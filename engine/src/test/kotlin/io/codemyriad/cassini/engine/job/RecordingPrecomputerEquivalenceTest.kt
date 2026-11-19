@@ -289,6 +289,7 @@ class RecordingPrecomputerEquivalenceTest {
         val voices: FakeVoices,
         val script: Script,
         val env: JobEnvironment,
+        val precomputeModels: FakeModels = FakeModels(),
     )
 
     private fun newLane(
@@ -311,7 +312,6 @@ class RecordingPrecomputerEquivalenceTest {
         model: SpeechModel,
         engines: JobEngines,
         track: FloatArray,
-        models: ModelAccess = FakeModels(),
     ): PrecomputeStopReason {
         val stop = AtomicBoolean(false)
         return RecordingPrecomputer(
@@ -320,7 +320,7 @@ class RecordingPrecomputerEquivalenceTest {
             speechModel = model,
             storage = lane.storage,
             voices = lane.voices,
-            models = models,
+            models = lane.precomputeModels,
             engines = engines,
             env = lane.env,
             openDecoder = { file, _, start -> ScriptedOggPrefixDecoder(file, track, start) },
@@ -647,11 +647,11 @@ class RecordingPrecomputerEquivalenceTest {
         val (audioFile, out, muxer) = openLiveOpus("missing-speakers.opus", precomputePackets)
 
         val pre = newLane("pre-no-spk", "note-no-spk", audioFile, SpeechModel.PARAKEET, "diar_nospk_")
-        val preModels = FakeModels().apply { readyParts = setOf(ModelPart.SPEECH, ModelPart.VOICES) }
+        pre.precomputeModels.readyParts = setOf(ModelPart.SPEECH, ModelPart.VOICES)
         val preEngines = parakeetEngines(pre.script, track, totalSeconds)
         assertEquals(
             PrecomputeStopReason.YIELDED,
-            runSinglePassPrecompute(pre, audioFile, SpeechModel.PARAKEET, preEngines, track, models = preModels),
+            runSinglePassPrecompute(pre, audioFile, SpeechModel.PARAKEET, preEngines, track),
         )
         assertTrue(pre.storage.saved.last().speakerFailure)
         assertTrue("Diarizer must not run when speaker model is absent", pre.script.diarizers.isEmpty())
@@ -679,11 +679,11 @@ class RecordingPrecomputerEquivalenceTest {
         val (audioFile, out, muxer) = openLiveOpus("missing-voices.opus", precomputePackets)
 
         val pre = newLane("pre-no-vox", "note-no-vox", audioFile, SpeechModel.PARAKEET, "diar_novox_")
-        val preModels = FakeModels().apply { readyParts = setOf(ModelPart.SPEECH, ModelPart.SPEAKERS) }
+        pre.precomputeModels.readyParts = setOf(ModelPart.SPEECH, ModelPart.SPEAKERS)
         val preEngines = parakeetEngines(pre.script, track, totalSeconds)
         assertEquals(
             PrecomputeStopReason.YIELDED,
-            runSinglePassPrecompute(pre, audioFile, SpeechModel.PARAKEET, preEngines, track, models = preModels),
+            runSinglePassPrecompute(pre, audioFile, SpeechModel.PARAKEET, preEngines, track),
         )
         assertFalse(pre.storage.saved.last().speakerFailure)
         assertNull("Precompute without voice model must mark voiceClips absent", pre.storage.saved.last().voiceClips)

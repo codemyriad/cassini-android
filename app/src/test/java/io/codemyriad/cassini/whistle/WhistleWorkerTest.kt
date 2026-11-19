@@ -110,12 +110,14 @@ class WhistleWorkerTest {
         override fun getApplicationContext(): Context = this
         override fun bindService(service: Intent, connection: ServiceConnection, flags: Int): Boolean {
             activeConnection = connection
-            connection.onServiceConnected(ComponentName(packageName, WhistleService::class.java.name), serviceMessenger.binder)
+            val component = ComponentName(packageName, WhistleService::class.java.name)
+            connection.onServiceConnected(component, serviceMessenger.binder)
             return true
         }
         override fun unbindService(connection: ServiceConnection) {
             unbound = true
-            activeConnection?.onServiceDisconnected(ComponentName(packageName, WhistleService::class.java.name))
+            val component = ComponentName(packageName, WhistleService::class.java.name)
+            activeConnection?.onServiceDisconnected(component)
         }
     }
 

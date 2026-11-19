@@ -103,13 +103,7 @@ class OggOpusPrefixScanner(
             val fileLength = raf.length()
             var pagesRead = 0
             var bytesRead = 0L
-            while (
-                scanOffset + PAGE_HEADER_BYTES <= fileLength &&
-                !sawEos &&
-                !corrupt &&
-                shouldContinue() &&
-                (pagesRead == 0 || (pagesRead < maxPages && bytesRead < maxBytes))
-            ) {
+            while (hasMorePages(fileLength) && withinPollBudget(pagesRead, bytesRead, maxPages, maxBytes) && shouldContinue()) {
                 val page = readNextNonEosPage(raf, fileLength) ?: break
                 pagesRead++
                 bytesRead += page.rawBytes.size
@@ -122,17 +116,19 @@ class OggOpusPrefixScanner(
 
     /**
      * Bounded convenience overload returning newly committed audio packets as a list
-     * (at most [maxPages] pages and [maxBytes] bytes per call).
+     * (at most [DEFAULT_MAX_POLL_PAGES] pages and [DEFAULT_MAX_POLL_BYTES] bytes per call).
      */
-    fun poll(
-        maxPages: Int = DEFAULT_MAX_POLL_PAGES,
-        maxBytes: Long = DEFAULT_MAX_POLL_BYTES,
-        shouldContinue: () -> Boolean = { !Thread.currentThread().isInterrupted },
-    ): List<CommittedOggPacket> {
+    fun poll(): List<CommittedOggPacket> {
         val released = ArrayList<CommittedOggPacket>()
-        poll(maxPages, maxBytes, shouldContinue) { released.add(it) }
+        poll(DEFAULT_MAX_POLL_PAGES, DEFAULT_MAX_POLL_BYTES) { released.add(it) }
         return released
     }
+
+    private fun hasMorePages(fileLength: Long): Boolean =
+        scanOffset + PAGE_HEADER_BYTES <= fileLength && !sawEos && !corrupt
+
+    private fun withinPollBudget(pagesRead: Int, bytesRead: Long, maxPages: Int, maxBytes: Long): Boolean =
+        pagesRead == 0 || (pagesRead < maxPages && bytesRead < maxBytes)
 
     private fun readNextNonEosPage(raf: RandomAccessFile, fileLength: Long): ScannedPage? {
         val raw = readCompletePageBytes(raf, fileLength) ?: return null

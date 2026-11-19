@@ -325,7 +325,10 @@ class TranscriptionJob(
         return if (compatible) {
             prepared
         } else {
-            env.warn("Precompute checkpoint model state differs from batch run; discarding and recomputing", null)
+            env.warn(
+                "Precompute checkpoint model state differs from batch run; discarding and recomputing",
+                RecognitionCheckpointMismatch("Precompute model availability differs from batch run"),
+            )
             bestEffort("Could not discard stale precompute work", Unit) { storage.discardWorkBlocking(noteId) }
             prepared.withoutResume()
         }
