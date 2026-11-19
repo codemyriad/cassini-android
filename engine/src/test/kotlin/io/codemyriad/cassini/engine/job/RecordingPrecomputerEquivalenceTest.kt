@@ -189,11 +189,13 @@ class RecordingPrecomputerEquivalenceTest {
             rate = Limits.ASR_RATE,
             probability = {
                 val sec = (frameIdx++ * 512) / Limits.ASR_RATE
-                if (sec in 0..4 || sec in 7..11 || sec in 14..17) 0.95f else 0.01f
+                if (sec in 0..4 || sec in 7..11 || sec in 14..18) 0.95f else 0.01f
             },
             transcribe = { seg ->
                 transcribeCalls.incrementAndGet()
-                """{"words":[{"word":"spoken${seg.size}","start":0.100,"end":0.400}]}""".toByteArray()
+                val endSec = maxOf(0.4, (seg.size.toDouble() / Limits.ASR_RATE) - 0.05)
+                val formattedEnd = String.format(java.util.Locale.ROOT, "%.3f", endSec)
+                """{"words":[{"word":"spoken${seg.size}","start":0.050,"end":$formattedEnd}]}""".toByteArray()
             },
             segment = { range, json, hash ->
                 onResult(WhistleResult(range.startSample, range.endSample, json, hash))
@@ -386,12 +388,12 @@ class RecordingPrecomputerEquivalenceTest {
     }
 
     @Test fun pairedWhistleProducesIdenticalOutputWithZeroPrefixNeuralReDecodes() = runBlocking {
-        val totalSeconds = 22
+        val totalSeconds = 23
         val totalPackets = totalSeconds * 50
         val precomputePackets = 14 * 50 + 5
         val track = FloatArray(totalSeconds * Limits.ASR_RATE) { i ->
             val sec = i / Limits.ASR_RATE
-            if (sec in 0..4 || sec in 7..11 || sec in 14..17) (((i % 389) - 194) / 1024f) else 0f
+            if (sec in 0..4 || sec in 7..11 || sec in 14..18) (((i % 389) - 194) / 1024f) else 0f
         }
         val (audioFile, out, muxer) = openLiveOpus("capture-whistle.opus", precomputePackets)
 
