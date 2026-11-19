@@ -94,8 +94,8 @@ class RecordingPrecomputeControllerTest {
         runCurrent()
         assertEquals("RECORD_ONLY must not spawn precompute", 0, starts.get())
 
-        h.mode.value = TranscriptionMode.TRANSCRIBE_WHILE_RECORDING
         h.recording.value = active(format = CaptureFormat.M4A)
+        h.mode.value = TranscriptionMode.TRANSCRIBE_WHILE_RECORDING
         runCurrent()
         assertEquals("API 26-28 AAC capture must not spawn precompute", 0, starts.get())
 
