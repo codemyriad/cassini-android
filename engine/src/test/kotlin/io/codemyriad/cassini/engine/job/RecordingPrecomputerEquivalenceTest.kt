@@ -580,16 +580,18 @@ class RecordingPrecomputerEquivalenceTest {
         val releaseOpen = CountDownLatch(1)
         val recognizerClosed = AtomicInteger()
         val decoderClosed = AtomicInteger()
-        val closeThread = AtomicReference<String?>(null)
+        val openThread = AtomicReference<Thread?>(null)
+        val closeThread = AtomicReference<Thread?>(null)
         val script = Script()
 
         val engines = JobEngines(
             recognizers = RecognizerFactory { restored, cb ->
+                openThread.set(Thread.currentThread())
                 val inner = FakeRecognizer(restored, cb, script)
                 val tracked = object : Recognizer by inner {
                     override fun close() {
                         recognizerClosed.incrementAndGet()
-                        closeThread.set(Thread.currentThread().name)
+                        closeThread.set(Thread.currentThread())
                         inner.close()
                     }
                 }
@@ -641,7 +643,8 @@ class RecordingPrecomputerEquivalenceTest {
 
         assertEquals(1, recognizerClosed.get())
         assertEquals(1, decoderClosed.get())
-        assertEquals("test-precompute-inference", closeThread.get())
+        assertEquals(openThread.get(), closeThread.get())
+        assertTrue(closeThread.get()?.name?.startsWith("test-precompute-inference") == true)
         assertFalse("NativeBudget must be released after cancellation", NativeBudget.isHeld)
     }
 
