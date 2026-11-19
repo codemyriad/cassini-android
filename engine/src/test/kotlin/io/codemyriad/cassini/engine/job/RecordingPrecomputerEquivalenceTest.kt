@@ -594,7 +594,13 @@ class RecordingPrecomputerEquivalenceTest {
                     }
                 }
                 opened.complete(Unit)
-                assertTrue(releaseOpen.await(10, TimeUnit.SECONDS))
+                try {
+                    assertTrue(releaseOpen.await(10, TimeUnit.SECONDS))
+                } catch (_: InterruptedException) {
+                    // Expected when runInterruptible interrupts the inference thread during job.cancel();
+                    // return the opened recognizer to exercise cancel-on-return cleanup.
+                }
+                Thread.interrupted()
                 tracked
             },
             diarizers = DiarizerFactory { restored -> FakeDiarizer(restored, script) },
