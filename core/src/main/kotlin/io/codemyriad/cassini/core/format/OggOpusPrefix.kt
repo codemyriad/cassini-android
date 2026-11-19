@@ -48,6 +48,7 @@ class OggOpusPrefixScanner(
     private val heldPages = ArrayDeque<ScannedPage>()
     private val partial = ByteArrayOutputStream()
     private val header = ByteArray(PAGE_HEADER_BYTES + MAX_SEGMENTS)
+    private val crcSaved = ByteArray(CRC_BYTES)
 
     private var scanOffset = 0L
     private var serial: Int? = null
@@ -77,20 +78,60 @@ class OggOpusPrefixScanner(
     /** SHA-256 lowercase hex digest over exact file bytes `[0 ..< committedBytes)`. */
     fun committedSha256(): String = OggOpus.hex((committedHash.clone() as MessageDigest).digest())
 
+    internal val heldPageCount: Int
+        get() = heldPages.size
+
     /**
-     * Scans any newly flushed complete CRC-valid non-EOS pages from [file] and returns audio packets
-     * released once at least [trailingPagesMargin] complete pages follow them.
+     * Scans up to [maxPages] pages and [maxBytes] bytes of newly flushed complete CRC-valid non-EOS pages
+     * from [file], releasing committed audio packets incrementally to [onPacket] as soon as at least
+     * [trailingPagesMargin] complete pages follow them.
+     *
+     * Checks [shouldContinue] between pages and stops early when it returns false.
+     * Returns the number of committed audio packets delivered to [onPacket].
      */
-    fun poll(): List<CommittedOggPacket> {
-        if (corrupt || sawEos || !file.isFile) return emptyList()
+    fun poll(
+        maxPages: Int = DEFAULT_MAX_POLL_PAGES,
+        maxBytes: Long = DEFAULT_MAX_POLL_BYTES,
+        shouldContinue: () -> Boolean = { !Thread.currentThread().isInterrupted },
+        onPacket: (CommittedOggPacket) -> Unit,
+    ): Int {
+        require(maxPages > 0) { "maxPages must be positive" }
+        require(maxBytes > 0L) { "maxBytes must be positive" }
+        if (corrupt || sawEos || !file.isFile) return 0
+        var delivered = 0
         RandomAccessFile(file, "r").use { raf ->
             val fileLength = raf.length()
-            while (scanOffset + PAGE_HEADER_BYTES <= fileLength && !sawEos && !corrupt) {
+            var pagesRead = 0
+            var bytesRead = 0L
+            while (
+                scanOffset + PAGE_HEADER_BYTES <= fileLength &&
+                !sawEos &&
+                !corrupt &&
+                shouldContinue() &&
+                (pagesRead == 0 || (pagesRead < maxPages && bytesRead < maxBytes))
+            ) {
                 val page = readNextNonEosPage(raf, fileLength) ?: break
+                pagesRead++
+                bytesRead += page.rawBytes.size
                 heldPages.addLast(page)
+                delivered += releaseCommitted(onPacket)
             }
         }
-        return releaseCommitted()
+        return delivered
+    }
+
+    /**
+     * Bounded convenience overload returning newly committed audio packets as a list
+     * (at most [maxPages] pages and [maxBytes] bytes per call).
+     */
+    fun poll(
+        maxPages: Int = DEFAULT_MAX_POLL_PAGES,
+        maxBytes: Long = DEFAULT_MAX_POLL_BYTES,
+        shouldContinue: () -> Boolean = { !Thread.currentThread().isInterrupted },
+    ): List<CommittedOggPacket> {
+        val released = ArrayList<CommittedOggPacket>()
+        poll(maxPages, maxBytes, shouldContinue) { released.add(it) }
+        return released
     }
 
     private fun readNextNonEosPage(raf: RandomAccessFile, fileLength: Long): ScannedPage? {
@@ -241,29 +282,34 @@ class OggOpusPrefixScanner(
         return true
     }
 
-    private fun releaseCommitted(): List<CommittedOggPacket> {
+    private fun releaseCommitted(onPacket: (CommittedOggPacket) -> Unit): Int {
         val releasable = heldPages.size - trailingPagesMargin
         var lastBoundaryIndex = -1
         for (i in 0 until releasable) {
             if (heldPages[i].completeBoundary) lastBoundaryIndex = i
         }
-        if (lastBoundaryIndex < 0) return emptyList()
-        val released = ArrayList<CommittedOggPacket>()
+        if (lastBoundaryIndex < 0) return 0
+        var delivered = 0
         repeat(lastBoundaryIndex + 1) {
             val page = heldPages.removeFirst()
             committedHash.update(page.rawBytes)
             committedBytes = page.endOffset
             committedGranule = page.cumulativeGranule
-            released.addAll(page.completedAudio)
+            for (packet in page.completedAudio) {
+                onPacket(packet)
+                delivered++
+            }
         }
-        return released
+        return delivered
     }
 
     private fun verifyCrc(page: ByteArray): Boolean {
         val expected = OggOpus.u32(page, CRC_OFFSET)
-        val copy = page.copyOf()
-        for (i in CRC_OFFSET until CRC_OFFSET + CRC_BYTES) copy[i] = 0
-        return OggOpus.crc(copy) == expected
+        page.copyInto(crcSaved, 0, CRC_OFFSET, CRC_OFFSET + CRC_BYTES)
+        for (i in CRC_OFFSET until CRC_OFFSET + CRC_BYTES) page[i] = 0
+        val actual = OggOpus.crc(page)
+        crcSaved.copyInto(page, CRC_OFFSET)
+        return actual == expected
     }
 
     private fun validOpusHead(packet: ByteArray): Boolean {
@@ -285,6 +331,12 @@ class OggOpusPrefixScanner(
     companion object {
         /** Hold back one complete non-EOS page behind the writer head by default. */
         const val DEFAULT_TRAILING_PAGES_MARGIN = 1
+
+        /** Maximum Ogg pages scanned per incremental [poll] call to bound heap and latency on long backlogs. */
+        const val DEFAULT_MAX_POLL_PAGES = 64
+
+        /** Maximum Ogg container bytes scanned per incremental [poll] call (256 KiB). */
+        const val DEFAULT_MAX_POLL_BYTES = 256L * 1024L
 
         private const val MAGIC_BYTE_0 = 0
         private const val MAGIC_BYTE_1 = 1

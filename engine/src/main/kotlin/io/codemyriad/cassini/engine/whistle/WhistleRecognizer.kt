@@ -145,7 +145,9 @@ class WhistleRecognizer(
         try {
             callbacks.checkReplayActive()
             restored?.let {
-                val cached = segmentStore?.load(PIPELINE).orEmpty()
+                val cached = segmentStore?.load(PIPELINE)
+                    .orEmpty()
+                    .filter { WhistleSegmentCache.isValidEntry(it.pcmSha256, it.sampleCount, it.json) }
                 if (cached.isNotEmpty()) transport.seedCache(cached)
                 val limit = it.chunks.start
                 replay.prefix(limit) { samples, count ->

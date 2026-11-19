@@ -4,6 +4,7 @@ import io.codemyriad.cassini.core.asr.SileroInputFilter
 import io.codemyriad.cassini.core.asr.whistle.WhistleSpeechGate
 import io.codemyriad.cassini.core.asr.whistle.WhistleSpeechSegment
 import io.codemyriad.cassini.core.audio.whistle.WhistleResampler
+import io.codemyriad.cassini.core.checkpoint.WhistleSegmentCache
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
@@ -67,7 +68,8 @@ class WhistleStream internal constructor(
         val digest = MessageDigest.getInstance("SHA-256")
         updateHash(digest, samples, samples.size)
         val hash = hex(digest.digest())
-        val json = cachedSegment(hash, samples.size) ?: transcribe(samples)
+        val cached = cachedSegment(hash, samples.size)?.takeIf(WhistleSegmentCache::isValidSegmentJson)
+        val json = cached ?: transcribe(samples)
         segment(range, json, hash)
     }
 

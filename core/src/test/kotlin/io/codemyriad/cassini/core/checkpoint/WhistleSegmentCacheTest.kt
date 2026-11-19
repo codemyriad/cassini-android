@@ -52,4 +52,40 @@ class WhistleSegmentCacheTest {
         file.writeText("{truncated")
         assertEquals(0, WhistleSegmentCache.readFrom(file, pipeline).size)
     }
+
+    @Test fun rejectsMalformedWordEntriesOnPutAndDecode() {
+        val cache = WhistleSegmentCache(pipeline)
+        val malformed = listOf(
+            """{"words":[{}]}""",
+            """{"words":[42]}""",
+            """{"words":[{"word":"","start":0.0,"end":0.1}]}""",
+            """{"words":[{"word":"   ","start":0.0,"end":0.1}]}""",
+            """{"words":[{"word":"two words","start":0.0,"end":0.1}]}""",
+            """{"words":[{"word":"ok","start":0.5,"end":0.1}]}""",
+            """{"words":[{"word":"ok","start":"0.0","end":0.1}]}""",
+            """{"words":[{"word":"ok","start":0.0}]}""",
+            """{"words":[{"word":123,"start":0.0,"end":0.1}]}""",
+        )
+        for (raw in malformed) {
+            val bytes = raw.toByteArray(Charsets.UTF_8)
+            assertEquals("Expected rejection for $raw", false, WhistleSegmentCache.isValidSegmentJson(bytes))
+            assertEquals("Expected put rejection for $raw", false, cache.put(sha2, 16_000, bytes))
+        }
+        // Empty words array is valid (silent/unrecognized segment).
+        assertTrue(cache.put(sha1, 16_000, """{"words":[]}""".toByteArray(Charsets.UTF_8)))
+
+        // Crafted cache file on disk with {"words":[{}]} is dropped on readFrom.
+        val file = temp.newFile("malformed-words.json")
+        val encodedBad = java.util.Base64.getEncoder().encodeToString("""{"words":[{}]}""".toByteArray(Charsets.UTF_8))
+        val encodedGood = java.util.Base64.getEncoder().encodeToString(json1)
+        file.writeText(
+            """{"format":"${WhistleSegmentCache.FORMAT}","pipeline":"$pipeline","segments":{""" +
+                """"$sha2":{"sampleCount":16000,"jsonBase64":"$encodedBad"},""" +
+                """"$sha1":{"sampleCount":16000,"jsonBase64":"$encodedGood"}}}""",
+        )
+        val loaded = WhistleSegmentCache.readFrom(file, pipeline)
+        assertEquals(1, loaded.size)
+        assertNull(loaded.get(sha2, 16_000))
+        assertArrayEquals(json1, loaded.get(sha1, 16_000))
+    }
 }

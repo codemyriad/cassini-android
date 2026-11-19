@@ -58,13 +58,14 @@ class RecordingPrecomputeControllerTest {
         noteId: String = "note-1",
         format: CaptureFormat = CaptureFormat.OPUS,
         pause: RecordingPause? = null,
+        elapsedMs: Long = 1_000L,
     ) = RecordingState.Active(
         noteId = noteId,
         title = "Meeting",
         defaultTitle = "Meeting",
         format = format,
         sampleRateHz = format.sampleRateHz,
-        elapsedMs = 1_000L,
+        elapsedMs = elapsedMs,
         pause = pause,
         space = RecordingSpace.of(10_000_000_000L, 6_000L, Long.MAX_VALUE),
         warning = null,
@@ -176,9 +177,18 @@ class RecordingPrecomputeControllerTest {
         runCurrent()
         assertEquals(1, starts.get())
 
-        h.recording.value = active(noteId = "note-1", pause = RecordingPause.USER)
+        // Subsequent recording ticks, visibility changes, and pause/resume must NOT restart after OOM.
+        h.recording.value = active(noteId = "note-1", elapsedMs = 2_000L)
         runCurrent()
-        h.recording.value = active(noteId = "note-1", pause = null)
+        h.recording.value = active(noteId = "note-1", elapsedMs = 3_000L)
+        runCurrent()
+        h.visible.value = false
+        runCurrent()
+        h.visible.value = true
+        runCurrent()
+        h.recording.value = active(noteId = "note-1", pause = RecordingPause.USER, elapsedMs = 4_000L)
+        runCurrent()
+        h.recording.value = active(noteId = "note-1", pause = null, elapsedMs = 5_000L)
         runCurrent()
         assertEquals(1, starts.get())
 

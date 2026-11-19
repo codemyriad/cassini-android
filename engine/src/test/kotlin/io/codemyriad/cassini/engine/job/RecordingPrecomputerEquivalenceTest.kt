@@ -10,6 +10,7 @@ import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.OggOpus
 import io.codemyriad.cassini.core.format.OggOpusPrefixScanner
 import io.codemyriad.cassini.core.models.ModelCatalog
+import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.engine.decode.CommittedPrefixDecoder
 import io.codemyriad.cassini.engine.whistle.FileWhistleSegmentStore
@@ -18,24 +19,32 @@ import io.codemyriad.cassini.engine.whistle.WhistleReplay
 import io.codemyriad.cassini.engine.whistle.WhistleResult
 import io.codemyriad.cassini.engine.whistle.WhistleStream
 import io.codemyriad.cassini.engine.whistle.WhistleTransport
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Base64
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Paired `AFTER_STOP` vs. `TRANSCRIBE_WHILE_RECORDING` equivalence and negative-control tests for both
@@ -302,6 +311,7 @@ class RecordingPrecomputerEquivalenceTest {
         model: SpeechModel,
         engines: JobEngines,
         track: FloatArray,
+        models: ModelAccess = FakeModels(),
     ): PrecomputeStopReason {
         val stop = AtomicBoolean(false)
         return RecordingPrecomputer(
@@ -310,7 +320,7 @@ class RecordingPrecomputerEquivalenceTest {
             speechModel = model,
             storage = lane.storage,
             voices = lane.voices,
-            models = FakeModels(),
+            models = models,
             engines = engines,
             env = lane.env,
             openDecoder = { file, _, start -> ScriptedOggPrefixDecoder(file, track, start) },
@@ -469,7 +479,7 @@ class RecordingPrecomputerEquivalenceTest {
                 speakerPrefix = "diar_wf_",
                 speakerFailure = false,
                 clipSamples = 0,
-                voiceClips = null,
+                voiceClips = emptyMap(),
                 positionSamples = 16_000L,
                 doneMs = 1_000L,
                 durationMs = 0L,
@@ -557,5 +567,185 @@ class RecordingPrecomputerEquivalenceTest {
         ).run()
         assertEquals(PrecomputeStopReason.YIELDED, pauseReason)
         assertFalse("NativeBudget must be released after pause", NativeBudget.isHeld)
+    }
+
+    @Test fun cancellationWhileOpeningSessionClosesRecognizerAndDecoderOnInferenceThread() = runBlocking {
+        val (audioFile, out, _) = openLiveOpus("cancel-open.opus", 5)
+        out.close()
+        val log = mutableListOf<String>()
+        val storage = FakeStorage(temp.newFolder("cancel-open-dir"), audioFile, log)
+        val env = JobEnvironment({ "Speaker $it" }, inference = inference)
+
+        val opened = CompletableDeferred<Unit>()
+        val releaseOpen = CountDownLatch(1)
+        val recognizerClosed = AtomicInteger()
+        val decoderClosed = AtomicInteger()
+        val closeThread = AtomicReference<String?>(null)
+        val script = Script()
+
+        val engines = JobEngines(
+            recognizers = RecognizerFactory { restored, cb ->
+                val inner = FakeRecognizer(restored, cb, script)
+                val tracked = object : Recognizer by inner {
+                    override fun close() {
+                        recognizerClosed.incrementAndGet()
+                        closeThread.set(Thread.currentThread().name)
+                        inner.close()
+                    }
+                }
+                opened.complete(Unit)
+                assertTrue(releaseOpen.await(10, TimeUnit.SECONDS))
+                tracked
+            },
+            diarizers = DiarizerFactory { restored -> FakeDiarizer(restored, script) },
+            prints = FakePrints(script),
+            audio = FakeAudio(1_000L),
+            encoders = OpusSinkFactory { _, _ -> error("unused") },
+        )
+
+        val reason = AtomicReference<PrecomputeStopReason?>(null)
+        val job = launch(Dispatchers.Default) {
+            reason.set(
+                RecordingPrecomputer(
+                    noteId = "note-cancel-open",
+                    audioFile = audioFile,
+                    speechModel = SpeechModel.PARAKEET,
+                    storage = storage,
+                    voices = FakeVoices(log),
+                    models = FakeModels(),
+                    engines = engines,
+                    env = env,
+                    openDecoder = { file, _, start ->
+                        val inner = ScriptedOggPrefixDecoder(file, FloatArray(16_000), start)
+                        object : CommittedPrefixDecoder by inner {
+                            override fun close() {
+                                decoderClosed.incrementAndGet()
+                                inner.close()
+                            }
+                        }
+                    },
+                ).run(),
+            )
+        }
+
+        opened.await()
+        job.cancel()
+        releaseOpen.countDown()
+        job.join()
+
+        assertEquals(1, recognizerClosed.get())
+        assertEquals(1, decoderClosed.get())
+        assertEquals("test-precompute-inference", closeThread.get())
+        assertFalse("NativeBudget must be released after cancellation", NativeBudget.isHeld)
+    }
+
+    @Test fun missingSpeakerModelDuringPrecomputeDiscardsAndDiarizesAfterBatchInstall() = runBlocking {
+        val totalSeconds = 70
+        val totalPackets = totalSeconds * 50
+        val precomputePackets = 60 * 50
+        val track = FloatArray(totalSeconds * Limits.ASR_RATE) { i -> ((i / (10 * Limits.ASR_RATE)) % 3 + 1) * 0.1f }
+        val (audioFile, out, muxer) = openLiveOpus("missing-speakers.opus", precomputePackets)
+
+        val pre = newLane("pre-no-spk", "note-no-spk", audioFile, SpeechModel.PARAKEET, "diar_nospk_")
+        val preModels = FakeModels().apply { readyParts = setOf(ModelPart.SPEECH, ModelPart.VOICES) }
+        val preEngines = parakeetEngines(pre.script, track, totalSeconds)
+        assertEquals(
+            PrecomputeStopReason.YIELDED,
+            runSinglePassPrecompute(pre, audioFile, SpeechModel.PARAKEET, preEngines, track, models = preModels),
+        )
+        assertTrue(pre.storage.saved.last().speakerFailure)
+        assertTrue("Diarizer must not run when speaker model is absent", pre.script.diarizers.isEmpty())
+
+        finishLiveOpus(out, muxer, precomputePackets, totalPackets)
+
+        pre.script.windows.clear()
+        // Post-Stop batch job has all models installed (including SPEAKERS) and must discard & diarize.
+        assertEquals(JobOutcome.Done, runBatchJob(pre, SpeechModel.PARAKEET, preEngines))
+        assertEquals(1, pre.storage.discardedCount)
+        assertTrue("Diarizer must run after batch install", pre.script.diarizers.isNotEmpty())
+        assertEquals(listOf(0L, 26_000L, 52_000L), pre.script.windows)
+
+        val batch = newLane("batch-no-spk", "note-no-spk", audioFile, SpeechModel.PARAKEET, "diar_nospk_")
+        val batchEngines = parakeetEngines(batch.script, track, totalSeconds)
+        assertEquals(JobOutcome.Done, runBatchJob(batch, SpeechModel.PARAKEET, batchEngines))
+        assertEquivalentSealedOutputs(batch, pre)
+    }
+
+    @Test fun missingVoiceModelDuringPrecomputeDiscardsAndCollectsVoiceClipsAfterBatchInstall() = runBlocking {
+        val totalSeconds = 70
+        val totalPackets = totalSeconds * 50
+        val precomputePackets = 60 * 50
+        val track = FloatArray(totalSeconds * Limits.ASR_RATE) { i -> ((i / (10 * Limits.ASR_RATE)) % 3 + 1) * 0.1f }
+        val (audioFile, out, muxer) = openLiveOpus("missing-voices.opus", precomputePackets)
+
+        val pre = newLane("pre-no-vox", "note-no-vox", audioFile, SpeechModel.PARAKEET, "diar_novox_")
+        val preModels = FakeModels().apply { readyParts = setOf(ModelPart.SPEECH, ModelPart.SPEAKERS) }
+        val preEngines = parakeetEngines(pre.script, track, totalSeconds)
+        assertEquals(
+            PrecomputeStopReason.YIELDED,
+            runSinglePassPrecompute(pre, audioFile, SpeechModel.PARAKEET, preEngines, track, models = preModels),
+        )
+        assertFalse(pre.storage.saved.last().speakerFailure)
+        assertNull("Precompute without voice model must mark voiceClips absent", pre.storage.saved.last().voiceClips)
+
+        finishLiveOpus(out, muxer, precomputePackets, totalPackets)
+
+        pre.script.windows.clear()
+        // Post-Stop batch job has VOICES installed and must discard & recompute to collect voice clips.
+        assertEquals(JobOutcome.Done, runBatchJob(pre, SpeechModel.PARAKEET, preEngines))
+        assertEquals(1, pre.storage.discardedCount)
+        assertEquals(listOf(0L, 26_000L, 52_000L), pre.script.windows)
+
+        val batch = newLane("batch-no-vox", "note-no-vox", audioFile, SpeechModel.PARAKEET, "diar_novox_")
+        val batchEngines = parakeetEngines(batch.script, track, totalSeconds)
+        assertEquals(JobOutcome.Done, runBatchJob(batch, SpeechModel.PARAKEET, batchEngines))
+        assertEquivalentSealedOutputs(batch, pre)
+    }
+
+    @Test fun malformedWhistleSegmentCacheEntryTreatedAsCacheMissThroughPostStopTranscription() = runBlocking {
+        val totalSeconds = 23
+        val totalPackets = totalSeconds * 50
+        val precomputePackets = 14 * 50 + 5
+        val track = FloatArray(totalSeconds * Limits.ASR_RATE) { i ->
+            val sec = i / Limits.ASR_RATE
+            if (sec in 0..4 || sec in 7..11 || sec in 14..18) (((i % 389) - 194) / 1024f) else 0f
+        }
+        val (audioFile, out, muxer) = openLiveOpus("malformed-whistle-cache.opus", precomputePackets)
+
+        val pre = newLane("pre-wm", "note-wm", audioFile, SpeechModel.INCLUDED, "diar_wm_")
+        val preCalls = AtomicInteger()
+        val preEngines = whistleEngines(pre.storage.whistleCacheFile, pre.script, track, totalSeconds, preCalls)
+        assertEquals(
+            PrecomputeStopReason.YIELDED,
+            runSinglePassPrecompute(pre, audioFile, SpeechModel.INCLUDED, preEngines, track),
+        )
+        assertEquals(2, preCalls.get())
+        assertTrue(pre.storage.whistleCacheFile.isFile)
+
+        // Replace one cached segment entry with {"words":[{}]} on disk.
+        val cacheJson = JSONObject(pre.storage.whistleCacheFile.readText(Charsets.UTF_8))
+        val segments = cacheJson.getJSONObject("segments")
+        val firstKey = segments.keys().next()
+        segments.getJSONObject(firstKey).put(
+            "jsonBase64",
+            Base64.getEncoder().encodeToString("""{"words":[{}]}""".toByteArray(Charsets.UTF_8)),
+        )
+        pre.storage.whistleCacheFile.writeText(cacheJson.toString())
+
+        finishLiveOpus(out, muxer, precomputePackets, totalPackets)
+
+        // Post-Stop transcription must treat the malformed entry as a cache miss (1 miss + 1 tail = 2 calls),
+        // keeping the other valid cached segment as a hit, and complete cleanly without UNKNOWN failure.
+        val postStopCalls = AtomicInteger()
+        val resumeEngines = whistleEngines(pre.storage.whistleCacheFile, pre.script, track, totalSeconds, postStopCalls)
+        assertEquals(JobOutcome.Done, runBatchJob(pre, SpeechModel.INCLUDED, resumeEngines))
+        assertEquals(2, postStopCalls.get())
+        assertEquals(0, pre.storage.discardedCount)
+
+        val batch = newLane("batch-wm", "note-wm", audioFile, SpeechModel.INCLUDED, "diar_wm_")
+        val batchCalls = AtomicInteger()
+        val batchEngines = whistleEngines(batch.storage.whistleCacheFile, batch.script, track, totalSeconds, batchCalls)
+        assertEquals(JobOutcome.Done, runBatchJob(batch, SpeechModel.INCLUDED, batchEngines))
+        assertEquivalentSealedOutputs(batch, pre)
     }
 }

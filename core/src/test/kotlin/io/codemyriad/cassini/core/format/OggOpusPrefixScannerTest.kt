@@ -139,4 +139,56 @@ class OggOpusPrefixScannerTest {
         assertFalse(OggOpusPrefixScanner.isOggOpusFile(m4a))
         assertNull(OggOpusPrefixScanner.sha256Prefix(File(temp.root, "missing.opus"), 16))
     }
+
+    @Test fun boundsMemoryAndHonorsPageByteLimitsAndCancellationOnLongStream() {
+        val file = temp.newFile("long-capture.opus")
+        val totalPackets = 7_200
+        FileOutputStream(file).use { out ->
+            val muxer = OggOpus.LiveMuxer(out, opusHead(), CassiniDocument.tagsPacket(emptyList()), serial = 55)
+            repeat(totalPackets) { i -> muxer.add(fakeOpusPacket(i, size = 1024)) }
+            out.flush()
+        }
+
+        // Cancellation between pages stops scanning immediately without reading the backlog.
+        val cancelScanner = OggOpusPrefixScanner(file, trailingPagesMargin = 1)
+        var cancelledAfter = 0
+        val deliveredBeforeCancel = cancelScanner.poll(
+            maxPages = 64,
+            maxBytes = 256L * 1024L,
+            shouldContinue = { cancelledAfter < 5 },
+        ) {
+            cancelledAfter++
+        }
+        assertEquals(5, deliveredBeforeCancel)
+        assertTrue(cancelScanner.committedBytes in 1L until (file.length() / 10L))
+        assertTrue(cancelScanner.heldPageCount <= 2)
+
+        // Incremental bounded polling scans the entire long capture with constant held-page memory.
+        val scanner = OggOpusPrefixScanner(file, trailingPagesMargin = 1)
+        val maxPagesPerPoll = 32
+        val maxBytesPerPoll = 64L * 1024L
+        var totalDelivered = 0
+        var polls = 0
+        var maxHeldSeen = 0
+        while (true) {
+            var pollDelivered = 0
+            val count = scanner.poll(maxPages = maxPagesPerPoll, maxBytes = maxBytesPerPoll) {
+                pollDelivered++
+                maxHeldSeen = maxOf(maxHeldSeen, scanner.heldPageCount)
+            }
+            assertEquals(pollDelivered, count)
+            assertTrue("Poll must respect maxPages=$maxPagesPerPoll", count <= maxPagesPerPoll)
+            maxHeldSeen = maxOf(maxHeldSeen, scanner.heldPageCount)
+            if (count == 0) break
+            totalDelivered += count
+            polls++
+        }
+
+        // LiveMuxer holds 1 pending packet (7199 written) and margin=1 holds 1 trailing page -> 7198 committed packets.
+        assertEquals(totalPackets - 2, totalDelivered)
+        assertTrue("Long backlog must require multiple bounded polls", polls > 100)
+        assertTrue("Held pages must stay O(margin), saw $maxHeldSeen", maxHeldSeen <= 2)
+        assertFalse(scanner.corrupt)
+        assertEquals(scanner.committedSha256(), OggOpusPrefixScanner.sha256Prefix(file, scanner.committedBytes))
+    }
 }

@@ -96,17 +96,38 @@ class WhistleSegmentCache(val pipeline: String) {
         private const val TEMP_SUFFIX = ".tmp"
         private val HEX64 = Regex("^[0-9a-f]{64}$")
 
-        fun isValidEntry(pcmSha256: String, sampleCount: Int, json: ByteArray): Boolean {
-            val shapeOk = HEX64.matches(pcmSha256) &&
+        fun isValidEntry(pcmSha256: String, sampleCount: Int, json: ByteArray): Boolean =
+            HEX64.matches(pcmSha256) &&
                 sampleCount in 1..MAX_SEGMENT_SAMPLES &&
-                json.size in 1..MAX_JSON_BYTES
-            return shapeOk && hasWordsArray(json)
+                isValidSegmentJson(json)
+
+        /**
+         * Validates that [json] is within size bounds and contains a complete `words` array where every
+         * item has a non-empty whitespace-free `word` string and finite `start`/`end` numbers with `end >= start`.
+         */
+        fun isValidSegmentJson(json: ByteArray): Boolean = if (json.size !in 1..MAX_JSON_BYTES) {
+            false
+        } else {
+            try {
+                val items = JSONObject(json.toString(Charsets.UTF_8)).optJSONArray("words")
+                items != null && (0 until items.length()).all { index -> isValidWordItem(items.optJSONObject(index)) }
+            } catch (_: JSONException) {
+                false
+            }
         }
 
-        private fun hasWordsArray(json: ByteArray): Boolean = try {
-            JSONObject(json.toString(Charsets.UTF_8)).optJSONArray("words") != null
-        } catch (_: JSONException) {
-            false
+        private fun isValidWordItem(item: JSONObject?): Boolean {
+            val text = (item?.opt("word") as? String)?.trim()
+            val start = (item?.opt("start") as? Number)?.toDouble()
+            val end = (item?.opt("end") as? Number)?.toDouble()
+            return text != null &&
+                text.isNotEmpty() &&
+                text.none(Char::isWhitespace) &&
+                start != null &&
+                end != null &&
+                start.isFinite() &&
+                end.isFinite() &&
+                end >= start
         }
 
         fun decode(json: JSONObject, expectedPipeline: String): WhistleSegmentCache {

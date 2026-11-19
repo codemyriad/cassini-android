@@ -177,9 +177,9 @@ class WhistleWorker internal constructor(
         return true
     }
 
-    private fun errorReply(error: String): Message {
+    private fun errorReply(error: String, code: Int = WhistleProtocol.ERROR_CODE_GENERIC): Message {
         return Message.obtain(null, WhistleProtocol.ERROR).apply {
-            data = Bundle().apply { putString("error", error) }
+            data = WhistleProtocol.errorBundle(error, code)
         }
     }
 
@@ -201,7 +201,7 @@ class WhistleWorker internal constructor(
                 check(!closed) { "Whistle worker closed" }
                 when (reply.what) {
                     WhistleProtocol.SEGMENT -> onSegment(reply.data)
-                    WhistleProtocol.ERROR -> error(reply.data.getString("error") ?: "Whistle worker failed")
+                    WhistleProtocol.ERROR -> WhistleProtocol.throwError(reply.data)
                     command -> return reply.data
                     else -> error("Unexpected Whistle worker reply")
                 }

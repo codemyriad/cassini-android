@@ -74,7 +74,7 @@ class WhistleService : Service() {
         } catch (_: LinkageError) {
             failure(reply, "Verified Whistle runtime could not load")
         } catch (_: OutOfMemoryError) {
-            failure(reply, "Whistle worker out of memory")
+            failure(reply, "Whistle worker out of memory", WhistleProtocol.ERROR_CODE_OUT_OF_MEMORY)
         }
     }
 
@@ -146,17 +146,17 @@ class WhistleService : Service() {
         segments.add(message)
     }
 
-    private fun failure(reply: Messenger, message: String) {
+    private fun failure(reply: Messenger, message: String, code: Int = WhistleProtocol.ERROR_CODE_GENERIC) {
         main.post {
             busy = false
             failed = true
-            sendError(reply, message)
+            sendError(reply, message, code)
         }
     }
 
-    private fun sendError(reply: Messenger, message: String) {
+    private fun sendError(reply: Messenger, message: String, code: Int = WhistleProtocol.ERROR_CODE_GENERIC) {
         val response = Message.obtain(null, WhistleProtocol.ERROR).apply {
-            data = Bundle().apply { putString("error", message) }
+            data = WhistleProtocol.errorBundle(message, code)
         }
         send(reply, response)
     }

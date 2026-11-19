@@ -20,12 +20,14 @@ import io.codemyriad.cassini.core.speakers.VoiceClipCache
 import io.codemyriad.cassini.engine.decode.CommittedOggOpusDecoder
 import io.codemyriad.cassini.engine.decode.CommittedPrefixDecoder
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicReference
 
 /** Why a recording-time precomputation session stopped. */
 enum class PrecomputeStopReason {
@@ -132,12 +134,12 @@ class RecordingPrecomputer(
         if (!shouldContinue()) return PrecomputeStopReason.YIELDED
         val resumed = loadResumableCheckpoint()
         val generation = withContext(env.io) { voices.generationBlocking() }
-        var session: Session? = null
+        val owned = AtomicReference<Session?>(null)
         return try {
-            session = onBackgroundInference { openSession(resumed, generation) }
+            val session = onBackgroundInference { openSession(resumed, generation, owned) }
             driveLoop(session)
         } finally {
-            session?.let { closeSession(it) }
+            owned.getAndSet(null)?.let { closeSession(it) }
         }
     }
 
@@ -156,24 +158,39 @@ class RecordingPrecomputer(
     }
 
     private suspend fun closeSession(session: Session) {
-        try {
-            runInterruptible(env.inference) { session.close() }
-        } catch (_: CancellationException) {
-            session.close()
-        } catch (
-            @Suppress("TooGenericExceptionCaught") // Best-effort teardown; never leak cleanup errors to recording.
-            _: RuntimeException,
-        ) {
-            // Best-effort teardown.
+        withContext(NonCancellable + env.inference) {
+            try {
+                session.close()
+            } catch (
+                @Suppress("TooGenericExceptionCaught") // Best-effort teardown; never leak cleanup errors to recording.
+                _: RuntimeException,
+            ) {
+                // Best-effort teardown.
+            }
         }
     }
 
     private suspend fun loadResumableCheckpoint(): CheckpointState? = when (val load = storage.loadCheckpoint(noteId)) {
-        is CheckpointLoad.Valid -> load.state.takeIf { it.model == speechModel.identity }
+        is CheckpointLoad.Valid -> load.state.takeIf { state ->
+            state.model == speechModel.identity && isPrecomputeModelStateCompatible(state)
+        }
         CheckpointLoad.Missing, is CheckpointLoad.Mismatch -> null
     }
 
-    private fun openSession(resumed: CheckpointState?, generation: Long): Session {
+    private suspend fun isPrecomputeModelStateCompatible(state: CheckpointState): Boolean {
+        val (speakersReady, voicesReady) = withContext(env.io) {
+            models.ready(ModelPart.SPEAKERS) to models.ready(ModelPart.VOICES)
+        }
+        val speakersMatch = speakersReady == !state.speakerFailure
+        val voicesMatch = !voicesReady || state.voiceClips != null
+        return speakersMatch && voicesMatch
+    }
+
+    private fun openSession(
+        resumed: CheckpointState?,
+        generation: Long,
+        owned: AtomicReference<Session?>,
+    ): Session {
         val files = storage.workFiles(noteId)
         if (resumed == null) {
             files.encodedAudio.delete()
@@ -192,6 +209,7 @@ class RecordingPrecomputer(
             diarizer = resumed?.diarizer?.let(engines.diarizers::open)
             val state = buildSession(resumed, files, clips, decoder, diarizer)
             state.recognizer = engines.recognizers.open(resumed?.recognition, callbacks(state))
+            owned.set(state)
             session = state
             return state
         } finally {
@@ -316,7 +334,7 @@ class RecordingPrecomputer(
             speakerPrefix = session.speakerPrefix,
             speakerFailure = session.speakerFailure,
             clipSamples = session.clips.sampleCount,
-            voiceClips = CheckpointState.voiceClips(session.clipCache.checkpoint()),
+            voiceClips = if (session.printsReady) CheckpointState.voiceClips(session.clipCache.checkpoint()) else null,
             positionSamples = recognizer.positionSamples,
             doneMs = recognizer.doneMs,
             durationMs = 0L,

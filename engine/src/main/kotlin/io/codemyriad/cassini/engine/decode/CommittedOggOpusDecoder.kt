@@ -83,15 +83,20 @@ class CommittedOggOpusDecoder(
 
     override fun poll(onSamples: (FloatArray, Int) -> Unit): Int {
         check(!closed) { "CommittedOggOpusDecoder is closed" }
-        val packets = scanner.poll()
-        val decoder = if (packets.isNotEmpty()) ensureCodec() else null
-        if (decoder == null) return 0
-        for (packet in packets) {
+        var decoded = 0
+        scanner.poll(
+            shouldContinue = { !Thread.currentThread().isInterrupted },
+        ) { packet ->
             requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+            val decoder = ensureCodec() ?: return@poll
             feedPacket(decoder, packet, onSamples)
+            decoded++
         }
-        drainOutputs(decoder, onSamples, timeoutUs = 0L)
-        return packets.size
+        requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+        if (decoded > 0) {
+            codec?.let { drainOutputs(it, onSamples, timeoutUs = 0L) }
+        }
+        return decoded
     }
 
     private fun ensureCodec(): MediaCodec? =

@@ -298,14 +298,36 @@ class TranscriptionJob(
     }
 
     private fun restoreAndDecode(prepared: Prepared): Decoded {
+        val candidate = validatePrecomputeCompatibility(prepared)
         return try {
-            runDecodeAttempt(prepared)
+            runDecodeAttempt(candidate)
         } catch (error: RecognitionCheckpointMismatch) {
-            if (prepared.resumed?.origin != CheckpointOrigin.PRECOMPUTE) throw error
+            if (candidate.resumed?.origin != CheckpointOrigin.PRECOMPUTE) throw error
             // D109 §5.2 rule 4: a precompute checkpoint mismatch MUST silently discard and fall back to full batch decode.
             env.warn("Precompute checkpoint rejected at replay; falling back to full batch decode", error)
             bestEffort("Could not discard stale precompute work", Unit) { storage.discardWorkBlocking(noteId) }
-            runDecodeAttempt(prepared.withoutResume())
+            runDecodeAttempt(candidate.withoutResume())
+        }
+    }
+
+    /**
+     * Validates that a recording-time precompute checkpoint matches post-Stop batch model availability
+     * (after [installModels] has run). Missing speaker/voice models during recording must never degrade
+     * the final transcript once batch processing has installed them.
+     */
+    private fun validatePrecomputeCompatibility(prepared: Prepared): Prepared {
+        val resumed = prepared.resumed?.takeIf { it.origin == CheckpointOrigin.PRECOMPUTE }
+        val compatible = resumed == null || (
+            resumed.model == speechModel.identity &&
+                models.ready(ModelPart.SPEAKERS) == !resumed.speakerFailure &&
+                (!models.ready(ModelPart.VOICES) || resumed.voiceClips != null)
+            )
+        return if (compatible) {
+            prepared
+        } else {
+            env.warn("Precompute checkpoint model state differs from batch run; discarding and recomputing", null)
+            bestEffort("Could not discard stale precompute work", Unit) { storage.discardWorkBlocking(noteId) }
+            prepared.withoutResume()
         }
     }
 
