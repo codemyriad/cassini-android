@@ -322,6 +322,7 @@ class NoteViewModel(
             launch { details.filterNotNull().first().details?.let { openInfo(it) } }
         }
         launch { saveOverlays() }
+        launch { loadActionsBytes() }
         launch { askVoicesQuestion() }
         key.start?.takeIf { saved.get<Boolean>(KEY_STARTED) != true }?.let { row ->
             saved[KEY_STARTED] = true
@@ -341,6 +342,7 @@ class NoteViewModel(
         val sheet: SheetKind? = null,
         val naming: NamingState? = null,
         val info: DocumentFacts? = null,
+        val actionsBytes: Long? = null,
         val dialog: NoteDialog? = null,
         val snackbar: SnackbarSpec? = null,
         val busyRow: NoteAction? = null,
@@ -558,7 +560,15 @@ class NoteViewModel(
             SheetKind.ACTIONS -> {
                 val active = activeNoteId(live.recording)
                 val stopBusy = (mode as? NoteMode.Processing)?.stopBusy == true
-                val actions = LibraryMapping.actions(details, active, now, clock.zone, live.voiceModelReady, stopBusy)
+                val actions = LibraryMapping.actions(
+                    details,
+                    active,
+                    now,
+                    clock.zone,
+                    live.voiceModelReady,
+                    stopBusy,
+                    ui.actionsBytes,
+                )
                 NoteSheet.Actions(if (ui.busyRow != null) actions.copy(busyRow = ui.busyRow) else actions)
             }
             SheetKind.VERSIONS -> NoteSheet.Versions(NoteMapping.versions(details, now, clock.zone))
@@ -835,7 +845,28 @@ class NoteViewModel(
 
     // Sheets and dialogs. --------------------------------------------------------------------------------------------
 
-    private fun openSheet(kind: SheetKind) = local.update { it.copy(sheet = kind) }
+    private fun openSheet(kind: SheetKind) {
+        local.update { it.copy(sheet = kind) }
+    }
+
+    /** Reads the document size while the Actions sheet is open; cancels the read as soon as it closes. */
+    private suspend fun loadActionsBytes() {
+        local.map { it.sheet == SheetKind.ACTIONS }.distinctUntilChanged().collectLatest { open ->
+            if (!open) {
+                local.update { it.copy(actionsBytes = null) }
+            } else {
+                val bytes = try {
+                    ports.documentBytes(noteId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                    Log.w(TAG, "Cannot read the document size", error)
+                    null
+                }
+                local.update { if (it.sheet == SheetKind.ACTIONS) it.copy(actionsBytes = bytes) else it }
+            }
+        }
+    }
 
     /** A swipe, scrim tap or back: the voices question counts as asked without an answer. */
     private fun dismissSheet() {
@@ -844,7 +875,7 @@ class NoteViewModel(
 
     private fun closeSheet() {
         saved[KEY_NAME_SHEET] = null
-        local.update { it.copy(sheet = null, naming = null, busyRow = null) }
+        local.update { it.copy(sheet = null, naming = null, busyRow = null, actionsBytes = null) }
     }
 
     // The voices question (D103, L-60). ---------------------------------------------------------------------------

@@ -56,6 +56,7 @@ import io.codemyriad.cassini.ui.note.SaveState
 import io.codemyriad.cassini.ui.note.TranscribeRowUi
 import io.codemyriad.cassini.ui.note.TrustUi
 import io.codemyriad.cassini.ui.theme.SpeakerTone
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -1182,6 +1183,80 @@ class NoteViewModelTest {
         assertEquals("Parakeet", info.model)
         assertEquals(3, info.speakers)
         assertEquals(10.0, info.realtimeFactor!!, 0.001)
+    }
+
+    @Test
+    fun actionsSheetLoadsDocumentBytesForDocumentNotesAndRefreshesOnReopen() = runTest(dispatcher) {
+        ports.documentBytesValue = 12L * 1024 * 1024
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.More)
+        assertEquals(12L * 1024 * 1024, (viewModel.now().sheet as NoteSheet.Actions).ui.documentBytes)
+
+        send(viewModel, NoteEvent.DismissSheet)
+        ports.documentBytesValue = 18L * 1024 * 1024
+        send(viewModel, NoteEvent.More)
+        assertEquals(18L * 1024 * 1024, (viewModel.now().sheet as NoteSheet.Actions).ui.documentBytes)
+
+        send(viewModel, NoteEvent.DismissSheet)
+        ports.details.value = documentNote(audioKind = AudioKind.PLAIN)
+        advanceUntilIdle()
+        send(viewModel, NoteEvent.More)
+        assertNull((viewModel.now().sheet as NoteSheet.Actions).ui.documentBytes)
+    }
+
+    @Test
+    fun actionsSheetLoadsDocumentBytesOnPickerCancelRestoredSheetAndCancelsStaleReads() = runTest(dispatcher) {
+        ports.documentBytesValue = 12L * 1024 * 1024
+
+        // Library long-press -> export -> cancel picker leaves Actions open with documentBytes loaded.
+        val fromLibrary = viewModel(start = NoteStart.SAVE_DOCUMENT)
+        assertTrue(effects.last() is NoteEffect.CreateFile)
+        fromLibrary.onExportTarget(null)
+        advanceUntilIdle()
+        assertEquals(12L * 1024 * 1024, (fromLibrary.now().sheet as NoteSheet.Actions).ui.documentBytes)
+
+        // Restoring an open Actions sheet after process death also loads documentBytes.
+        ports.documentBytesValue = 15L * 1024 * 1024
+        val restored = viewModel()
+        assertEquals(15L * 1024 * 1024, (restored.now().sheet as NoteSheet.Actions).ui.documentBytes)
+
+        // Dismissing cancels an in-flight read so it cannot overwrite a reopened sheet.
+        send(restored, NoteEvent.DismissSheet)
+        val firstStarted = CompletableDeferred<Unit>()
+        val firstGate = CompletableDeferred<Long?>()
+        val secondGate = CompletableDeferred<Long?>()
+        var firstCancelled = false
+        var calls = 0
+        ports.readDocumentBytes = {
+            if (++calls == 1) {
+                firstStarted.complete(Unit)
+                try {
+                    firstGate.await()
+                } catch (cancelled: CancellationException) {
+                    firstCancelled = true
+                    throw cancelled
+                }
+            } else {
+                secondGate.await()
+            }
+        }
+
+        restored.onEvent(NoteEvent.More)
+        runCurrent()
+        assertTrue(firstStarted.isCompleted)
+        assertNull((restored.now().sheet as NoteSheet.Actions).ui.documentBytes)
+
+        restored.onEvent(NoteEvent.DismissSheet)
+        runCurrent()
+        assertTrue("dismissing cancels the pending size read", firstCancelled)
+
+        restored.onEvent(NoteEvent.More)
+        runCurrent()
+        assertNull((restored.now().sheet as NoteSheet.Actions).ui.documentBytes)
+
+        secondGate.complete(22L * 1024 * 1024)
+        advanceUntilIdle()
+        assertEquals(22L * 1024 * 1024, (restored.now().sheet as NoteSheet.Actions).ui.documentBytes)
     }
 
     private fun progress() = RunningProgress(

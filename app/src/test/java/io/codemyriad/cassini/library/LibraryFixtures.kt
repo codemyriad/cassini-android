@@ -140,6 +140,13 @@ internal class FakeLibraryPorts : LibraryPorts {
         return searchRows.map { it[query].orEmpty() }
     }
 
+    var documentBytesValue: Long? = null
+    var readDocumentBytes: (suspend (String) -> Long?)? = null
+
+    override suspend fun documentBytes(id: String): Long? =
+        readDocumentBytes?.invoke(id)
+            ?: if (rows.value.firstOrNull { it.id == id }?.audioKind == AudioKind.DOCUMENT) documentBytesValue else null
+
     override fun details(id: String): Flow<NoteDetails?> = detailsById.map { it[id] }
 
     override suspend fun transcribe(id: String, kind: JobKind): TranscribeOutcome {

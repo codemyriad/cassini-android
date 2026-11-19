@@ -19,11 +19,8 @@
         <item quantity="many">%1$s reuniones</item>
         <item quantity="other">%1$s reuniones</item>
     </plurals>
-    <string name="ui_voices_stale">Vuelve a poner nombre a esta persona en una reunión para que Cassini la siga reconociendo.</string>
-    <string name="ui_voices_footnote">Para añadir a alguien, pon nombre a un hablante en una reunión y deja activado “Recordar esta voz”. Si olvidas una voz, los nombres que ya están en tus reuniones se mantienen.</string>
     <string name="ui_voices_options">Opciones de %1$s</string>
     <string name="ui_voices_forget">Olvidar…</string>
-    <string name="ui_voices_forget_body">Cassini deja de reconocer esta voz. Los nombres que ya están en tus reuniones se mantienen.</string>
     <plurals name="ui_voices_forget_everyone_body">
         <item quantity="one">Cassini deja de reconocer %1$s voz guardada y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen.</item>
         <item quantity="many">Cassini deja de reconocer las %1$s voces guardadas y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen.</item>
@@ -158,4 +155,27 @@
     <string name="ui_setting_on">Activado</string>
     <string name="ui_transcription_right_away">Transcribir enseguida</string>
     <string name="ui_transcription_right_away_subtitle">Si está desactivado, Cassini guarda el audio y tú eliges cuándo transcribir.</string>
+    <string name="ui_export_heading">Exportar</string>
+    <string name="ui_export_cassini_file_short">Audio y transcripción en un solo archivo</string>
+    <string name="ui_export_markdown_short">Transcripción con hablantes y tiempos</string>
+    <string name="ui_export_plain_text_short">Solo la transcripción, sin formato</string>
+    <string name="ui_export_subtitles">Subtítulos</string>
+    <string name="ui_export_srt_short">Para reproductores y editores de vídeo</string>
+    <string name="ui_export_vtt_short">Con los nombres de los hablantes, para vídeo web</string>
+    <string name="ui_export_type_with_size">%1$s (%2$s)</string>
+    <string name="ui_voices_footnote_made_on">Las huellas de voz se crean en este teléfono.</string>
+    <string name="ui_voices_footnote_names_only">Las exportaciones y lo que compartes solo incluyen los nombres.</string>
+    <plurals name="ui_voices_stale_title">
+        <item quantity="one">%1$s voz necesita un nombre de nuevo</item>
+        <item quantity="many">%1$s voces necesitan un nombre de nuevo</item>
+        <item quantity="other">%1$s voces necesitan un nombre de nuevo</item>
+    </plurals>
+    <string name="ui_voices_stale_body">El reconocimiento de voz se ha actualizado y las voces guardadas antes de la actualización no se pueden reconocer. Pon nombre a %1$s en una reunión para volver a guardar su voz.</string>
+    <string name="ui_voices_needs_naming">Necesita un nombre de nuevo</string>
+    <string name="ui_voices_caption">Para añadir a alguien, pon nombre a un hablante en una reunión y deja activado «Recordar esta voz».</string>
+    <string name="ui_voices_empty">Aún no hay voces guardadas</string>
+    <string name="ui_voices_empty_body">Pon nombre a un hablante en una reunión y deja activado «Recordar esta voz». La próxima vez, Cassini le pondrá el nombre por ti.</string>
+    <string name="ui_voices_forget_title">¿Olvidar la voz de %1$s?</string>
+    <string name="ui_voices_forget_body">Cassini ya no reconocerá a %1$s en las reuniones nuevas. Los nombres que ya están en las transcripciones se mantienen.</string>
+    <string name="ui_voices_forget_action">Olvidar</string>
 </resources>

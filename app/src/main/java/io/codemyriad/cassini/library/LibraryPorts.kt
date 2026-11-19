@@ -6,6 +6,7 @@ import android.view.accessibility.AccessibilityManager
 import androidx.core.net.toUri
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.BuildConfig
+import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.SearchFilters
 import io.codemyriad.cassini.core.models.ModelPart
@@ -26,6 +27,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -46,6 +49,9 @@ interface LibraryPorts {
 
     /** One note with its variants, speakers and job, for the Note actions sheet. */
     fun details(id: String): Flow<NoteDetails?>
+
+    /** Size in bytes of the document's `.opus` file on disk, or null if unavailable or not a document. */
+    suspend fun documentBytes(id: String): Long? = null
 
     val processing: Flow<ProcessingState>
     val recording: StateFlow<RecordingState>
@@ -136,6 +142,14 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
     override val calendarZone: Flow<ZoneId> = searchCalendar(app, graph.config.zone)
 
     override fun details(id: String): Flow<NoteDetails?> = flow { emitAll(graph.awaitCatalogue().notes.note(id)) }
+
+    override suspend fun documentBytes(id: String): Long? {
+        val row = graph.awaitCatalogue().database.notes().note(id)?.takeIf {
+            it.audioKind == AudioKind.DOCUMENT
+        } ?: return null
+        val file = File(graph.paths.note(id), row.audioFile)
+        return withContext(graph.dispatchers.io) { file.length().takeIf { it > 0 } }
+    }
 
     override val processing: Flow<ProcessingState> get() = graph.processing.state
     override val recording: StateFlow<RecordingState> get() = graph.recording.state

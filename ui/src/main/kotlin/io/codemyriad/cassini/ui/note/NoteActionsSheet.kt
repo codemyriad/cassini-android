@@ -32,6 +32,7 @@ import io.codemyriad.cassini.ui.components.SheetSection
 import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.Durations
+import io.codemyriad.cassini.ui.format.Sizes
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 
@@ -75,7 +76,7 @@ fun NoteActionsSheetContent(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, m
         Text(
             text = metaLine(ui, document),
             modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-            style = CassiniTheme.type.caption,
+            style = CassiniTheme.type.body14,
             color = c.text2,
         )
         SaveACopy(ui, document, onAction)
@@ -129,7 +130,7 @@ private fun metaLine(ui: NoteActionsUi, document: Boolean): String {
  */
 @Composable
 private fun ColumnScope.SaveACopy(ui: NoteActionsUi, document: Boolean, onAction: (NoteAction) -> Unit) {
-    SheetSection(stringResource(R.string.ui_actions_save_copy))
+    SheetSection(stringResource(R.string.ui_export_heading), uppercase = false)
     AudioRow(ui, document, onAction)
     if (!ui.textExportEnabled) {
         val why = if (ui.transcriptUnreadable) R.string.ui_actions_not_readable else R.string.ui_export_audio_only
@@ -150,20 +151,25 @@ private fun ColumnScope.SaveACopy(ui: NoteActionsUi, document: Boolean, onAction
 private fun AudioRow(ui: NoteActionsUi, document: Boolean, onAction: (NoteAction) -> Unit) {
     val plain = ui.documentKind as? DocumentKindUi.Plain
     val (labelRes, bodyRes) = when {
-        document -> R.string.ui_export_cassini_file to R.string.ui_export_cassini_file_body
+        document -> R.string.ui_export_cassini_file to R.string.ui_export_cassini_file_short
         plain?.imported == true -> R.string.ui_export_original_audio to R.string.ui_export_original_audio_body
         else -> R.string.ui_actions_audio_file to R.string.ui_actions_audio_file_body
     }
     val label = stringResource(labelRes)
+    val extension = when {
+        plain != null -> stringResource(R.string.ui_ext_any, plain.ext)
+        ui.documentBytes != null && ui.documentBytes > 0 -> stringResource(
+            R.string.ui_export_type_with_size,
+            stringResource(R.string.ui_ext_opus),
+            Sizes.megabytes(ui.documentBytes),
+        )
+        else -> stringResource(R.string.ui_ext_opus)
+    }
     SheetActionRow(
         label = label,
         glyph = Glyph.Music,
         onClick = { onAction(NoteAction.SAVE_DOCUMENT) },
-        extension = if (plain != null) {
-            stringResource(R.string.ui_ext_any, plain.ext)
-        } else {
-            stringResource(R.string.ui_ext_opus)
-        },
+        extension = extension,
         subtitle = stringResource(bodyRes),
         style = SheetRowStyle.Featured,
         busy = ui.busyRow == NoteAction.SAVE_DOCUMENT,
@@ -216,20 +222,21 @@ private data class ExportFormatRow(
 @Composable
 private fun ExportRow(ui: NoteActionsUi, row: ExportFormatRow, onAction: (NoteAction) -> Unit) {
     val text = stringResource(row.label)
+    val ext = stringResource(row.extension)
     SheetActionRow(
         label = text,
         glyph = row.glyph,
         onClick = { onAction(row.save) },
-        extension = stringResource(row.extension),
+        extension = ext,
         subtitle = stringResource(row.body),
         busy = ui.busyRow == row.save,
-        share = rowShare(text) { onAction(row.share) },
+        share = rowShare("$text $ext") { onAction(row.share) },
     )
 }
 
 private val MARKDOWN_ROW = ExportFormatRow(
     label = R.string.ui_actions_markdown,
-    body = R.string.ui_markdown_description,
+    body = R.string.ui_export_markdown_short,
     extension = R.string.ui_ext_md,
     glyph = Glyph.TextFile,
     save = NoteAction.SAVE_MARKDOWN,
@@ -240,23 +247,23 @@ private val MARKDOWN_ROW = ExportFormatRow(
 private val MORE_FORMAT_ROWS = listOf(
     ExportFormatRow(
         label = R.string.ui_export_plain_text,
-        body = R.string.ui_export_plain_text_body,
+        body = R.string.ui_export_plain_text_short,
         extension = R.string.ui_ext_txt,
         glyph = Glyph.TextFile,
         save = NoteAction.SAVE_TEXT,
         share = NoteAction.SHARE_TEXT,
     ),
     ExportFormatRow(
-        label = R.string.ui_export_srt,
-        body = R.string.ui_export_srt_body,
+        label = R.string.ui_export_subtitles,
+        body = R.string.ui_export_srt_short,
         extension = R.string.ui_ext_srt,
         glyph = Glyph.Subtitles,
         save = NoteAction.SAVE_SRT,
         share = NoteAction.SHARE_SRT,
     ),
     ExportFormatRow(
-        label = R.string.ui_export_vtt,
-        body = R.string.ui_export_vtt_body,
+        label = R.string.ui_export_subtitles,
+        body = R.string.ui_export_vtt_short,
         extension = R.string.ui_ext_vtt,
         glyph = Glyph.Subtitles,
         save = NoteAction.SAVE_VTT,

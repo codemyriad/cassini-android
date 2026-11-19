@@ -350,6 +350,7 @@ internal object BoardFixtures {
         documentKind = DocumentKindUi.Document,
         textExportEnabled = true,
         transcribeRow = TranscribeRowUi.TranscribeAgain(nextVersion = 3, namesCarry = true),
+        documentBytes = 24L * 1024 * 1024,
     )
 
     // Board 07: Saved voices.

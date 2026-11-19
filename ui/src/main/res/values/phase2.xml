@@ -17,11 +17,8 @@
         <item quantity="one">%1$s meeting</item>
         <item quantity="other">%1$s meetings</item>
     </plurals>
-    <string name="ui_voices_stale">Name them again in a meeting to keep recognising them.</string>
-    <string name="ui_voices_footnote">To add someone, name a speaker in a meeting and keep “Remember this voice” on. Forgetting a voice keeps the names already in your meetings.</string>
     <string name="ui_voices_options">Options for %1$s</string>
     <string name="ui_voices_forget">Forget…</string>
-    <string name="ui_voices_forget_body">Cassini stops recognising this voice. Names already in your meetings stay.</string>
     <plurals name="ui_voices_forget_everyone_body">
         <item quantity="one">Cassini stops recognising %1$s saved voice and deletes the voiceprints from every meeting. Names already in your meetings stay.</item>
         <item quantity="other">Cassini stops recognising all %1$s saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.</item>
@@ -151,4 +148,26 @@
     <string name="ui_setting_on">On</string>
     <string name="ui_transcription_right_away">Transcribe right away</string>
     <string name="ui_transcription_right_away_subtitle">When this is off, Cassini keeps the audio and you choose when to transcribe.</string>
+    <string name="ui_export_heading">Export</string>
+    <string name="ui_export_cassini_file_short">Audio and transcript in one file</string>
+    <string name="ui_export_markdown_short">Transcript with speakers and times</string>
+    <string name="ui_export_plain_text_short">Transcript only, no formatting</string>
+    <string name="ui_export_subtitles">Subtitles</string>
+    <string name="ui_export_srt_short">For video players and editors</string>
+    <string name="ui_export_vtt_short">With speaker names, for web video</string>
+    <string name="ui_export_type_with_size">%1$s (%2$s)</string>
+    <string name="ui_voices_footnote_made_on">Voiceprints are made on this phone.</string>
+    <string name="ui_voices_footnote_names_only">Exports and shares include names only.</string>
+    <plurals name="ui_voices_stale_title">
+        <item quantity="one">%1$s voice needs naming again</item>
+        <item quantity="other">%1$s voices need naming again</item>
+    </plurals>
+    <string name="ui_voices_stale_body">Voice recognition was updated, and voices saved before the update can’t be recognised. Name %1$s in a meeting to save their voice again.</string>
+    <string name="ui_voices_needs_naming">Needs naming again</string>
+    <string name="ui_voices_caption">To add someone, name a speaker in a meeting and keep “Remember this voice” on.</string>
+    <string name="ui_voices_empty">No saved voices yet</string>
+    <string name="ui_voices_empty_body">Name a speaker in a meeting and keep “Remember this voice” on. Next time, Cassini names them for you.</string>
+    <string name="ui_voices_forget_title">Forget %1$s’s voice?</string>
+    <string name="ui_voices_forget_body">Cassini will no longer recognise %1$s in new meetings. Names already in transcripts stay.</string>
+    <string name="ui_voices_forget_action">Forget</string>
 </resources>

@@ -127,6 +127,8 @@ interface NotePorts {
 
     suspend fun documentFacts(id: String, variantId: String?): DocumentFacts
 
+    suspend fun documentBytes(id: String): Long? = null
+
     // The player.
     val playback: StateFlow<PlaybackState>
 
@@ -285,6 +287,14 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
         flow { emitAll(graph.awaitCatalogue().checkpoints.names.observe(id)) }
 
     override suspend fun loadDraft(id: String): DraftTranscript? = graph.awaitCatalogue().checkpoints.loadDraft(id)
+
+    override suspend fun documentBytes(id: String): Long? {
+        val row = graph.awaitCatalogue().database.notes().note(id)?.takeIf {
+            it.audioKind == io.codemyriad.cassini.core.library.AudioKind.DOCUMENT
+        } ?: return null
+        val file = File(graph.paths.note(id), row.audioFile)
+        return withContext(graph.dispatchers.io) { file.length().takeIf { it > 0 } }
+    }
 
     override suspend fun documentFacts(id: String, variantId: String?): DocumentFacts {
         val catalogue = graph.awaitCatalogue()

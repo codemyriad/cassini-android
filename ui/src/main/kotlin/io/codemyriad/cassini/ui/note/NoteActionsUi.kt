@@ -35,6 +35,7 @@ data class NoteActionsUi(
     val recordedLabel: String? = null,
     val transcriptUnreadable: Boolean = false,
     val starred: Boolean = false,
+    val documentBytes: Long? = null,
 )
 
 /** What "Save a copy" saves first: the [Document] (the Cassini file, `.opus`) or the [Plain] audio file. */

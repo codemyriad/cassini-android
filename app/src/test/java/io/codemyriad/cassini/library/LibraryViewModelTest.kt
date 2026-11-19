@@ -33,6 +33,7 @@ import io.codemyriad.cassini.ui.library.LibrarySheet
 import io.codemyriad.cassini.ui.library.LibraryUiState
 import io.codemyriad.cassini.ui.library.RecordingPillUi
 import io.codemyriad.cassini.ui.note.NoteAction
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -62,6 +63,7 @@ import org.robolectric.RobolectricTestRunner
 /** The Library ViewModel over fake ports (features.md section 1; ui.md section 7). */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
+@Suppress("LargeClass") // one test per Library screen behaviour
 class LibraryViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val ports = FakeLibraryPorts()
@@ -642,6 +644,42 @@ class LibraryViewModelTest {
         viewModel.onEvent(LibraryEvent.ConfirmDialog)
         advanceUntilIdle()
         assertEquals("startOver q", ports.actions.last())
+    }
+
+    @Test
+    fun actionsSheetLoadsDocumentBytesOnlyForDocumentNotes() = runTest(dispatcher) {
+        ports.documentBytesValue = 24L * 1024 * 1024
+        ports.add(docRow("d", DocumentState.OK, words = 3))
+        ports.add(libraryRow("p", audioKind = AudioKind.PLAIN))
+        val viewModel = viewModel()
+
+        viewModel.onEvent(LibraryEvent.LongPress("d"))
+        advanceUntilIdle()
+        assertEquals(24L * 1024 * 1024, (viewModel.now().sheet as LibrarySheet.Actions).ui.documentBytes)
+
+        viewModel.onEvent(LibraryEvent.DismissSheet)
+        advanceUntilIdle()
+
+        viewModel.onEvent(LibraryEvent.LongPress("p"))
+        advanceUntilIdle()
+        assertNull((viewModel.now().sheet as LibrarySheet.Actions).ui.documentBytes)
+    }
+
+    @Test
+    fun actionsSheetOpensImmediatelyWhileDocumentBytesReadIsPending() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Long?>()
+        ports.readDocumentBytes = { gate.await() }
+        ports.add(docRow("d", DocumentState.OK, words = 3))
+        val viewModel = viewModel()
+
+        viewModel.onEvent(LibraryEvent.LongPress("d"))
+        runCurrent()
+        val open = viewModel.now().sheet as LibrarySheet.Actions
+        assertNull(open.ui.documentBytes)
+
+        gate.complete(24L * 1024 * 1024)
+        advanceUntilIdle()
+        assertEquals(24L * 1024 * 1024, (viewModel.now().sheet as LibrarySheet.Actions).ui.documentBytes)
     }
 
     @Test

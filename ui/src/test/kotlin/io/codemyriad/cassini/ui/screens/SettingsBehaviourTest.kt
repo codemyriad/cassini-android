@@ -290,7 +290,41 @@ class SettingsBehaviourTest {
     @Test fun noSavedVoicesHidesForgetEveryone() {
         setThemed { SavedVoicesScreen(VariantFixtures.savedVoices.getValue("voices-empty"), onEvent = {}) }
         rule.onNodeWithText("No saved voices yet").assertExists()
+        rule.onNodeWithText(
+            "Name a speaker in a meeting and keep “Remember this voice” on. Next time, Cassini names them for you.",
+        ).assertExists()
+        rule.onNodeWithText("Voiceprints are made on this phone.").assertExists()
+        rule.onNodeWithText("Exports and shares include names only.").assertExists()
         rule.onAllNodesWithText("Forget everyone…").assertCountEquals(0)
+    }
+
+    @Test fun savedVoicesShowsPeopleCountStaleNoticeAndPill() {
+        setThemed { SavedVoicesScreen(BoardFixtures.savedVoices, onEvent = {}) }
+        rule.onNodeWithText("4 people").assertExists()
+        rule.onNodeWithText("1 voice needs naming again").assertExists()
+        rule.onAllNodesWithText("Luca", substring = true).assertCountEquals(2)
+        rule.onNodeWithText("Needs naming again").assertExists()
+        rule.onNodeWithText("Voiceprints are made on this phone.").assertExists()
+        rule.onNodeWithText("Exports and shares include names only.").assertExists()
+    }
+
+    @Test fun twoStaleVoicesKeepPluralHeadingRowPillsAndSingleNameBody() {
+        setThemed { SavedVoicesScreen(VariantFixtures.savedVoices.getValue("voices-stale"), onEvent = {}) }
+        rule.onNodeWithText("2 voices need naming again").assertExists()
+        rule.onNodeWithText(
+            "Voice recognition was updated, and voices saved before the update can’t be recognised. " +
+                "Name Paolo Ferri in a meeting to save their voice again.",
+        ).assertExists()
+        rule.onAllNodesWithText("Needs naming again").assertCountEquals(2)
+    }
+
+    @Test fun forgetVoiceDialogUsesForgetWording() {
+        setThemed { SavedVoicesScreen(VariantFixtures.savedVoices.getValue("voices-forget"), onEvent = {}) }
+        rule.onNodeWithText("Forget Giulia’s voice?").assertExists()
+        rule.onNodeWithText(
+            "Cassini will no longer recognise Giulia in new meetings. Names already in transcripts stay.",
+        ).assertExists()
+        rule.onNodeWithText("Forget").assertExists()
     }
 
     @Test fun trashCardsAndHeaderSendTheirEvents() {
