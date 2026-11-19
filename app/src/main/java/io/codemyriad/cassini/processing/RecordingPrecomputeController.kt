@@ -60,7 +60,8 @@ class RecordingPrecomputeController(
     private var worker: Job? = null
     private var activeNoteId: String? = null
     private var activeSpeechModel: SpeechModel? = null
-    private var suppressedNoteId: String? = null
+
+    @Volatile private var suppressedNoteId: String? = null
 
     private val watcher: Job = parts.scope.launch {
         val inputs = combine(

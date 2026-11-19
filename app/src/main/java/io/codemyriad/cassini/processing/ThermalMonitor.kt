@@ -23,6 +23,7 @@ interface ThermalMonitor {
         }
 
         /** True when [status] is at or above `PowerManager.THERMAL_STATUS_SEVERE`. */
+        @RequiresApi(Build.VERSION_CODES.Q)
         fun isThrottled(status: Int): Boolean = status >= PowerManager.THERMAL_STATUS_SEVERE
     }
 }

@@ -9,11 +9,12 @@ import io.codemyriad.cassini.recording.CaptureFormat
 import io.codemyriad.cassini.recording.RecordingPause
 import io.codemyriad.cassini.recording.RecordingState
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -78,7 +79,7 @@ class RecordingPrecomputeControllerTest {
         assertTrue(ThermalMonitor.isThrottled(PowerManager.THERMAL_STATUS_EMERGENCY))
     }
 
-    @Test fun afterStopRecordOnlyAndAacNeverSpawnPrecompute() = runTest {
+    @Test fun afterStopRecordOnlyAndAacNeverSpawnPrecompute() = runTest(UnconfinedTestDispatcher()) {
         val starts = AtomicInteger()
         val h = Harness(backgroundScope, initialMode = TranscriptionMode.AFTER_STOP) { _, _ ->
             starts.incrementAndGet()
@@ -101,76 +102,78 @@ class RecordingPrecomputeControllerTest {
         h.controller.close()
     }
 
-    @Test fun yieldsImmediatelyOnPauseBackgroundThermalAndPreempt() = runTest {
+    @Test fun yieldsImmediatelyOnPauseBackgroundThermalAndPreempt() = runTest(UnconfinedTestDispatcher()) {
         val starts = AtomicInteger()
         val cancels = AtomicInteger()
         val activeNow = AtomicInteger()
+        val started = Channel<Int>(Channel.UNLIMITED)
+        val stopped = Channel<Int>(Channel.UNLIMITED)
         val h = Harness(backgroundScope) { _, _ ->
-            starts.incrementAndGet()
+            val n = starts.incrementAndGet()
             activeNow.incrementAndGet()
+            started.trySend(n)
+            var wasCancelled = false
             try {
                 awaitCancellation()
             } catch (cancelled: CancellationException) {
-                cancels.incrementAndGet()
+                wasCancelled = true
                 throw cancelled
             } finally {
                 activeNow.decrementAndGet()
+                if (wasCancelled) stopped.trySend(cancels.incrementAndGet())
             }
         }
 
         h.recording.value = active()
-        runCurrent()
+        assertEquals(1, started.receive())
         assertEquals(1 to 1, starts.get() to activeNow.get())
 
         h.recording.value = active(pause = RecordingPause.USER)
-        runCurrent()
+        assertEquals(1, stopped.receive())
         assertEquals(0 to 1, activeNow.get() to cancels.get())
         h.recording.value = active(pause = null)
-        runCurrent()
+        assertEquals(2, started.receive())
         assertEquals(2 to 1, starts.get() to activeNow.get())
 
         h.visible.value = false
-        runCurrent()
+        assertEquals(2, stopped.receive())
         assertEquals(0 to 2, activeNow.get() to cancels.get())
         h.visible.value = true
-        runCurrent()
+        assertEquals(3, started.receive())
         assertEquals(3 to 1, starts.get() to activeNow.get())
 
         h.throttled.value = true
-        runCurrent()
+        assertEquals(3, stopped.receive())
         assertEquals(0 to 3, activeNow.get() to cancels.get())
         h.throttled.value = false
-        runCurrent()
+        assertEquals(4, started.receive())
         assertEquals(4 to 1, starts.get() to activeNow.get())
 
         h.busy.value = true
-        runCurrent()
+        assertEquals(4, stopped.receive())
         assertEquals(0 to 4, activeNow.get() to cancels.get())
         h.busy.value = false
-        runCurrent()
+        assertEquals(5, started.receive())
         assertEquals(5 to 1, starts.get() to activeNow.get())
 
         h.controller.stopAndJoin()
+        assertEquals(5, stopped.receive())
         assertEquals(0 to 5, activeNow.get() to cancels.get())
         h.controller.close()
     }
 
-    @Test fun oomSuppressesRestartForSameRecordingButAllowsNextRecording() = runTest {
+    @Test fun oomSuppressesRestartForSameRecordingButAllowsNextRecording() = runTest(UnconfinedTestDispatcher()) {
         val starts = AtomicInteger()
-        val firstDone = CompletableDeferred<Unit>()
+        val seenNotes = Channel<String>(Channel.UNLIMITED)
         val h = Harness(backgroundScope) { noteId, _ ->
             starts.incrementAndGet()
-            if (noteId == "note-1") {
-                firstDone.complete(Unit)
-                PrecomputeStopReason.OUT_OF_MEMORY
-            } else {
-                PrecomputeStopReason.YIELDED
-            }
+            seenNotes.trySend(noteId)
+            if (noteId == "note-1") PrecomputeStopReason.OUT_OF_MEMORY else PrecomputeStopReason.YIELDED
         }
 
         h.recording.value = active(noteId = "note-1")
+        assertEquals("note-1", seenNotes.receive())
         runCurrent()
-        firstDone.await()
         assertEquals(1, starts.get())
 
         h.recording.value = active(noteId = "note-1", pause = RecordingPause.USER)
@@ -182,7 +185,7 @@ class RecordingPrecomputeControllerTest {
         h.recording.value = RecordingState.Idle
         runCurrent()
         h.recording.value = active(noteId = "note-2")
-        runCurrent()
+        assertEquals("note-2", seenNotes.receive())
         assertEquals(2, starts.get())
 
         h.controller.close()
