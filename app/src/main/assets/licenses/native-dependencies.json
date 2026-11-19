@@ -15,7 +15,7 @@
   {
     "name": "onnxruntime",
     "version": "1.27.1",
-    "url": "https://github.com/microsoft/onnxruntime/archive/refs/tags/v1.27.1.tar.gz",
+    "url": "https://github.com/codemyriad/sherpa-onnx/releases/download/v1.13.7-cassini-mobile.1/onnxruntime-1.27.1-source.tar.gz",
     "sha256": "e53b06ccd454f56088fde374d1af6660ef111ca7ce7a98d62b274ff9094d3005"
   },
   {
