@@ -322,6 +322,7 @@ class NoteViewModel(
             launch { details.filterNotNull().first().details?.let { openInfo(it) } }
         }
         launch { saveOverlays() }
+        launch { loadActionsBytes() }
         launch { askVoicesQuestion() }
         key.start?.takeIf { saved.get<Boolean>(KEY_STARTED) != true }?.let { row ->
             saved[KEY_STARTED] = true
@@ -846,10 +847,23 @@ class NoteViewModel(
 
     private fun openSheet(kind: SheetKind) {
         local.update { it.copy(sheet = kind) }
-        if (kind == SheetKind.ACTIONS) {
-            launch {
-                val bytes = ports.documentBytes(noteId)
-                local.update { it.copy(actionsBytes = bytes) }
+    }
+
+    /** Reads the document size while the Actions sheet is open; cancels the read as soon as it closes. */
+    private suspend fun loadActionsBytes() {
+        local.map { it.sheet == SheetKind.ACTIONS }.distinctUntilChanged().collectLatest { open ->
+            if (!open) {
+                local.update { it.copy(actionsBytes = null) }
+            } else {
+                val bytes = try {
+                    ports.documentBytes(noteId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                    Log.w(TAG, "Cannot read the document size", error)
+                    null
+                }
+                local.update { if (it.sheet == SheetKind.ACTIONS) it.copy(actionsBytes = bytes) else it }
             }
         }
     }

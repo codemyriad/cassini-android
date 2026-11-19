@@ -347,7 +347,7 @@ class AcceptanceWalkTest {
         see(rule.text(UiR.string.ui_actions_document_info))
         shot("06-note-actions-and-export")
         Espresso.pressBack()
-        rule.waitGone(hasText(rule.text(UiR.string.ui_export_cassini_file)))
+        rule.waitGone(hasText(rule.text(UiR.string.ui_export_heading)))
         library()
     }
 

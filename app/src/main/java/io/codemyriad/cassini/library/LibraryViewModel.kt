@@ -228,7 +228,7 @@ class LibraryViewModel(
         if (id == null) {
             flowOf(null to null)
         } else {
-            val bytes = flow { emit(ports.documentBytes(id)) }.catch { emit(null) }
+            val bytes = flow { emit(ports.documentBytes(id)) }.onStart { emit(null) }.catch { emit(null) }
             combine(ports.details(id).catch { emit(null) }, bytes) { details, size -> details to size }
         }
     }

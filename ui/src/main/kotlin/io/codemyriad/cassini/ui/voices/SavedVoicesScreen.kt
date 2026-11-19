@@ -3,7 +3,6 @@
 
 package io.codemyriad.cassini.ui.voices
 
-import android.icu.text.ListFormatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -139,8 +138,9 @@ private fun SavedVoicesContent(state: SavedVoicesUiState, onEvent: (SavedVoicesE
     }
     val stale = state.people.filter { it.stale }
     if (stale.isNotEmpty()) {
-        val names = ListFormatter.getInstance(LocalFormat.current.locale).format(stale.map { it.name })
-        StaleVoicesNotice(count = stale.size, names = names)
+        // The pinned catalog defines {name} as one person (translations such as Italian keep singular grammar);
+        // the heading carries the total and every affected row carries the stale pill.
+        StaleVoicesNotice(count = stale.size, name = stale.first().name)
     }
     Text(
         text = Counts.plural(R.plurals.ui_settings_people, state.people.size),
@@ -183,7 +183,7 @@ private fun SavedVoicesContent(state: SavedVoicesUiState, onEvent: (SavedVoicesE
 
 /** One amber notice above the list when one or more voices are stale (D106 §5). */
 @Composable
-private fun StaleVoicesNotice(count: Int, names: String) {
+private fun StaleVoicesNotice(count: Int, name: String) {
     val c = CassiniTheme.colors
     Column(
         modifier = Modifier
@@ -201,7 +201,7 @@ private fun StaleVoicesNotice(count: Int, names: String) {
             color = c.amberInk,
         )
         Text(
-            text = stringResource(R.string.ui_voices_stale_body, names),
+            text = stringResource(R.string.ui_voices_stale_body, name),
             style = CassiniTheme.type.body14,
             color = c.ink,
         )

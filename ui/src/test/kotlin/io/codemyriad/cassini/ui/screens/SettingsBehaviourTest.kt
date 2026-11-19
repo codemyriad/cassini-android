@@ -308,6 +308,16 @@ class SettingsBehaviourTest {
         rule.onNodeWithText("Exports and shares include names only.").assertExists()
     }
 
+    @Test fun twoStaleVoicesKeepPluralHeadingRowPillsAndSingleNameBody() {
+        setThemed { SavedVoicesScreen(VariantFixtures.savedVoices.getValue("voices-stale"), onEvent = {}) }
+        rule.onNodeWithText("2 voices need naming again").assertExists()
+        rule.onNodeWithText(
+            "Voice recognition was updated, and voices saved before the update can’t be recognised. " +
+                "Name Paolo Ferri in a meeting to save their voice again.",
+        ).assertExists()
+        rule.onAllNodesWithText("Needs naming again").assertCountEquals(2)
+    }
+
     @Test fun forgetVoiceDialogUsesForgetWording() {
         setThemed { SavedVoicesScreen(VariantFixtures.savedVoices.getValue("voices-forget"), onEvent = {}) }
         rule.onNodeWithText("Forget Giulia’s voice?").assertExists()
