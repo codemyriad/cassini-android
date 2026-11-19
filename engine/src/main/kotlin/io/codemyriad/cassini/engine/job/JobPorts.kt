@@ -136,6 +136,15 @@ interface JobStorage {
     fun discardSealedBlocking(noteId: String)
 
     /**
+     * Deletes the work directory of [noteId] when a recording-time precompute checkpoint must be discarded
+     * and replaced with a clean post-Stop batch decode. Blocking, inference thread.
+     */
+    fun discardWorkBlocking(noteId: String) = Unit
+
+    /** `work/whistle-segments.json`, or null when Whistle segment caching is disabled. Any thread. */
+    fun whistleSegmentCache(noteId: String): File? = null
+
+    /**
      * Installs the sealed file as `document.opus`, updates the row and the cache, retitles a dirty title, merges the
      * pending prints when the voices generation is unchanged, enrols the draft choices of [adoption], stores the
      * finalization estimate, then deletes `work/`. Idempotent. The job runs it in `NonCancellable` (IO).

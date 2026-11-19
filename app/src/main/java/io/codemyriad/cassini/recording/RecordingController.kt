@@ -70,6 +70,8 @@ class RecordingController(private val parts: Parts) {
         val clock: () -> Long = System::currentTimeMillis,
         val timing: Timing = Timing(),
         val transcribeRightAway: suspend () -> Boolean = { true },
+        val onPreemptPrecompute: () -> Unit = {},
+        val onStopping: suspend () -> Unit = {},
     )
 
     /** The intervals of architecture 5.8; tests shorten [tickMs]. */
@@ -438,9 +440,11 @@ class RecordingController(private val parts: Parts) {
             silence = null
             silenceCheck?.cancel()
             silenceCheck = null
+            parts.onPreemptPrecompute()
             val notes = parts.notes()
             stopEntered = true
             val file = stopCapture(mic)
+            guarded("stop recording precomputation") { parts.onStopping() }
             if (file == null) {
                 guarded("discard an empty recording") { notes.discard(current.noteId) }
                 kept = null

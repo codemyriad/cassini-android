@@ -12,6 +12,7 @@ import io.codemyriad.cassini.adapters.RepositoryJobStorage
 import io.codemyriad.cassini.adapters.RepositoryJobVoices
 import io.codemyriad.cassini.adapters.RepositoryModelAccess
 import io.codemyriad.cassini.adapters.RepositoryModelInstallBackend
+import io.codemyriad.cassini.adapters.SelectedModelAccess
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.models.ModelCheck
@@ -50,6 +51,8 @@ import io.codemyriad.cassini.engine.job.JobEnvironment
 import io.codemyriad.cassini.engine.job.JobStorage
 import io.codemyriad.cassini.engine.job.JobVoices
 import io.codemyriad.cassini.engine.job.ModelAccess
+import io.codemyriad.cassini.engine.job.PrecomputeStopReason
+import io.codemyriad.cassini.engine.job.RecordingPrecomputer
 import io.codemyriad.cassini.models.ParakeetRecommendation
 import io.codemyriad.cassini.models.SpeechSelection
 import io.codemyriad.cassini.nav.ViewedImports
@@ -66,6 +69,7 @@ import io.codemyriad.cassini.playback.PlaybackService
 import io.codemyriad.cassini.playback.RepositoryPositionStore
 import io.codemyriad.cassini.playback.SessionPlayer
 import io.codemyriad.cassini.playback.SettingsSpeedStore
+import io.codemyriad.cassini.processing.AndroidThermalMonitor
 import io.codemyriad.cassini.processing.AppVisibility
 import io.codemyriad.cassini.processing.ForegroundServiceStarter
 import io.codemyriad.cassini.processing.ModelInstallOwner
@@ -74,7 +78,9 @@ import io.codemyriad.cassini.processing.ProcessingCoordinator
 import io.codemyriad.cassini.processing.ProcessingJobFactory
 import io.codemyriad.cassini.processing.ProcessingNotices
 import io.codemyriad.cassini.processing.ProcessingNotifications
+import io.codemyriad.cassini.processing.RecordingPrecomputeController
 import io.codemyriad.cassini.processing.ServiceStarter
+import io.codemyriad.cassini.processing.ThermalMonitor
 import io.codemyriad.cassini.processing.TranscriptionJobFactory
 import io.codemyriad.cassini.recording.AndroidRecordingPlatform
 import io.codemyriad.cassini.recording.CaptureSource
@@ -96,6 +102,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -227,11 +234,11 @@ class AppGraph(context: Context, val config: Config) {
     }
     val jobEnvironment: JobEnvironment by lazy { InstalledEngines.environment(app) }
 
-    suspend fun jobEngines(model: SpeechModel, file: java.io.File): JobEngines {
+    suspend fun jobEngines(model: SpeechModel, file: java.io.File, segmentCacheFile: java.io.File? = null): JobEngines {
         if (model == SpeechModel.PARAKEET) return engines
         requireUser(speech.included.await(), Failure.INCLUDED_UNAVAILABLE)
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            WhistleJobs.of(app, engines, paths.cache, file)
+            WhistleJobs.of(app, engines, paths.cache, file, segmentCacheFile)
         } else {
             throw UserFacingException(Failure.INCLUDED_UNAVAILABLE)
         }
@@ -270,6 +277,9 @@ class AppGraph(context: Context, val config: Config) {
     private val recorderThread: ExecutorService = Executors.newSingleThreadExecutor { task ->
         Thread(task, "cassini-recorder").apply { isDaemon = true }
     }
+    private val thermalHolder = lazy<ThermalMonitor> { AndroidThermalMonitor(app) }
+    private val foregroundBusy = MutableStateFlow(false)
+    private val recordingPrecompute = AtomicReference<RecordingPrecomputeController?>(null)
     private val recordingHolder = lazy { createRecording() }
 
     /** The one recording of the process (architecture 5.8), created on first use. */
@@ -404,6 +414,8 @@ class AppGraph(context: Context, val config: Config) {
      * looper there, so that work posted to the main thread can end. Throws when the work did not end in 10 s.
      */
     fun close(whileWaiting: () -> Unit = {}) {
+        recordingPrecompute.getAndSet(null)?.close()
+        if (thermalHolder.isInitialized()) thermalHolder.value.close()
         val work = appScope.coroutineContext.job
         work.cancel()
         val ended = runBlocking {
@@ -496,9 +508,11 @@ class AppGraph(context: Context, val config: Config) {
             battery = hooks.battery ?: BatterySource { elapsedMs -> BatteryReader.read(app, elapsedMs) },
             placeholderLabel = { number -> InstalledEngines.speakerLabel(app, number) },
             sdkInt = hooks.sdkInt,
+            onPreemptPrecompute = ::preemptRecordingPrecompute,
         )
         val coordinator = ProcessingCoordinator(this, parts)
         created.set(coordinator)
+        appScope.launch { coordinator.hasForegroundWork.collect { foregroundBusy.value = it } }
         bindRunningJobCanceller { noteId -> coordinator.cancelAndJoin(noteId) }
         return coordinator
     }
@@ -526,9 +540,58 @@ class AppGraph(context: Context, val config: Config) {
             defaultTitle = ::defaultTitle,
             clock = config.clock,
             timing = hooks.timing,
-            transcribeRightAway = { settings.transcribeRightAway.first() },
+            transcribeRightAway = { settings.transcriptionMode.first().autoEnqueueOnStop },
+            onPreemptPrecompute = ::preemptRecordingPrecompute,
+            onStopping = { recordingPrecompute.get()?.stopAndJoin() },
         )
-        return RecordingController(parts)
+        val controller = RecordingController(parts)
+        val precomputer = RecordingPrecomputeController(
+            RecordingPrecomputeController.Parts(
+                scope = appScope,
+                recordingState = controller.state,
+                transcriptionMode = settings.transcriptionMode,
+                visible = visibility.visible,
+                throttled = thermalHolder.value.throttled,
+                foregroundBusy = foregroundBusy,
+                speechModel = settings.speechModel,
+                runPrecompute = ::runRecordingPrecompute,
+            ),
+        )
+        recordingPrecompute.set(precomputer)
+        return controller
+    }
+
+    private fun preemptRecordingPrecompute() {
+        recordingPrecompute.get()?.preempt()
+    }
+
+    private suspend fun runRecordingPrecompute(noteId: String, shouldContinue: () -> Boolean): PrecomputeStopReason {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return PrecomputeStopReason.YIELDED
+        ready.await()
+        val catalogue = awaitCatalogue()
+        val audioFile = catalogue.jobStorage.audioFile(noteId)
+        return if (audioFile.extension != "opus") {
+            PrecomputeStopReason.YIELDED
+        } else {
+            val model = speech.selected()
+            val engines = jobEngines(model, audioFile, catalogue.jobStorage.whistleSegmentCache(noteId))
+            val choices = settings.speakerChoices.first()
+            RecordingPrecomputer(
+                noteId = noteId,
+                audioFile = audioFile,
+                speechModel = model,
+                storage = catalogue.jobStorage,
+                voices = catalogue.jobVoices,
+                models = SelectedModelAccess(modelAccess, choices),
+                engines = engines,
+                env = jobEnvironment,
+                shouldContinue = shouldContinue,
+                waitForMoreBytes = {
+                    delay(PRECOMPUTE_POLL_MS)
+                    shouldContinue()
+                },
+            ).run()
+        }
     }
 
     /** "Voice note 8 Oct, 08:14" in the app language (features.md section 2). */
@@ -556,6 +619,7 @@ class AppGraph(context: Context, val config: Config) {
             "CassiniTalk/$version (Android $release; build $build)"
         private const val CLOSE_WAIT_MS = 10_000L
         private const val CLOSE_POLL_MS = 10L
+        private const val PRECOMPUTE_POLL_MS = 500L
 
         // The startup steps in their order (architecture 4.8), as Config.onStartupStep names them.
         const val STEP_DATABASE = "database"

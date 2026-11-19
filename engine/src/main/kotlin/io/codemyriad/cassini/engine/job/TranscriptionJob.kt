@@ -8,6 +8,7 @@ import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.audio.PcmAudio
 import io.codemyriad.cassini.core.audio.PcmFile
 import io.codemyriad.cassini.core.checkpoint.CheckpointNames
+import io.codemyriad.cassini.core.checkpoint.CheckpointOrigin
 import io.codemyriad.cassini.core.checkpoint.CheckpointState
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.DocumentState
@@ -297,6 +298,18 @@ class TranscriptionJob(
     }
 
     private fun restoreAndDecode(prepared: Prepared): Decoded {
+        return try {
+            runDecodeAttempt(prepared)
+        } catch (error: RecognitionCheckpointMismatch) {
+            if (prepared.resumed?.origin != CheckpointOrigin.PRECOMPUTE) throw error
+            // D109 §5.2 rule 4: a precompute checkpoint mismatch MUST silently discard and fall back to full batch decode.
+            env.warn("Precompute checkpoint rejected at replay; falling back to full batch decode", error)
+            bestEffort("Could not discard stale precompute work", Unit) { storage.discardWorkBlocking(noteId) }
+            runDecodeAttempt(prepared.withoutResume())
+        }
+    }
+
+    private fun runDecodeAttempt(prepared: Prepared): Decoded {
         val run = openRun(prepared)
         var decoded: Decoded? = null
         try {
@@ -348,6 +361,18 @@ class TranscriptionJob(
             // A fresh run starts with no draft names (0.1.0); there are no words yet that the user could have named.
             val generation = run.prepared.generation
             writing { storage.mutateNames(noteId) { CheckpointNames(emptyMap(), emptyMap(), generation = generation) } }
+        } else if (resumed.origin == CheckpointOrigin.PRECOMPUTE) {
+            // Precomputation ran during capture with no user edits; align names generation with the post-Stop run.
+            val generation = run.prepared.generation
+            writing {
+                storage.mutateNames(noteId) { current ->
+                    if (current.labels.isEmpty() && current.merges.isEmpty() && current.remembered.isEmpty()) {
+                        current.copy(generation = generation)
+                    } else {
+                        current
+                    }
+                }
+            }
         }
         if (run.sealAudio != run.prepared.audioFile) {
             run.encoder = writing { engines.encoders.open(run.sealAudio, resumed?.encoder) }
@@ -878,6 +903,16 @@ class TranscriptionJob(
     ) {
         fun carriesIdentity(voiceId: String): Boolean =
             voiceId.startsWith(CheckpointNames.NOTE_VOICE_PREFIX) || voiceId in carriedVoiceIds
+
+        fun withoutResume(): Prepared = Prepared(
+            resumed = null,
+            audioFile = audioFile,
+            noteVoices = noteVoices,
+            carriedVoiceIds = carriedVoiceIds,
+            generation = generation,
+            knownMs = knownMs,
+            lowMemory = lowMemory,
+        )
     }
 
     /** The voices one match runs against, and their names by voice id. */

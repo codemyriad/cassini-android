@@ -11,7 +11,14 @@ VENDOR = Path('third_party/cassini-ux')
 # shares the bundle commit. phase2/strings.json carries L-67 phone nouns (D-1048).
 # wave5/strings.json (D-975) carries the D98 first-run hero and privacy-line copy;
 # contract/import-types.json (D-1030) has its own contract pin. The bundle itself moved for L-10 (D-1035).
-OWN_COMMIT = {'wave5/strings.json', 'contract/import-types.json', 'phase2/strings.json'}
+# vectors/head-start/* (D-1119 / D-1124) carry the D109 head-start transcription policy and mobile prefix checkpoint vectors.
+OWN_COMMIT = {
+    'wave5/strings.json',
+    'contract/import-types.json',
+    'phase2/strings.json',
+    'vectors/head-start/transcription-mode-vectors.json',
+    'vectors/head-start/mobile-prefix-checkpoint-vectors.json',
+}
 
 
 def check(root):

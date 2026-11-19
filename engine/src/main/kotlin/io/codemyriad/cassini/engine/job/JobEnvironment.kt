@@ -40,4 +40,6 @@ class JobEnvironment(
     val syncFile: (File, () -> Unit) -> Unit = { _, sync -> sync() },
     val maxDurationMs: Long = Limits.MAX_TRANSCRIBE_MS,
     val maxBodyBytes: Long = WordBodyBudget.MAX_BYTES,
+    /** Runs [block] at background thread priority for recording-time precomputation, restoring priority afterward. */
+    val runAtBackgroundPriority: (() -> Unit) -> Unit = { it() },
 )

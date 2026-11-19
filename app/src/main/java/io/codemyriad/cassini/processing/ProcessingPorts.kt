@@ -57,7 +57,7 @@ class TranscriptionJobFactory(private val graph: AppGraph) : ProcessingJobFactor
             throw UserFacingException(Failure.INCLUDED_UNAVAILABLE).apply { initCause(error) }
         }
         val source = catalogue.jobStorage.audioFile(noteId)
-        val engines = graph.jobEngines(model, source)
+        val engines = graph.jobEngines(model, source, catalogue.jobStorage.whistleSegmentCache(noteId))
         val choices = graph.settings.speakerChoices.first()
         val job = TranscriptionJob(
             noteId,

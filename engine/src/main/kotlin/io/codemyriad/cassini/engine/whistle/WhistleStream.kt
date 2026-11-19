@@ -14,9 +14,13 @@ class WhistleStream internal constructor(
     private val probability: (FloatArray) -> Float,
     private val transcribe: (FloatArray) -> ByteArray,
     private val segment: (WhistleSpeechSegment, ByteArray, String) -> Unit,
+    private val cachedSegment: (String, Int) -> ByteArray? = { _, _ -> null },
 ) {
-    constructor(rate: Int, segment: (WhistleSpeechSegment, ByteArray, String) -> Unit) :
-        this(rate, WhistleNative::probability, WhistleNative::transcribe, segment)
+    constructor(
+        rate: Int,
+        segment: (WhistleSpeechSegment, ByteArray, String) -> Unit,
+        cachedSegment: (String, Int) -> ByteArray? = { _, _ -> null },
+    ) : this(rate, WhistleNative::probability, WhistleNative::transcribe, segment, cachedSegment)
 
     private val raw = FloatArray(RING_SIZE)
     private var count = 0L
@@ -62,7 +66,9 @@ class WhistleStream internal constructor(
         val samples = FloatArray(length.toInt()) { raw[((range.startSample + it) and RING_MASK).toInt()] }
         val digest = MessageDigest.getInstance("SHA-256")
         updateHash(digest, samples, samples.size)
-        segment(range, transcribe(samples), hex(digest.digest()))
+        val hash = hex(digest.digest())
+        val json = cachedSegment(hash, samples.size) ?: transcribe(samples)
+        segment(range, json, hash)
     }
 
     companion object {

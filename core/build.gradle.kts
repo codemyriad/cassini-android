@@ -47,6 +47,8 @@ val ciModels: File = rootDir.resolve("scripts/ci-models.json")
 // ImportTypesTest compares ImportTypes with the vendored cassini-ux import-types contract and its pin.
 val uxVendor: File = rootDir.resolve("third_party/cassini-ux")
 val importTypes: File = uxVendor.resolve("contract/import-types.json")
+val headStartModeVectors: File = uxVendor.resolve("vectors/head-start/transcription-mode-vectors.json")
+val headStartPrefixVectors: File = uxVendor.resolve("vectors/head-start/mobile-prefix-checkpoint-vectors.json")
 val uxPin: File = uxVendor.resolve("UPSTREAM.json")
 
 tasks.test {
@@ -54,7 +56,14 @@ tasks.test {
         CoreTestData(
             conformance = fileTree(conformanceDirectory),
             resources = fileTree(appResources) { include("values*/strings.xml") },
-            scripts = files(diarizationPatch, ciModels, importTypes, uxPin),
+            scripts = files(
+                diarizationPatch,
+                ciModels,
+                importTypes,
+                headStartModeVectors,
+                headStartPrefixVectors,
+                uxPin,
+            ),
             properties = mapOf(
                 "cassini.conformance" to conformanceDirectory,
                 "cassini.appResources" to appResources.absolutePath,

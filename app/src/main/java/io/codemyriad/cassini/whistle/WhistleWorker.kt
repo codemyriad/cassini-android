@@ -14,6 +14,7 @@ import android.os.Message
 import android.os.Messenger
 import android.os.RemoteException
 import androidx.annotation.RequiresApi
+import io.codemyriad.cassini.core.checkpoint.WhistleCachedSegment
 import io.codemyriad.cassini.core.models.WhistleCapability
 import io.codemyriad.cassini.engine.asr.WhistleDeviceCapability
 import io.codemyriad.cassini.engine.whistle.WhistleStream
@@ -102,6 +103,33 @@ class WhistleWorker internal constructor(
         ) {
             closePreserving(error)
             throw error
+        }
+    }
+
+    /** Seeds verified segment cache entries into the isolated worker in Binder-bounded chunks. */
+    fun seedCache(entries: List<WhistleCachedSegment>) {
+        if (entries.isEmpty()) return
+        var batch = Bundle()
+        var batchCount = 0
+        var batchBytes = 0
+        for (entry in entries) {
+            val entryBytes = entry.pcmSha256.length + entry.json.size + CACHE_ENTRY_OVERHEAD_BYTES
+            if (batchCount > 0 && batchBytes + entryBytes > MAX_SEED_BATCH_BYTES) {
+                batch.putInt("count", batchCount)
+                command(WhistleProtocol.SEED_CACHE, batch)
+                batch = Bundle()
+                batchCount = 0
+                batchBytes = 0
+            }
+            batch.putString("hash_$batchCount", entry.pcmSha256)
+            batch.putInt("samples_$batchCount", entry.sampleCount)
+            batch.putByteArray("json_$batchCount", entry.json)
+            batchCount++
+            batchBytes += entryBytes
+        }
+        if (batchCount > 0) {
+            batch.putInt("count", batchCount)
+            command(WhistleProtocol.SEED_CACHE, batch)
         }
     }
 
@@ -247,5 +275,7 @@ class WhistleWorker internal constructor(
         private const val CLOSE_SECONDS = 10L
         private const val DEADLINE_SECONDS = 180L
         private const val REPLY_CAPACITY = 4
+        private const val MAX_SEED_BATCH_BYTES = 64 * 1024
+        private const val CACHE_ENTRY_OVERHEAD_BYTES = 64
     }
 }

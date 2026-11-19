@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.codemyriad.cassini.core.asr.TranscriptionMode
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
@@ -110,12 +111,42 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     /** "Name people automatically" in Settings › Speakers (D106, L-58); off by default. */
     suspend fun setAutoNameVoices(enabled: Boolean) = set(Keys.AUTO_NAME_VOICES, enabled)
 
-    /** "Transcribe right away" in Settings › Transcription (D106, L-58); on by default. */
-    val transcribeRightAway: Flow<Boolean> = preferences.map {
-        it[Keys.TRANSCRIBE_RIGHT_AWAY] ?: true
+    /**
+     * Non-UI transcription lifecycle mode (`contract/HEAD-START-TRANSCRIPTION.md`, D-1124).
+     * Defaults to [TranscriptionMode.AFTER_STOP]; invalid stored values fall back deterministically to `AFTER_STOP`.
+     */
+    val transcriptionMode: Flow<TranscriptionMode> = preferences.map { prefs ->
+        val raw = prefs[Keys.TRANSCRIPTION_MODE]
+        when {
+            raw != null -> TranscriptionMode.parse(raw).mode
+            prefs[Keys.TRANSCRIBE_RIGHT_AWAY] == false -> TranscriptionMode.RECORD_ONLY
+            else -> TranscriptionMode.AFTER_STOP
+        }
     }.distinctUntilChanged()
 
-    suspend fun setTranscribeRightAway(enabled: Boolean) = set(Keys.TRANSCRIBE_RIGHT_AWAY, enabled)
+    suspend fun setTranscriptionMode(mode: TranscriptionMode) {
+        store.edit { prefs ->
+            prefs[Keys.TRANSCRIPTION_MODE] = mode.canonical
+            prefs[Keys.TRANSCRIBE_RIGHT_AWAY] = mode.autoEnqueueOnStop
+        }
+    }
+
+    /** "Transcribe right away" in Settings › Transcription (D106, L-58); on by default. */
+    val transcribeRightAway: Flow<Boolean> = transcriptionMode.map {
+        it.autoEnqueueOnStop
+    }.distinctUntilChanged()
+
+    suspend fun setTranscribeRightAway(enabled: Boolean) {
+        store.edit { prefs ->
+            prefs[Keys.TRANSCRIBE_RIGHT_AWAY] = enabled
+            val current = prefs[Keys.TRANSCRIPTION_MODE]?.let { TranscriptionMode.parse(it).mode }
+            prefs[Keys.TRANSCRIPTION_MODE] = when {
+                !enabled -> TranscriptionMode.RECORD_ONLY.canonical
+                current == TranscriptionMode.TRANSCRIBE_WHILE_RECORDING -> current.canonical
+                else -> TranscriptionMode.AFTER_STOP.canonical
+            }
+        }
+    }
 
     /** Every setting at once. */
     val settings: Flow<Settings> = preferences.map(::settings).distinctUntilChanged()
@@ -298,6 +329,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val AUTO_NAME_VOICES = booleanPreferencesKey("speakers.autoName")
         val REMEMBER_VOICES = booleanPreferencesKey("voices.rememberDefault")
         val TRANSCRIBE_RIGHT_AWAY = booleanPreferencesKey("transcription.rightAway")
+        val TRANSCRIPTION_MODE = stringPreferencesKey("transcription.mode")
         val VOICES_QUESTION_ASKED = booleanPreferencesKey("voices.questionAsked")
         val PARAKEET_DEFAULT_NOTICE = booleanPreferencesKey("notices.parakeetDefault")
         val FIRST_WHISTLE_NOTE = stringPreferencesKey("recognition.firstWhistleNote")

@@ -11,6 +11,7 @@ internal object WorkFiles {
     const val AUDIO_PART = "audio.opus.part"
     const val CLIPS = "clips.pcm"
     const val WORD_LOG = "words.log"
+    const val WHISTLE_SEGMENTS = "whistle-segments.json"
     const val SEALED = "sealed.opus"
     const val SEALED_MARKER = "sealed"
 

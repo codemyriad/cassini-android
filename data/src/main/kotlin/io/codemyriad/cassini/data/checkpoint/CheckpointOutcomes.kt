@@ -19,11 +19,14 @@ data class CheckpointIdentity(
     val signature: String,
     val modelRevision: String = ModelCatalog.PARAKEET_REVISION,
     val speakersSha256: String = ModelCatalog.diarizationModel.sha256,
+    val audioFile: File? = null,
 ) {
     companion object {
         /** The identity of a job over [audioFile] in [noteDir], with this build's pinned models. */
-        fun of(noteDir: File, audioFile: String): CheckpointIdentity =
-            CheckpointIdentity(audioFile, CheckpointState.signature(File(noteDir, audioFile)))
+        fun of(noteDir: File, audioFile: String): CheckpointIdentity {
+            val file = File(noteDir, audioFile)
+            return CheckpointIdentity(audioFile, CheckpointState.signature(file), audioFile = file)
+        }
     }
 }
 
