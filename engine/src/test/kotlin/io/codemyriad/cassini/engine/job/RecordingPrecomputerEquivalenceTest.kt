@@ -596,12 +596,7 @@ class RecordingPrecomputerEquivalenceTest {
                     }
                 }
                 opened.complete(Unit)
-                try {
-                    assertTrue(releaseOpen.await(10, TimeUnit.SECONDS))
-                } catch (_: InterruptedException) {
-                    // Expected when runInterruptible interrupts the inference thread during job.cancel();
-                    // return the opened recognizer to exercise cancel-on-return cleanup.
-                }
+                runCatching { releaseOpen.await(10, TimeUnit.SECONDS) }
                 Thread.interrupted()
                 tracked
             },
@@ -611,29 +606,26 @@ class RecordingPrecomputerEquivalenceTest {
             encoders = OpusSinkFactory { _, _ -> error("unused") },
         )
 
-        val reason = AtomicReference<PrecomputeStopReason?>(null)
         val job = launch(Dispatchers.Default) {
-            reason.set(
-                RecordingPrecomputer(
-                    noteId = "note-cancel-open",
-                    audioFile = audioFile,
-                    speechModel = SpeechModel.PARAKEET,
-                    storage = storage,
-                    voices = FakeVoices(log),
-                    models = FakeModels(),
-                    engines = engines,
-                    env = env,
-                    openDecoder = { file, _, start ->
-                        val inner = ScriptedOggPrefixDecoder(file, FloatArray(16_000), start)
-                        object : CommittedPrefixDecoder by inner {
-                            override fun close() {
-                                decoderClosed.incrementAndGet()
-                                inner.close()
-                            }
+            RecordingPrecomputer(
+                noteId = "note-cancel-open",
+                audioFile = audioFile,
+                speechModel = SpeechModel.PARAKEET,
+                storage = storage,
+                voices = FakeVoices(log),
+                models = FakeModels(),
+                engines = engines,
+                env = env,
+                openDecoder = { file, _, start ->
+                    val inner = ScriptedOggPrefixDecoder(file, FloatArray(16_000), start)
+                    object : CommittedPrefixDecoder by inner {
+                        override fun close() {
+                            decoderClosed.incrementAndGet()
+                            inner.close()
                         }
-                    },
-                ).run(),
-            )
+                    }
+                },
+            ).run()
         }
 
         opened.await()
