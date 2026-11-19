@@ -57,6 +57,8 @@ The upstream build scripts download a prebuilt ONNX Runtime Android library. Its
 | `sherpa-onnx-aar` | The URL and SHA-256 of the prebuilt AAR, and `patchSha256`, the SHA-256 of the patch that the AAR contains |
 | `onnxruntime` and the other entries | The source archives of the dependencies |
 
+The `onnxruntime` source archive is the upstream `v1.27.1` tag tarball, mirrored on the shared release [`v1.13.7-cassini-mobile.1`](https://github.com/codemyriad/sherpa-onnx/releases/tag/v1.13.7-cassini-mobile.1) as `onnxruntime-1.27.1-source.tar.gz` (listed in its `CASSINI-SHA256SUMS`). The mirror was added when github.com/microsoft/onnxruntime returned 404 and release builds could not collect the source bundle (D-1128). It has the same SHA-256 as the upstream tarball, taken from the bundle of release `android-internal-32`.
+
 `scripts/verify-native-runtime.sh` makes sure of three things:
 
 - The installed AAR has the SHA-256 of the `sherpa-onnx-aar` entry.
@@ -128,3 +130,5 @@ Each release attaches `cassini-native-sources.tar`. It holds the pinned archives
 - This file and the notice index.
 
 Run `python3 scripts/package-native-sources.py` to make the bundle again. Downloads and archives stay in directories that git ignores.
+
+Release builds are the only builds that collect the bundle. So that a pinned URL that stops answering fails before a release build, `native.yml` runs `python3 scripts/package-native-sources.py --check-urls` on every change to the pins and each week. That mode sends one HEAD request per entry and downloads nothing.

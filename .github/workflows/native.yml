@@ -22,6 +22,7 @@ on:
       - 'whistle/exports.map'
       - 'scripts/native-common.sh'
       - 'scripts/native-dependencies.json'
+      - 'scripts/package-native-sources.py'
       - 'scripts/streaming-diarization.patch'
       - 'scripts/build-native-aar.sh'
       - 'scripts/ci-downloads.py'
@@ -48,6 +49,7 @@ on:
       - 'whistle/exports.map'
       - 'scripts/native-common.sh'
       - 'scripts/native-dependencies.json'
+      - 'scripts/package-native-sources.py'
       - 'scripts/streaming-diarization.patch'
       - 'scripts/build-native-aar.sh'
       - 'scripts/ci-downloads.py'
@@ -126,6 +128,11 @@ jobs:
           path: ~/.m2/repository/org/robolectric
           key: robolectric-${{ steps.robolectric.outputs.version }}-
           restore-keys: robolectric-${{ steps.robolectric.outputs.version }}-
+      # Release builds collect every pinned source archive (android.yml, package-native-sources.py), and pull
+      # requests do not; this check makes a pin that no longer answers (D-1128: upstream 404) fail here, weekly and
+      # on every change to the pins, before a release build meets it.
+      - name: Check that every pinned native URL answers
+        run: python3 scripts/package-native-sources.py --check-urls
       # setup.sh finds the pinned NDK inside ANDROID_HOME. The job reports drift and does not fail
       # on it: a source build is not yet known to match the release byte for byte. The summary
       # records both hashes and a mismatch raises a warning annotation.

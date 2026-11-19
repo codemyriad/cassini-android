@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""Collect the pinned native dependency sources, with their upstream build files."""
+"""Collect the pinned native dependency sources, with their upstream build files.
+
+With --check-urls it only checks that every pinned URL still answers, without downloading the archives.
+native.yml runs that check on pull requests and weekly; the full collection runs only for release builds.
+"""
 import hashlib
 import json
 import subprocess
+import sys
 import tarfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -26,9 +31,23 @@ def fetch(entry):
     print(f"Verified source: {entry['name']}", flush=True)
     return path
 
+def check_url(entry):
+    result = subprocess.run(['curl', '--fail', '--location', '--head', '--retry', '3', '--silent', '--show-error',
+                             '--output', '/dev/null', entry['url']], capture_output=True, text=True)
+    if result.returncode != 0:
+        return f"{entry['name']}: {entry['url']}: {result.stderr.strip()}"
+    print(f"Reachable: {entry['name']}", flush=True)
+    return None
+
 if __name__ == '__main__':
+    pins = json.loads(manifest.read_text())
+    if sys.argv[1:] == ['--check-urls']:
+        failures = [failure for failure in ThreadPoolExecutor(max_workers=4).map(check_url, pins) if failure]
+        for failure in failures:
+            print(f"::error title=Unreachable native pin::{failure}", flush=True)
+        sys.exit(1 if failures else 0)
     # The prebuilt AAR entry pins a binary, not a source archive.
-    entries = [entry for entry in json.loads(manifest.read_text()) if not entry['url'].endswith('.aar')]
+    entries = [entry for entry in pins if not entry['url'].endswith('.aar')]
     paths = list(ThreadPoolExecutor(max_workers=4).map(fetch, entries))
     destination = Path('dist')
     destination.mkdir(exist_ok=True)
