@@ -1,16 +1,39 @@
 package io.codemyriad.cassini
 
 import android.content.Context
+import android.os.Bundle
 import io.codemyriad.cassini.adapters.NetworkCheck
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.models.ModelDescriptor
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelFetcher
+import io.codemyriad.cassini.engine.capture.MicrophoneCapture
+import io.codemyriad.cassini.engine.job.JobEngines
+import io.codemyriad.cassini.engine.job.JobEnvironment
+import io.codemyriad.cassini.engine.job.PrecomputeStopReason
+import io.codemyriad.cassini.processing.AndroidThermalMonitor
 import io.codemyriad.cassini.processing.ProcessingJobFactory
+import io.codemyriad.cassini.processing.ThermalMonitor
 import io.codemyriad.cassini.processing.TranscriptionJobFactory
 import io.codemyriad.cassini.recording.AndroidRecordingPlatform
+import io.codemyriad.cassini.recording.CaptureFormat
+import io.codemyriad.cassini.recording.CaptureSource
+import io.codemyriad.cassini.recording.FactoryCaptureSource
 import io.codemyriad.cassini.recording.RecordingPlatform
+import io.codemyriad.cassini.recording.SilenceWatch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import java.io.File
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.Semaphore
@@ -33,18 +56,102 @@ object TestHooks {
 
     @Volatile var recordingFreeBytes: ((File) -> Long)? = null
 
+    @Volatile var captureSource: CaptureSource? = null
+
+    @Volatile var lowMemoryOverride: ((Long?) -> Boolean)? = null
+
+    @Volatile var speakerPrefixOverride: (() -> String)? = null
+
+    @Volatile var enginesOverride: ((SpeechModel, JobEngines, Boolean) -> JobEngines)? = null
+
+    @Volatile var onWhistleFinish: ((Bundle) -> Unit)? = null
+
+    @Volatile var onPrecomputeCheckpointed: ((String, Long) -> Unit)? = null
+
+    @Volatile var onPrecomputeStopped: ((String, PrecomputeStopReason) -> Unit)? = null
+
+    val injectedThermalThrottled = MutableStateFlow(false)
+
+    private val ticks = MutableStateFlow(0L)
+    val policyTicks: StateFlow<Long> = ticks.asStateFlow()
+
+    @Volatile private var activeSilenceListener: ((Boolean) -> Unit)? = null
+
+    fun emitSilence(silenced: Boolean) {
+        activeSilenceListener?.invoke(silenced)
+    }
+
     fun network(context: Context): NetworkCheck {
         val real = NetworkCheck.of(context)
         return NetworkCheck { validatedNetwork ?: real.validated() }
     }
 
+    fun capture(context: Context): CaptureSource {
+        val real = FactoryCaptureSource(context)
+        return object : CaptureSource {
+            override suspend fun format(): CaptureFormat = (captureSource ?: real).format()
+            override fun start(file: File, onError: () -> Unit): MicrophoneCapture =
+                (captureSource ?: real).start(file, onError)
+        }
+    }
+
     fun recordingPlatform(context: Context): RecordingPlatform {
         val real = AndroidRecordingPlatform(context)
         return object : RecordingPlatform by real {
-            override fun usableBytes(directory: File): Long =
-                recordingFreeBytes?.invoke(directory) ?: real.usableBytes(directory)
+            override fun usableBytes(directory: File): Long {
+                ticks.update { it + 1L }
+                return recordingFreeBytes?.invoke(directory) ?: real.usableBytes(directory)
+            }
+
+            override fun watchSilence(capture: MicrophoneCapture, onSilenced: (Boolean) -> Unit): SilenceWatch {
+                activeSilenceListener = onSilenced
+                val delegate = real.watchSilence(capture, onSilenced)
+                return object : SilenceWatch {
+                    override fun resumed() = delegate.resumed()
+                    override fun close() {
+                        if (activeSilenceListener === onSilenced) activeSilenceListener = null
+                        delegate.close()
+                    }
+                }
+            }
         }
     }
+
+    fun thermal(context: Context): ThermalMonitor {
+        val real = AndroidThermalMonitor(context)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val combined = combine(real.throttled, injectedThermalThrottled) { hw, injected -> hw || injected }
+            .stateIn(scope, SharingStarted.Eagerly, real.throttled.value || injectedThermalThrottled.value)
+        return object : ThermalMonitor {
+            override val throttled: StateFlow<Boolean> = combined
+            override fun close() {
+                real.close()
+                scope.cancel()
+            }
+        }
+    }
+
+    fun environment(base: JobEnvironment): JobEnvironment {
+        val lowMem = lowMemoryOverride
+        val prefix = speakerPrefixOverride
+        if (lowMem == null && prefix == null) return base
+        return JobEnvironment(
+            placeholderLabel = base.placeholderLabel,
+            inference = base.inference,
+            io = base.io,
+            nanoTime = base.nanoTime,
+            speakerPrefix = prefix ?: base.speakerPrefix,
+            lowMemory = lowMem ?: base.lowMemory,
+            warn = base.warn,
+            syncFile = base.syncFile,
+            maxDurationMs = base.maxDurationMs,
+            maxBodyBytes = base.maxBodyBytes,
+            runAtBackgroundPriority = base.runAtBackgroundPriority,
+        )
+    }
+
+    fun engines(model: SpeechModel, raw: JobEngines, precompute: Boolean): JobEngines =
+        enginesOverride?.invoke(model, raw, precompute) ?: raw
 
     /** The app's [TranscriptionJobFactory], or [jobFactory] while a test sets one. */
     fun jobs(graph: AppGraph): ProcessingJobFactory {
@@ -56,6 +163,15 @@ object TestHooks {
         validatedNetwork = null
         recordingFreeBytes = null
         jobFactory = null
+        captureSource = null
+        lowMemoryOverride = null
+        speakerPrefixOverride = null
+        enginesOverride = null
+        onWhistleFinish = null
+        onPrecomputeCheckpointed = null
+        onPrecomputeStopped = null
+        injectedThermalThrottled.value = false
+        activeSilenceListener = null
         ScriptedModels.clear()
     }
 }

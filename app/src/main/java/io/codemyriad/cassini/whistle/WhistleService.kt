@@ -89,13 +89,17 @@ class WhistleService : Service() {
             Bundle.EMPTY
         }
         WhistleProtocol.FINISH -> {
-            val hashes = requireNotNull(stream).finish()
+            val activeStream = requireNotNull(stream)
+            val hashes = activeStream.finish()
             Bundle().apply {
                 putString("rawSha256", hashes.rawSha256)
                 putString("vadSha256", hashes.vadSha256)
                 putInt("vadFrames", hashes.frames)
                 putInt("voicedFrames", hashes.voiced)
                 putFloat("maxProbability", hashes.maximum)
+                putInt("cacheHits", activeStream.cacheHits)
+                putInt("neuralTranscribes", activeStream.neuralTranscribes)
+                putLong("workerCpuMs", Process.getElapsedCpuTime())
             }
         }
         else -> error("Invalid Whistle worker command")

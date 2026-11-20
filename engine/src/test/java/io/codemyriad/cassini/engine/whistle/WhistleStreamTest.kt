@@ -77,6 +77,8 @@ class WhistleStreamTest {
         }
         val firstSummary = first.finish()
         assertTrue(firstTranscribeCalls >= 1)
+        assertEquals(0, first.cacheHits)
+        assertEquals(firstTranscribeCalls, first.neuralTranscribes)
         assertEquals(firstTranscribeCalls, cache.size)
 
         val secondSegments = mutableListOf<Triple<Long, Long, String>>()
@@ -101,6 +103,8 @@ class WhistleStreamTest {
         }
         val secondSummary = second.finish()
         assertEquals(0, secondTranscribeCalls)
+        assertEquals(firstTranscribeCalls, second.cacheHits)
+        assertEquals(0, second.neuralTranscribes)
         assertEquals(firstSegments, secondSegments)
         assertEquals(firstSummary, secondSummary)
     }

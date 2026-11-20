@@ -1,0 +1,624 @@
+#!/usr/bin/env python3
+"""Build, upload, schedule, and collect D-1126 Android handset qualification runs on AWS Device Farm (D89).
+
+Usage:
+  AWS_PROFILE=cassini-devicefarm uv run --with boto3 python3 scripts/devicefarm-qualify.py \\
+      --device-arn <ARN> --pool-name d1126-pixel8-api35 --name d1126-pixel8-5min \\
+      --test-class io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test02PairedFiveMinuteEquivalence
+
+When AWS credentials live on a separate control host (such as drmeyers) with tight local disk, pass
+`--control-ssh drmeyers`: control-plane API calls run over SSH while APK uploads and log downloads stream
+directly between this host and S3 without storing artifacts on the SSH host or logging presigned URLs.
+
+Enforces the D89 $200.00/month deny ceiling across all projects and all paginated ListRuns pages before
+scheduling any run.
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import datetime as dt
+import json
+import os
+import re
+import subprocess
+import time
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+REGION = "us-west-2"
+PROJECT_ARN = "arn:aws:devicefarm:us-west-2:613912634239:project:6c67e094-43ab-4c2a-af51-f93bd2b1bfac"
+RATE_PER_MINUTE = 0.17
+MONTHLY_DENY_USD = 200.0
+DEFAULT_TEST_CLASS = "io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest"
+APP_PACKAGE = "io.codemyriad.cassini.talk.debug"
+
+SAFE_CLASS_RE = re.compile(r"^[A-Za-z0-9_.$#,-]+$")
+SAFE_KEY_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+SAFE_VAL_RE = re.compile(r"^[A-Za-z0-9_.,:/@#=-]+$")
+
+SSH_CONTROL_SCRIPT = """
+import boto3, datetime as dt, json, sys
+
+req = json.loads(sys.stdin.read())
+df = boto3.client("devicefarm", region_name=req["region"])
+fn = getattr(df, req["op"])
+resp = fn(**req["kwargs"])
+
+def default_json(obj):
+    if isinstance(obj, (dt.datetime, dt.date)):
+        return {"__datetime__": obj.isoformat()}
+    raise TypeError(f"Unsupported type: {type(obj)!r}")
+
+sys.stdout.write(json.dumps(resp, default=default_json))
+"""
+
+
+def _decode_datetimes(value: Any) -> Any:
+    if isinstance(value, dict):
+        if set(value.keys()) == {"__datetime__"} and isinstance(value["__datetime__"], str):
+            return dt.datetime.fromisoformat(value["__datetime__"])
+        return {k: _decode_datetimes(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_decode_datetimes(item) for item in value]
+    return value
+
+
+class SshDeviceFarmClient:
+    """Executes lightweight AWS Device Farm control-plane operations over SSH without transferring files."""
+
+    def __init__(self, ssh_target: str, aws_profile: str, region: str = REGION) -> None:
+        self.ssh_target = ssh_target
+        self.aws_profile = aws_profile
+        self.region = region
+
+    def _call(self, op: str, **kwargs: Any) -> dict[str, Any]:
+        payload = json.dumps({"region": self.region, "op": op, "kwargs": kwargs})
+        encoded = base64.b64encode(SSH_CONTROL_SCRIPT.encode("utf-8")).decode("ascii")
+        remote_cmd = (
+            f"env AWS_PROFILE={self.aws_profile} uv run --with boto3 "
+            f"python3 -c 'import base64;exec(base64.b64decode(\"{encoded}\"))'"
+        )
+        proc = subprocess.run(
+            ["ssh", self.ssh_target, remote_cmd],
+            input=payload,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=120,
+        )
+        if proc.returncode != 0:
+            raise SystemExit(f"Device Farm control call {op} failed via SSH: {proc.stderr.strip()}")
+        return _decode_datetimes(json.loads(proc.stdout))
+
+    def list_projects(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("list_projects", **kwargs)
+
+    def list_runs(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("list_runs", **kwargs)
+
+    def create_upload(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("create_upload", **kwargs)
+
+    def get_upload(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("get_upload", **kwargs)
+
+    def list_device_pools(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("list_device_pools", **kwargs)
+
+    def create_device_pool(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("create_device_pool", **kwargs)
+
+    def schedule_run(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("schedule_run", **kwargs)
+
+    def get_run(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("get_run", **kwargs)
+
+    def list_jobs(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("list_jobs", **kwargs)
+
+    def list_suites(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("list_suites", **kwargs)
+
+    def list_tests(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("list_tests", **kwargs)
+
+    def list_artifacts(self, **kwargs: Any) -> dict[str, Any]:
+        return self._call("list_artifacts", **kwargs)
+
+
+def paginate(fetch, list_key: str, **kwargs: Any) -> list[dict[str, Any]]:
+    """Collects all pages of a Device Farm list_* API, guarding against repeated pagination tokens."""
+    items: list[dict[str, Any]] = []
+    seen_tokens: set[str] = set()
+    next_token: str | None = None
+    while True:
+        call_kwargs = dict(kwargs)
+        if next_token is not None:
+            call_kwargs["nextToken"] = next_token
+        response = fetch(**call_kwargs)
+        items.extend(response.get(list_key, []))
+        token = response.get("nextToken")
+        if not token:
+            break
+        if token in seen_tokens:
+            raise SystemExit(f"Repeated pagination nextToken while reading {list_key}.")
+        seen_tokens.add(token)
+        next_token = token
+    return items
+
+
+def _to_utc(timestamp: dt.datetime | str) -> dt.datetime:
+    parsed = dt.datetime.fromisoformat(timestamp) if isinstance(timestamp, str) else timestamp
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed.astimezone(dt.timezone.utc)
+
+
+def check_budget(
+    df: Any,
+    *,
+    now: dt.datetime | None = None,
+    ceiling_usd: float = MONTHLY_DENY_USD,
+    default_project_arn: str = PROJECT_ARN,
+) -> float:
+    """Sums metered minutes across all projects and all ListRuns pages for the current UTC calendar month."""
+    if ceiling_usd <= 0 or ceiling_usd > MONTHLY_DENY_USD:
+        raise SystemExit(f"Invalid ceiling ${ceiling_usd:.2f}; must be in (0, ${MONTHLY_DENY_USD:.2f}].")
+    now_utc = _to_utc(now) if now is not None else dt.datetime.now(dt.timezone.utc)
+
+    project_arns: list[str] = []
+    if hasattr(df, "list_projects"):
+        projects = paginate(df.list_projects, "projects")
+        project_arns = [p["arn"] for p in projects if p.get("arn")]
+    if default_project_arn and default_project_arn not in project_arns:
+        project_arns.append(default_project_arn)
+
+    metered_minutes = 0.0
+    for project_arn in project_arns:
+        runs = paginate(df.list_runs, "runs", arn=project_arn)
+        for run in runs:
+            created = _to_utc(run["created"])
+            if created.year == now_utc.year and created.month == now_utc.month:
+                metered_minutes += float(run.get("deviceMinutes", {}).get("metered", 0.0) or 0.0)
+
+    spent_usd = metered_minutes * RATE_PER_MINUTE
+    print(
+        f"Device Farm month-to-date ({now_utc:%Y-%m}): {metered_minutes:.2f} metered min "
+        f"(~${spent_usd:.2f} / ${ceiling_usd:.2f} deny cap)",
+        flush=True,
+    )
+    if spent_usd >= ceiling_usd:
+        raise SystemExit(f"Budget guard (D89): ${spent_usd:.2f} >= ${ceiling_usd:.2f} monthly deny ceiling.")
+    return spent_usd
+
+
+def validate_runner_args(test_class: str, extra_args: dict[str, str]) -> list[str]:
+    """Validates instrumentation runner arguments so custom TestSpec shell commands remain injection-safe."""
+    if not SAFE_CLASS_RE.fullmatch(test_class):
+        raise SystemExit(f"Unsafe instrumentation class selector: {test_class!r}")
+    flags = ["-e", "class", test_class]
+    for key, value in sorted(extra_args.items()):
+        if not SAFE_KEY_RE.fullmatch(key):
+            raise SystemExit(f"Unsafe instrumentation argument key: {key!r}")
+        if not SAFE_VAL_RE.fullmatch(value):
+            raise SystemExit(f"Unsafe instrumentation argument value for {key}: {value!r}")
+        flags.extend(["-e", key, value])
+    return flags
+
+
+def build_test_spec(test_class: str, extra_args: dict[str, str]) -> str:
+    """Builds the Amazon Linux 2 Device Farm Instrumentation TestSpec YAML."""
+    runner_flags = " ".join(validate_runner_args(test_class, extra_args))
+    return f"""version: 0.1
+android_test_host: amazon_linux_2
+
+phases:
+  install:
+    commands:
+      - echo "Device Farm host ready"
+
+  pre_test:
+    commands:
+      - adb -s "$DEVICEFARM_DEVICE_UDID" wait-for-device
+      - adb -s "$DEVICEFARM_DEVICE_UDID" shell input keyevent KEYCODE_WAKEUP || true
+      - adb -s "$DEVICEFARM_DEVICE_UDID" shell wm dismiss-keyguard || true
+      - adb -s "$DEVICEFARM_DEVICE_UDID" shell settings put global hide_error_dialogs 1 || true
+      - adb -s "$DEVICEFARM_DEVICE_UDID" shell pm grant {APP_PACKAGE} android.permission.RECORD_AUDIO || true
+      - adb -s "$DEVICEFARM_DEVICE_UDID" shell pm grant {APP_PACKAGE} android.permission.POST_NOTIFICATIONS || true
+      - adb -s "$DEVICEFARM_DEVICE_UDID" logcat -c || true
+      - >-
+        adb -s "$DEVICEFARM_DEVICE_UDID" shell
+        "getprop ro.product.manufacturer; getprop ro.product.model; getprop ro.build.version.release;
+        getprop ro.build.version.sdk; grep -E '^(MemTotal|MemAvailable):' /proc/meminfo"
+        | tee "$DEVICEFARM_LOG_DIR/device-info.txt"
+
+  test:
+    commands:
+      - echo "Running Cassini Android handset qualification ({test_class})"
+      - >-
+        adb -s "$DEVICEFARM_DEVICE_UDID" shell
+        "am instrument -r -w --no-window-animation {runner_flags}
+        $DEVICEFARM_TEST_PACKAGE_NAME/$DEVICEFARM_TEST_PACKAGE_RUNNER 2>&1
+        || echo INSTRUMENTATION_SHELL_FAILED"
+        | tee "$DEVICEFARM_LOG_DIR/instrument.log"
+      - |-
+        STARTED=$(grep -c "INSTRUMENTATION_STATUS_CODE: 1" "$DEVICEFARM_LOG_DIR/instrument.log" || true)
+        ERRORED=$(grep -c "INSTRUMENTATION_STATUS_CODE: -1" "$DEVICEFARM_LOG_DIR/instrument.log" || true)
+        FAILED=$(grep -c "INSTRUMENTATION_STATUS_CODE: -2" "$DEVICEFARM_LOG_DIR/instrument.log" || true)
+        IGNORED=$(grep -c "INSTRUMENTATION_STATUS_CODE: -3" "$DEVICEFARM_LOG_DIR/instrument.log" || true)
+        SKIPPED=$(grep -c "INSTRUMENTATION_STATUS_CODE: -4" "$DEVICEFARM_LOG_DIR/instrument.log" || true)
+        echo "Instrumentation: started=$STARTED errored=$ERRORED failed=$FAILED ignored=$IGNORED skipped=$SKIPPED"
+        if [ "$STARTED" -lt 1 ] || [ "$ERRORED" -ne 0 ] || [ "$FAILED" -ne 0 ]; then
+          exit 1
+        fi
+        if [ "$IGNORED" -ne 0 ] || [ "$SKIPPED" -ne 0 ]; then
+          exit 1
+        fi
+        BAD_PAT="FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_SHELL_FAILED|shortMsg=Process crashed"
+        if grep -Eq "$BAD_PAT" "$DEVICEFARM_LOG_DIR/instrument.log"; then
+          exit 1
+        fi
+        grep -Eq "^OK \\([1-9][0-9]* tests?\\)" "$DEVICEFARM_LOG_DIR/instrument.log"
+
+  post_test:
+    commands:
+      - adb -s "$DEVICEFARM_DEVICE_UDID" logcat -d > "$DEVICEFARM_LOG_DIR/logcat.txt" 2>&1 || true
+      - >-
+        adb -s "$DEVICEFARM_DEVICE_UDID" shell
+        "run-as {APP_PACKAGE} cat files/handset-qual-reports.json"
+        > "$DEVICEFARM_LOG_DIR/handset-qual-reports.json" 2>/dev/null || true
+
+artifacts:
+  - $DEVICEFARM_LOG_DIR
+"""
+
+
+def build_apks(root: Path = ROOT) -> tuple[Path, Path]:
+    """Builds the arm64-v8a (or universal) debug APK under test and the debug instrumentation APK."""
+    cmd = [
+        str(root / "scripts/heavy-lock.sh"),
+        str(root / "gradlew"),
+        "--no-daemon",
+        "-Pandroid.builder.sdkDownload=false",
+        ":app:assembleDebug",
+        ":app:assembleDebugAndroidTest",
+    ]
+    print("+", " ".join(cmd), flush=True)
+    subprocess.run(cmd, cwd=root, check=True)
+    return resolve_apks(root)
+
+
+def resolve_apks(root: Path = ROOT) -> tuple[Path, Path]:
+    arm_apk = root / "app/build/outputs/apk/debug/app-arm64-v8a-debug.apk"
+    universal_apk = root / "app/build/outputs/apk/debug/app-debug.apk"
+    app_apk = arm_apk if arm_apk.is_file() else universal_apk
+    test_apk = root / "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+    if not app_apk.is_file() or not test_apk.is_file():
+        raise SystemExit(f"Expected built APKs at {app_apk} and {test_apk}.")
+    return app_apk, test_apk
+
+
+def put_presigned_file(put_url: str, path: Path) -> None:
+    """Streams a local file directly to a presigned S3 URL without printing or exposing the URL in argv."""
+    # Pass URL via curl --config stdin so query tokens never appear in process arguments or logs.
+    escaped_url = put_url.replace("\\", "\\\\").replace('"', '\\"')
+    escaped_path = str(path).replace("\\", "\\\\").replace('"', '\\"')
+    curl_cfg = (
+        f'url = "{escaped_url}"\n'
+        f'upload-file = "{escaped_path}"\n'
+        'request = "PUT"\n'
+        'header = "Content-Type: application/octet-stream"\n'
+        "fail\n"
+        "silent\n"
+        "show-error\n"
+    )
+    proc = subprocess.run(
+        ["curl", "--config", "-"],
+        input=curl_cfg,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=900,
+    )
+    if proc.returncode != 0:
+        # Scrub any URL fragments from curl stderr before reporting.
+        sanitized = re.sub(r"https?://\S+", "<redacted-url>", proc.stderr.strip())
+        raise SystemExit(f"Upload of {path.name} failed (curl exit {proc.returncode}): {sanitized}")
+
+
+def upload_file(df: Any, path: Path, upload_type: str, project_arn: str = PROJECT_ARN) -> str:
+    resp = df.create_upload(projectArn=project_arn, name=path.name, type=upload_type)["upload"]
+    arn = resp["arn"]
+    put_url = resp["url"]
+    mib = path.stat().st_size / (1024 * 1024)
+    print(f"Uploading {path.name} ({mib:.1f} MiB) as {upload_type}...", flush=True)
+    put_presigned_file(put_url, path)
+    deadline = time.monotonic() + 180.0
+    while True:
+        upload = df.get_upload(arn=arn)["upload"]
+        status = upload["status"]
+        if status == "SUCCEEDED":
+            return arn
+        if status == "FAILED":
+            raise SystemExit(f"Device Farm rejected upload {path.name}: {upload.get('metadata')}")
+        if time.monotonic() >= deadline:
+            raise SystemExit(f"Timed out waiting for Device Farm to process upload {path.name} ({status}).")
+        time.sleep(2)
+
+
+def ensure_device_pool(df: Any, name: str, device_arns: list[str], project_arn: str = PROJECT_ARN) -> str:
+    expected_rule = [{"attribute": "ARN", "operator": "IN", "value": json.dumps(device_arns)}]
+    for pool in paginate(df.list_device_pools, "devicePools", arn=project_arn, type="PRIVATE"):
+        if pool.get("name") == name and pool.get("rules") == expected_rule:
+            return pool["arn"]
+    return df.create_device_pool(
+        projectArn=project_arn,
+        name=name,
+        rules=expected_rule,
+    )["devicePool"]["arn"]
+
+
+def extract_reports_from_text(body: str) -> list[dict[str, Any]]:
+    """Extracts structured JSON qualification reports framed by CASSINI_HANDSET_QUAL_BEGIN/END markers."""
+    reports: list[dict[str, Any]] = []
+    marker = "CASSINI_HANDSET_QUAL_BEGIN:"
+    idx = 0
+    while True:
+        start = body.find(marker, idx)
+        if start == -1:
+            break
+        nl = body.find("\n", start)
+        if nl == -1:
+            break
+        name = body[start + len(marker) : nl].strip()
+        end_marker = f"CASSINI_HANDSET_QUAL_END:{name}"
+        end = body.find(end_marker, nl)
+        if end == -1:
+            break
+        raw = body[nl + 1 : end]
+        # Strip optional `INSTRUMENTATION_STATUS: stream=` or logcat prefixes if interleaved, or parse raw JSON.
+        cleaned_lines = []
+        for line in raw.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("INSTRUMENTATION_STATUS") or stripped.startswith("INSTRUMENTATION_CODE"):
+                continue
+            cleaned_lines.append(line)
+        candidate = "\n".join(cleaned_lines).strip()
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                reports.append(parsed)
+        except json.JSONDecodeError:
+            pass
+        idx = end + len(end_marker)
+    return reports
+
+
+def extract_reports(df: Any, run_arn: str, out_dir: Path) -> list[dict[str, Any]]:
+    reports: list[dict[str, Any]] = []
+    seen_payloads: set[str] = set()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for job in paginate(df.list_jobs, "jobs", arn=run_arn):
+        job_prefix = re.sub(r"[^A-Za-z0-9_.-]+", "_", job.get("name", "device"))
+        for suite in paginate(df.list_suites, "suites", arn=job["arn"]):
+            for test in paginate(df.list_tests, "tests", arn=suite["arn"]):
+                for art_type in ("LOG", "FILE"):
+                    for art in paginate(df.list_artifacts, "artifacts", arn=test["arn"], type=art_type):
+                        ext = art.get("extension", "")
+                        if ext not in ("log", "txt", "json") and "Output" not in art.get("name", ""):
+                            continue
+                        with urllib.request.urlopen(art["url"], timeout=180) as response:
+                            body = response.read().decode("utf-8", errors="replace")
+                        raw_label = (
+                            f"{job_prefix}-{suite.get('name', 'suite')}-"
+                            f"{test.get('name', 'test')}-{art.get('name', 'art')}.{ext or 'txt'}"
+                        )
+                        safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", raw_label)
+                        (out_dir / safe_name).write_text(body, encoding="utf-8")
+                        candidates = extract_reports_from_text(body)
+                        if "handset-qual-reports" in art.get("name", ""):
+                            try:
+                                parsed_json = json.loads(body)
+                                if isinstance(parsed_json, list):
+                                    candidates.extend(x for x in parsed_json if isinstance(x, dict))
+                                elif isinstance(parsed_json, dict):
+                                    candidates.append(parsed_json)
+                            except json.JSONDecodeError:
+                                pass
+                        for item in candidates:
+                            canonical = json.dumps(item, sort_keys=True)
+                            if canonical not in seen_payloads:
+                                seen_payloads.add(canonical)
+                                reports.append(item)
+    return reports
+
+
+def open_client(control_ssh: str | None, aws_profile: str) -> Any:
+    if control_ssh:
+        return SshDeviceFarmClient(control_ssh, aws_profile=aws_profile, region=REGION)
+    import boto3
+
+    session = (
+        boto3.Session(profile_name=aws_profile, region_name=REGION)
+        if aws_profile
+        else boto3.Session(region_name=REGION)
+    )
+    return session.client("devicefarm", region_name=REGION)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--device-arn",
+        action="append",
+        required=False,
+        help="Target Device Farm device ARN (repeatable).",
+    )
+    parser.add_argument("--pool-name", help="Private device pool name.")
+    parser.add_argument("--name", help="Device Farm run name.")
+    parser.add_argument("--test-class", default=DEFAULT_TEST_CLASS, help="Instrumentation class or class#method.")
+    parser.add_argument("--short-seconds", type=int, default=300)
+    parser.add_argument("--long-seconds", type=int, default=1800)
+    parser.add_argument("--no-parakeet", action="store_true")
+    parser.add_argument("--no-whistle", action="store_true")
+    parser.add_argument("--long-engine", choices=("parakeet", "whistle", "none"), default="none")
+    parser.add_argument("--arg", action="append", default=[], help="Extra instrumentation KEY=VALUE argument.")
+    parser.add_argument("--timeout-minutes", type=int, default=75)
+    parser.add_argument("--ceiling-usd", type=float, default=MONTHLY_DENY_USD)
+    parser.add_argument("--out-dir", type=Path, help="Output directory for logs and extracted reports.")
+    parser.add_argument("--control-ssh", help="Optional SSH host holding AWS credentials (control-plane only).")
+    parser.add_argument("--aws-profile", default=os.environ.get("AWS_PROFILE", "cassini-devicefarm"))
+    parser.add_argument("--app-arn", help="Reuse an already-uploaded ANDROID_APP upload ARN.")
+    parser.add_argument("--test-arn", help="Reuse an already-uploaded INSTRUMENTATION_TEST_PACKAGE upload ARN.")
+    parser.add_argument("--skip-build", action="store_true")
+    parser.add_argument("--no-wait", action="store_true")
+    parser.add_argument("--collect-run-arn", help="Collect artifacts and reports from an existing run ARN.")
+    parser.add_argument(
+        "--check-budget-only",
+        action="store_true",
+        help="Verify monthly spend against the D89 ceiling and exit.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
+    df = open_client(args.control_ssh, args.aws_profile)
+
+    if args.collect_run_arn:
+        out_dir = args.out_dir or (ROOT / ".tools/devicefarm-out/collected")
+        run_info = df.get_run(arn=args.collect_run_arn)["run"]
+        print(
+            f"[{run_info['status']}] result={run_info.get('result')} minutes={run_info.get('deviceMinutes')}",
+            flush=True,
+        )
+        if run_info["status"] == "COMPLETED":
+            reports = extract_reports(df, args.collect_run_arn, out_dir / "artifacts")
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "reports.json").write_text(json.dumps(reports, indent=2) + "\n", encoding="utf-8")
+            (out_dir / "run.json").write_text(
+                json.dumps(
+                    {
+                        "arn": run_info["arn"],
+                        "name": run_info.get("name"),
+                        "status": run_info.get("status"),
+                        "result": run_info.get("result"),
+                        "counters": run_info.get("counters"),
+                        "deviceMinutes": run_info.get("deviceMinutes"),
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            print(f"Extracted {len(reports)} qualification report(s) -> {out_dir / 'reports.json'}", flush=True)
+        return
+
+    check_budget(df, ceiling_usd=args.ceiling_usd)
+    if args.check_budget_only:
+        return
+
+    if not args.device_arn or not args.pool_name or not args.name:
+        raise SystemExit("--device-arn, --pool-name, and --name are required to schedule a run.")
+
+    out_dir = args.out_dir or (ROOT / ".tools/devicefarm-out" / args.name)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    app_apk, test_apk = resolve_apks(ROOT) if args.skip_build else build_apks(ROOT)
+
+    extra_args: dict[str, str] = {
+        "cassiniHandsetQual": "true",
+        "downloadModels": "true",
+        "shortSeconds": str(args.short_seconds),
+        "longSeconds": str(args.long_seconds),
+        "runParakeet": "false" if args.no_parakeet else "true",
+        "runWhistle": "false" if args.no_whistle else "true",
+        "longEngine": args.long_engine,
+    }
+    for item in args.arg:
+        if "=" not in item:
+            raise SystemExit(f"--arg expects KEY=VALUE, got {item!r}")
+        key, val = item.split("=", 1)
+        extra_args[key] = val
+
+    spec_path = out_dir / f"{args.name}-testspec.yml"
+    spec_path.write_text(build_test_spec(args.test_class, extra_args), encoding="utf-8")
+
+    app_arn = args.app_arn or upload_file(df, app_apk, "ANDROID_APP")
+    test_arn = args.test_arn or upload_file(df, test_apk, "INSTRUMENTATION_TEST_PACKAGE")
+    spec_arn = upload_file(df, spec_path, "INSTRUMENTATION_TEST_SPEC")
+    pool_arn = ensure_device_pool(df, args.pool_name, args.device_arn)
+
+    # Re-verify budget immediately prior to scheduling in case parallel runs finished during upload.
+    check_budget(df, ceiling_usd=args.ceiling_usd)
+
+    scheduled = df.schedule_run(
+        projectArn=PROJECT_ARN,
+        appArn=app_arn,
+        devicePoolArn=pool_arn,
+        name=args.name,
+        test={
+            "type": "INSTRUMENTATION",
+            "testPackageArn": test_arn,
+            "testSpecArn": spec_arn,
+        },
+        executionConfiguration={"jobTimeoutMinutes": args.timeout_minutes},
+    )["run"]
+    run_arn = scheduled["arn"]
+    (out_dir / "scheduled.json").write_text(
+        json.dumps(
+            {
+                "name": args.name,
+                "runArn": run_arn,
+                "poolArn": pool_arn,
+                "appArn": app_arn,
+                "testArn": test_arn,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    print(f"Scheduled run: {args.name} -> {run_arn}", flush=True)
+    if args.no_wait:
+        return
+
+    while True:
+        run_info = df.get_run(arn=run_arn)["run"]
+        print(
+            f"  [{run_info['status']}] result={run_info.get('result')} "
+            f"counters={run_info.get('counters')} minutes={run_info.get('deviceMinutes')}",
+            flush=True,
+        )
+        if run_info["status"] == "COMPLETED":
+            reports = extract_reports(df, run_arn, out_dir / "artifacts")
+            (out_dir / "reports.json").write_text(json.dumps(reports, indent=2) + "\n", encoding="utf-8")
+            (out_dir / "run.json").write_text(
+                json.dumps(
+                    {
+                        "arn": run_info["arn"],
+                        "name": run_info.get("name"),
+                        "status": run_info.get("status"),
+                        "result": run_info.get("result"),
+                        "counters": run_info.get("counters"),
+                        "deviceMinutes": run_info.get("deviceMinutes"),
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            print(f"Extracted {len(reports)} qualification report(s) -> {out_dir / 'reports.json'}", flush=True)
+            if run_info.get("result") != "PASSED":
+                raise SystemExit(f"Device Farm run ended with {run_info.get('result')}")
+            return
+        time.sleep(25)
+
+
+if __name__ == "__main__":
+    main()

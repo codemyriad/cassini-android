@@ -57,8 +57,19 @@ class CassiniTestRunner : AndroidJUnitRunner() {
                     ModelFetcher.network(AppGraph.MODEL_USER_AGENT)
                 },
                 network = TestHooks.network(application),
-                recording = AppGraph.RecordingHooks(platform = TestHooks.recordingPlatform(application)),
-                processing = AppGraph.ProcessingHooks(jobs = TestHooks::jobs),
+                recording = AppGraph.RecordingHooks(
+                    capture = TestHooks.capture(application),
+                    platform = TestHooks.recordingPlatform(application),
+                ),
+                processing = AppGraph.ProcessingHooks(
+                    jobs = TestHooks::jobs,
+                    thermal = TestHooks.thermal(application),
+                    environment = TestHooks::environment,
+                    engines = TestHooks::engines,
+                    onWhistleFinish = { summary -> TestHooks.onWhistleFinish?.invoke(summary) },
+                    onPrecomputeCheckpointed = { id, doneMs -> TestHooks.onPrecomputeCheckpointed?.invoke(id, doneMs) },
+                    onPrecomputeStopped = { id, reason -> TestHooks.onPrecomputeStopped?.invoke(id, reason) },
+                ),
             )
             AppGraph(application, config).also {
                 graph = it
