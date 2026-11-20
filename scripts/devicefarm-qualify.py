@@ -20,6 +20,7 @@ import argparse
 import base64
 import datetime as dt
 import json
+import math
 import os
 import re
 import subprocess
@@ -35,6 +36,12 @@ RATE_PER_MINUTE = 0.17
 MONTHLY_BUDGET_USD = 200.0
 MONTHLY_DENY_USD = 160.0
 DEFAULT_TEST_CLASS = "io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest"
+DEFAULT_CORE_METHODS = (
+    "qualificationHarnessTelemetryAndPrefixContractSmoke",
+    "test01HardwareCaptureLifecycleInterruptionsAndAacControl",
+    "test02PairedFiveMinuteEquivalenceAndPressure",
+)
+LONG_METHOD = "test03ThirtyMinuteContinuousQualification"
 APP_PACKAGE = "io.codemyriad.cassini.talk.debug"
 
 SAFE_CLASS_RE = re.compile(r"^[A-Za-z0-9_.$#,-]+$")
@@ -168,8 +175,10 @@ def check_budget(
     default_project_arn: str = PROJECT_ARN,
 ) -> float:
     """Sums metered minutes across all projects and all ListRuns pages for the current UTC calendar month."""
-    if ceiling_usd <= 0 or ceiling_usd > MONTHLY_DENY_USD:
-        raise SystemExit(f"Invalid ceiling ${ceiling_usd:.2f}; must be in (0, ${MONTHLY_DENY_USD:.2f}].")
+    if not math.isfinite(ceiling_usd) or ceiling_usd <= 0 or ceiling_usd > MONTHLY_DENY_USD:
+        raise SystemExit(
+            f"Invalid ceiling {ceiling_usd!r}; must be a finite value in (0, ${MONTHLY_DENY_USD:.2f}].",
+        )
     now_utc = _to_utc(now) if now is not None else dt.datetime.now(dt.timezone.utc)
 
     project_arns: list[str] = []
@@ -454,6 +463,16 @@ def open_client(control_ssh: str | None, aws_profile: str) -> Any:
     return session.client("devicefarm", region_name=REGION)
 
 
+def resolve_test_class(test_class: str | None, long_engine: str) -> str:
+    """Resolves the instrumentation class/method selector from selected lanes so unrequested lanes are not skipped."""
+    if test_class:
+        return test_class
+    methods = list(DEFAULT_CORE_METHODS)
+    if long_engine != "none":
+        methods.append(LONG_METHOD)
+    return ",".join(f"{DEFAULT_TEST_CLASS}#{method}" for method in methods)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -464,7 +483,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--pool-name", help="Private device pool name.")
     parser.add_argument("--name", help="Device Farm run name.")
-    parser.add_argument("--test-class", default=DEFAULT_TEST_CLASS, help="Instrumentation class or class#method.")
+    parser.add_argument(
+        "--test-class",
+        default=None,
+        help="Instrumentation class or class#method selector (defaults to selected lanes).",
+    )
     parser.add_argument("--short-seconds", type=int, default=300)
     parser.add_argument("--long-seconds", type=int, default=1800)
     parser.add_argument("--no-parakeet", action="store_true")
@@ -549,8 +572,9 @@ def main(argv: list[str] | None = None) -> None:
         key, val = item.split("=", 1)
         extra_args[key] = val
 
+    selected_test_class = resolve_test_class(args.test_class, args.long_engine)
     spec_path = out_dir / f"{args.name}-testspec.yml"
-    spec_path.write_text(build_test_spec(args.test_class, extra_args), encoding="utf-8")
+    spec_path.write_text(build_test_spec(selected_test_class, extra_args), encoding="utf-8")
 
     app_arn = args.app_arn or upload_file(df, app_apk, "ANDROID_APP")
     test_arn = args.test_arn or upload_file(df, test_apk, "INSTRUMENTATION_TEST_PACKAGE")

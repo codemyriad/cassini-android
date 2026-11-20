@@ -142,6 +142,32 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             MODULE.check_budget(valid, ceiling_usd=200.0)
 
+    def test_budget_guard_rejects_non_finite_cli_ceiling_values(self) -> None:
+        valid = FakeDeviceFarmClient(project_pages=[{"projects": []}], run_pages_by_project={})
+        for raw_value in ("nan", "inf", "-inf"):
+            parsed = MODULE.build_parser().parse_args([f"--ceiling-usd={raw_value}"])
+            with self.assertRaises(SystemExit):
+                MODULE.check_budget(valid, ceiling_usd=parsed.ceiling_usd)
+
+    def test_default_test_class_selector_matches_selected_lanes(self) -> None:
+        default_args = MODULE.build_parser().parse_args([])
+        default_selector = MODULE.resolve_test_class(default_args.test_class, default_args.long_engine)
+        self.assertIn("test01HardwareCaptureLifecycleInterruptionsAndAacControl", default_selector)
+        self.assertIn("test02PairedFiveMinuteEquivalenceAndPressure", default_selector)
+        self.assertNotIn("test03ThirtyMinuteContinuousQualification", default_selector)
+
+        long_args = MODULE.build_parser().parse_args(["--long-engine", "parakeet"])
+        long_selector = MODULE.resolve_test_class(long_args.test_class, long_args.long_engine)
+        self.assertIn("test03ThirtyMinuteContinuousQualification", long_selector)
+
+        explicit_args = MODULE.build_parser().parse_args(
+            ["--test-class", "io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test01HardwareCaptureLifecycleInterruptionsAndAacControl"],
+        )
+        self.assertEqual(
+            "io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test01HardwareCaptureLifecycleInterruptionsAndAacControl",
+            MODULE.resolve_test_class(explicit_args.test_class, explicit_args.long_engine),
+        )
+
     def test_test_spec_validates_arguments_and_rejects_shell_metacharacters(self) -> None:
         spec = MODULE.build_test_spec(
             "io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test02Paired",

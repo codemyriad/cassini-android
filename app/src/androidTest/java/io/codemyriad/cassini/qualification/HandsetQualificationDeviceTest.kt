@@ -185,13 +185,28 @@ class HandsetQualificationDeviceTest {
 
     private data class SealedOpusCheck(val maxPcmDiff: Float, val sealedDurationMs: Long)
 
+    private class LifecyclePrecomputeWatch {
+        val tracker = HandsetQualificationAudit.PrecomputeBackgroundYieldTracker()
+        val postResumeStarted = CompletableDeferred<Unit>()
+        val postResumeStopped = CompletableDeferred<PrecomputeStopReason>()
+
+        fun install() {
+            TestHooks.enginesOverride = { _, raw, precompute ->
+                if (precompute && tracker.onWorkerStarted()) postResumeStarted.complete(Unit)
+                raw
+            }
+            TestHooks.onPrecomputeStopped = { _, reason ->
+                if (tracker.onWorkerStopped(reason.name)) postResumeStopped.complete(reason)
+            }
+        }
+    }
+
     private suspend fun runLiveOpusLifecycleAndInterruptions(): JSONObject {
         var screen: ActivityScenario<MainActivity>? = ActivityScenario.launch(MainActivity::class.java)
         val monitor = HandsetTelemetryMonitor.start(context)
         TestHooks.onWhistleFinish = { monitor.recordWhistleWorkerCpuMs(it.getLong("workerCpuMs")) }
         val whistleEligible = WhistleDeviceCapability.current() == WhistleCapability.ELIGIBLE
-        val precomputeStops = Channel<PrecomputeStopReason>(Channel.UNLIMITED)
-        TestHooks.onPrecomputeStopped = { _, reason -> precomputeStops.trySend(reason) }
+        val precomputeWatch = LifecyclePrecomputeWatch().apply { install() }
         var decoder: CommittedOggOpusDecoder? = null
         val livePcmFile = File(context.cacheDir, "qual-live-pcm.f32")
         var livePcmOut: DataOutputStream? = null
@@ -207,7 +222,7 @@ class HandsetQualificationDeviceTest {
             val liveSamplesCount = longArrayOf(0L)
             decoder = CommittedOggOpusDecoder(captureFile, included = whistleEligible)
             val committed1 = pollInitialPrefix(decoder, livePcmOut, liveSamplesCount)
-            val (next, bgEvidence) = exercisePauseResumeAndBackground(screen!!, whistleEligible, precomputeStops)
+            val (next, bgEvidence) = exercisePauseResumeAndBackground(screen!!, whistleEligible, precomputeWatch)
             screen = next
             val focusObserved = exerciseInterruptionsAndRouteLoss()
             val committed2 = pollPostInterruptionPrefix(decoder, livePcmOut, liveSamplesCount, committed1.first)
@@ -312,7 +327,7 @@ class HandsetQualificationDeviceTest {
     private suspend fun exercisePauseResumeAndBackground(
         initialScreen: ActivityScenario<MainActivity>,
         whistleEligible: Boolean,
-        precomputeStops: Channel<PrecomputeStopReason>,
+        precomputeWatch: LifecyclePrecomputeWatch,
     ): Pair<ActivityScenario<MainActivity>, BackgroundEvidence> {
         val recording = graph.recording
         recording.pause()
@@ -321,9 +336,15 @@ class HandsetQualificationDeviceTest {
         awaitNPicks(2)
         val driftWhilePaused = abs(recording.elapsedNowMs - pausedMs)
         assertTrue("Paused OpusCapture must not advance ($driftWhilePaused ms)", driftWhilePaused <= 100L)
+
+        // Ignore any stale precompute stop queued by Pause and require a fresh post-Resume worker start.
+        precomputeWatch.tracker.markResumed()
         recording.resume()
         awaitRecordingState("Resumed after user pause") {
             it is RecordingState.Active && it.pause == null && it.elapsedMs >= pausedMs + 1_200L
+        }
+        if (whistleEligible) {
+            withTimeout(EVENT_TIMEOUT_MS) { precomputeWatch.postResumeStarted.await() }
         }
 
         val beforeBgMs = recording.elapsedNowMs
@@ -331,7 +352,8 @@ class HandsetQualificationDeviceTest {
         Background.shell("input keyevent KEYCODE_HOME")
         awaitVisible(false)
         if (whistleEligible) {
-            withTimeout(EVENT_TIMEOUT_MS) { precomputeStops.receive() }
+            withTimeout(EVENT_TIMEOUT_MS) { precomputeWatch.postResumeStopped.await() }
+            precomputeWatch.tracker.verifyYieldedAfterBackground()
         }
         val bgState = withTimeout(BACKGROUND_TIMEOUT_MS) {
             recording.state.first { state ->
@@ -487,14 +509,15 @@ class HandsetQualificationDeviceTest {
     }
 
     private suspend fun exerciseApi26FocusPauseIfApplicable(): Boolean {
-        val competing = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) requestTransientFocus() else null
-        if (competing == null) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return false
+        val competing = requestTransientFocus()
+        assertNotNull("Competing transient audio-focus request must be granted on API 26-28", competing)
         try {
             awaitRecordingState("API 26-28 focus loss pauses AAC") {
                 (it as? RecordingState.Active)?.pause == RecordingPause.OTHER_APP
             }
         } finally {
-            abandonTransientFocus(competing)
+            abandonTransientFocus(competing!!)
         }
         graph.recording.resume()
         awaitRecordingState("API 26-28 AAC resumed") { it is RecordingState.Active && it.pause == null }

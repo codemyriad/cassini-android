@@ -3,8 +3,9 @@ package io.codemyriad.cassini.qualification
 /**
  * Deterministic pure-Kotlin qualification validators for D-1126 physical handset checks.
  *
- * Lives in `src/instrumented/java` so both JVM unit tests (`testDebugUnitTest`) and device tests
- * (`debugAndroidTest` / `releaseTestAndroidTest`) exercise the exact same assertions without shipping in release APKs.
+ * Pure Kotlin with no Android dependencies so both debug and release JVM unit tests (`testDebugUnitTest`,
+ * `testReleaseUnitTest`) and device tests (`androidTest`) share the exact same assertions (R8 strips unused
+ * qualification helpers from minified release builds).
  */
 object HandsetQualificationAudit {
     private const val MIN_HAL_SAMPLES_FOR_DELTA = 2
@@ -14,6 +15,53 @@ object HandsetQualificationAudit {
     private const val FOCUS_LOST_PERMANENT = "LOST"
     private const val FOCUS_LOST_TRANSIENT = "LOST_FOR_NOW"
     private const val FOCUS_GAINED = "GAINED"
+    private const val STOP_REASON_YIELDED = "YIELDED"
+
+    /**
+     * Tracks a fresh precompute worker start after user Resume and verifies that subsequent Home backgrounding
+     * yields that post-Resume worker with `YIELDED` (ignoring any stale stop events queued by the prior Pause).
+     */
+    class PrecomputeBackgroundYieldTracker {
+        private var awaitingPostResumeStart = false
+        private var postResumeWorkerStarted = false
+        private val postResumeStops = ArrayList<String>()
+
+        @Synchronized
+        fun markResumed() {
+            awaitingPostResumeStart = true
+            postResumeWorkerStarted = false
+            postResumeStops.clear()
+        }
+
+        @Synchronized
+        fun onWorkerStarted(): Boolean {
+            if (awaitingPostResumeStart) {
+                postResumeWorkerStarted = true
+            }
+            return postResumeWorkerStarted
+        }
+
+        @Synchronized
+        fun onWorkerStopped(reason: String): Boolean {
+            if (!postResumeWorkerStarted) return false
+            postResumeStops.add(reason)
+            return true
+        }
+
+        @Synchronized
+        fun verifyYieldedAfterBackground() {
+            val failure = when {
+                !postResumeWorkerStarted ->
+                    "Precompute worker did not start fresh after Resume before Home backgrounding"
+                postResumeStops.isEmpty() ->
+                    "Expected $STOP_REASON_YIELDED after KEYCODE_HOME, got no post-Resume stop event"
+                postResumeStops.first() != STOP_REASON_YIELDED ->
+                    "Expected $STOP_REASON_YIELDED after KEYCODE_HOME, got ${postResumeStops.first()}"
+                else -> null
+            }
+            if (failure != null) throw AssertionError(failure)
+        }
+    }
 
     data class HalDropSummary(
         val halTimestampSamples: Int,
@@ -41,20 +89,19 @@ object HandsetQualificationAudit {
         fun record(halFramePosition: Long, appSamples: Long, ringSamples: Int): Boolean {
             validSamples++
             val firstHal = baseHalFrame
-            if (firstHal == null) {
+            return if (firstHal == null) {
                 baseHalFrame = halFramePosition
                 baseAppSamples = appSamples
-                return false
+                false
+            } else {
+                val halDelta = halFramePosition - firstHal
+                val appDelta = appSamples - baseAppSamples
+                val deficit = halDelta - appDelta
+                if (deficit > maxDeficit) maxDeficit = deficit
+                val dropped = deficit > ringSamples
+                if (dropped) halDrops++
+                dropped
             }
-            val halDelta = halFramePosition - firstHal
-            val appDelta = appSamples - baseAppSamples
-            val deficit = halDelta - appDelta
-            if (deficit > maxDeficit) maxDeficit = deficit
-            if (deficit > ringSamples) {
-                halDrops++
-                return true
-            }
-            return false
         }
 
         @Synchronized
@@ -97,25 +144,20 @@ object HandsetQualificationAudit {
     )
 
     fun verifyCaptureHealth(summary: HalDropSummary, maxFrameIntervalMs: Long, ringBufferMs: Long) {
-        if (!summary.halTimestampAvailable) {
-            throw AssertionError(
+        val dropped = summary.droppedBuffers
+        val failure = when {
+            !summary.halTimestampAvailable || dropped == null ->
                 "HAL AudioTimestamp continuity evidence unavailable " +
-                    "(validSamples=${summary.halTimestampSamples}, need >= $MIN_HAL_SAMPLES_FOR_DELTA)",
-            )
-        }
-        val dropped = summary.droppedBuffers ?: throw AssertionError("Dropped buffer count unavailable")
-        if (dropped != 0) {
-            throw AssertionError(
+                    "(validSamples=${summary.halTimestampSamples}, need >= $MIN_HAL_SAMPLES_FOR_DELTA)"
+            dropped != 0 ->
                 "Expected zero dropped AudioRecord buffers, got $dropped " +
                     "(halDrops=${summary.halDropEvents}, timingDrops=${summary.timingDropEvents}, " +
-                    "maxHalFrameDeficit=${summary.maxHalFrameDeficit})",
-            )
+                    "maxHalFrameDeficit=${summary.maxHalFrameDeficit})"
+            maxFrameIntervalMs >= ringBufferMs ->
+                "Max OpusCapture frame interval ($maxFrameIntervalMs ms) must be < ring ($ringBufferMs ms)"
+            else -> null
         }
-        if (maxFrameIntervalMs >= ringBufferMs) {
-            throw AssertionError(
-                "Max OpusCapture frame interval ($maxFrameIntervalMs ms) must be < ring ($ringBufferMs ms)",
-            )
-        }
+        if (failure != null) throw AssertionError(failure)
     }
 
     fun verifyNonEmptyBaseline(

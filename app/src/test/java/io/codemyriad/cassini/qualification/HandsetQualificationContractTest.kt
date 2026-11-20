@@ -391,6 +391,32 @@ class HandsetQualificationContractTest {
         }
     }
 
+    @Test
+    fun precomputeBackgroundYieldTrackerIgnoresStalePauseStopAndRequiresPostResumeYield() {
+        val tracker = HandsetQualificationAudit.PrecomputeBackgroundYieldTracker()
+
+        // Pre-resume worker starts and stops with YIELDED due to user Pause: must NOT satisfy Home yield.
+        assertFalse(tracker.onWorkerStarted())
+        assertFalse(tracker.onWorkerStopped("YIELDED"))
+
+        // Even a delayed stale stop arriving right after markResumed (before fresh post-Resume worker starts) is ignored.
+        tracker.markResumed()
+        assertFalse(tracker.onWorkerStopped("YIELDED"))
+        assertThrows(AssertionError::class.java) { tracker.verifyYieldedAfterBackground() }
+
+        // Fresh post-Resume worker starts, then stops with CANCELLED (not YIELDED): must fail.
+        val wrongReason = HandsetQualificationAudit.PrecomputeBackgroundYieldTracker()
+        wrongReason.markResumed()
+        assertTrue(wrongReason.onWorkerStarted())
+        assertTrue(wrongReason.onWorkerStopped("CANCELLED"))
+        assertThrows(AssertionError::class.java) { wrongReason.verifyYieldedAfterBackground() }
+
+        // Fresh post-Resume worker starts and yields on KEYCODE_HOME with YIELDED: passes.
+        assertTrue(tracker.onWorkerStarted())
+        assertTrue(tracker.onWorkerStopped("YIELDED"))
+        tracker.verifyYieldedAfterBackground()
+    }
+
     private data class FakeSeg(val start: Long, val end: Long, val sha256: String, val json: String)
 
     private class FakeWhistleTransport(private val segments: List<FakeSeg>) : WhistleTransport {
