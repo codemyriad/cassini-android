@@ -4,7 +4,7 @@
 Usage:
   AWS_PROFILE=cassini-devicefarm uv run --with boto3 python3 scripts/devicefarm-qualify.py \\
       --device-arn <ARN> --pool-name d1126-pixel8-api35 --name d1126-pixel8-5min \\
-      --test-class io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test02PairedFiveMinuteEquivalence
+      --test-class io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test02PairedFiveMinuteEquivalenceAndPressure
 
 When AWS credentials live on a separate control host (such as drmeyers) with tight local disk, pass
 `--control-ssh drmeyers`: control-plane API calls run over SSH while APK uploads and log downloads stream
@@ -173,6 +173,17 @@ def _to_utc(timestamp: dt.datetime | str) -> dt.datetime:
     return parsed.astimezone(dt.timezone.utc)
 
 
+def _run_overlaps_month(run: dict[str, Any], year: int, month: int) -> bool:
+    for field in ("created", "started", "stopped"):
+        raw = run.get(field)
+        if raw is None:
+            continue
+        ts = _to_utc(raw)
+        if ts.year == year and ts.month == month:
+            return True
+    return False
+
+
 def check_budget(
     df: Any,
     *,
@@ -202,9 +213,8 @@ def check_budget(
     for project_arn in project_arns:
         runs = paginate(df.list_runs, "runs", arn=project_arn)
         for run in runs:
-            created = _to_utc(run["created"])
             run_metered = float(run.get("deviceMinutes", {}).get("metered", 0.0) or 0.0)
-            if created.year == now_utc.year and created.month == now_utc.month:
+            if _run_overlaps_month(run, now_utc.year, now_utc.month):
                 metered_minutes += run_metered
             status = str(run.get("status", "COMPLETED") or "COMPLETED").upper()
             if status != "COMPLETED":
@@ -246,6 +256,41 @@ def _schedule_lock(lock_path: Path):
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
+@contextlib.contextmanager
+def _remote_schedule_lock(control_ssh: str):
+    remote_cmd = (
+        "mkdir -p ~/.cache/cassini-devicefarm && "
+        "flock -x ~/.cache/cassini-devicefarm/schedule.lock sh -c 'echo LOCKED; read _'"
+    )
+    proc = subprocess.Popen(
+        ["ssh", control_ssh, remote_cmd],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert proc.stdout is not None
+        line = proc.stdout.readline().strip()
+        if line != "LOCKED":
+            stderr = proc.stderr.read().strip() if proc.stderr is not None else ""
+            raise SystemExit(
+                f"Failed to acquire remote schedule lock on {control_ssh}: {stderr or line or 'EOF'}",
+            )
+        yield
+    finally:
+        if proc.stdin is not None:
+            with contextlib.suppress(OSError):
+                proc.stdin.write("\n")
+                proc.stdin.flush()
+                proc.stdin.close()
+        try:
+            proc.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+
+
 def schedule_run_guarded(
     df: Any,
     *,
@@ -253,10 +298,12 @@ def schedule_run_guarded(
     ceiling_usd: float,
     projected_new_run_usd: float,
     schedule_kwargs: dict[str, Any],
+    control_ssh: str | None = None,
     now: dt.datetime | None = None,
 ) -> dict[str, Any]:
-    """Serializes the final budget check and schedule_run call with an exclusive file lock."""
-    with _schedule_lock(lock_path):
+    """Serializes the final budget check and schedule_run call (locally or on --control-ssh)."""
+    lock_ctx = _remote_schedule_lock(control_ssh) if control_ssh else _schedule_lock(lock_path)
+    with lock_ctx:
         check_budget(
             df,
             now=now,
@@ -683,6 +730,7 @@ def main(argv: list[str] | None = None) -> None:
         lock_path=args.lock_file,
         ceiling_usd=args.ceiling_usd,
         projected_new_run_usd=projected_new_run_usd,
+        control_ssh=args.control_ssh,
         schedule_kwargs={
             "projectArn": PROJECT_ARN,
             "appArn": app_arn,

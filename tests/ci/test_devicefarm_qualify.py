@@ -260,12 +260,32 @@ class DeviceFarmQualifyTest(unittest.TestCase):
                 MODULE.main(["--check-budget-only"])
         self.assertIn("$204.00", str(cli_err.exception))
 
+        # Completed cross-month rollover run (created in Oct, stopped in Nov with 960 min = $163.20) must be counted.
+        completed_rollover = {
+            "created": dt.datetime(2026, 10, 31, 23, 50, tzinfo=dt.timezone.utc),
+            "started": dt.datetime(2026, 11, 1, 0, 1, tzinfo=dt.timezone.utc),
+            "stopped": dt.datetime(2026, 11, 1, 2, 0, tzinfo=dt.timezone.utc),
+            "status": "COMPLETED",
+            "deviceMinutes": {"metered": 960.0},
+        }
+        rollover_client = FakeDeviceFarmClient(
+            project_pages=[{"projects": [{"arn": p1}]}],
+            run_pages_by_project={p1: [{"runs": [completed_rollover]}]},
+        )
+        two_device_150m_usd = MODULE.project_run_cost_usd(device_count=2, timeout_minutes=150)
+        with self.assertRaises(SystemExit) as rollover_err:
+            MODULE.check_budget(rollover_client, now=now, projected_new_run_usd=two_device_150m_usd)
+        self.assertIn("$163.20 >= $160.00", str(rollover_err.exception))
+
     def test_schedule_run_guarded_serializes_concurrent_submissions_under_200_usd(self) -> None:
+        import fcntl
         import tempfile
         import threading
 
         p1 = MODULE.PROJECT_ARN
         now = dt.datetime(2026, 11, 20, 14, 0, tzinfo=dt.timezone.utc)
+        entered_schedule = threading.Event()
+        release_schedule = threading.Event()
 
         class ThreadSafeFakeClient:
             def __init__(self) -> None:
@@ -281,6 +301,8 @@ class DeviceFarmQualifyTest(unittest.TestCase):
                     return {"runs": list(self._runs)}
 
             def schedule_run(self, **kwargs) -> dict:
+                entered_schedule.set()
+                release_schedule.wait(timeout=5.0)
                 with self._lock:
                     self.scheduled_count += 1
                     run_arn = f"arn:aws:devicefarm:us-west-2:1:run:{self.scheduled_count}"
@@ -298,7 +320,6 @@ class DeviceFarmQualifyTest(unittest.TestCase):
 
         fake = ThreadSafeFakeClient()
         one_device_150m_usd = MODULE.project_run_cost_usd(device_count=1, timeout_minutes=150)
-        barrier = threading.Barrier(2)
         outcomes: list[str] = []
         outcomes_lock = threading.Lock()
 
@@ -306,7 +327,6 @@ class DeviceFarmQualifyTest(unittest.TestCase):
             lock_path = Path(tmp) / "schedule.lock"
 
             def worker(idx: int) -> None:
-                barrier.wait(timeout=5.0)
                 try:
                     MODULE.schedule_run_guarded(
                         fake,
@@ -322,14 +342,79 @@ class DeviceFarmQualifyTest(unittest.TestCase):
                 with outcomes_lock:
                     outcomes.append(result)
 
-            threads = [threading.Thread(target=worker, args=(i,)) for i in range(2)]
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join(timeout=10.0)
+            t1 = threading.Thread(target=worker, args=(0,))
+            t1.start()
+            self.assertTrue(entered_schedule.wait(timeout=5.0), "First worker did not enter schedule_run")
+
+            # Verify an independent file descriptor cannot acquire the exclusive lock while worker 1 holds it.
+            with lock_path.open("a+", encoding="utf-8") as probe:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(probe.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            t2 = threading.Thread(target=worker, args=(1,))
+            t2.start()
+            release_schedule.set()
+            t1.join(timeout=10.0)
+            t2.join(timeout=10.0)
 
         self.assertEqual(1, fake.scheduled_count)
         self.assertEqual(["admitted", "denied"], sorted(outcomes))
+
+    def test_schedule_run_guarded_uses_remote_ssh_lock_when_control_ssh_is_set(self) -> None:
+        import io
+        from unittest import mock
+
+        p1 = MODULE.PROJECT_ARN
+        now = dt.datetime(2026, 11, 20, 14, 0, tzinfo=dt.timezone.utc)
+        events: list[str] = []
+
+        class FakeRemoteLockProc:
+            def __init__(self, cmd: list[str], **kwargs) -> None:
+                self.cmd = cmd
+                self.stdout = io.StringIO("LOCKED\n")
+                self.stderr = io.StringIO("")
+                self.stdin = io.StringIO()
+                events.append(f"lock_acquire:{cmd[1]}")
+
+            def wait(self, timeout: int = 15) -> int:
+                events.append("lock_release")
+                return 0
+
+            def kill(self) -> None:
+                events.append("lock_kill")
+
+        class FakeClient:
+            def list_projects(self, nextToken: str | None = None) -> dict:
+                events.append("list_projects")
+                return {"projects": [{"arn": p1}]}
+
+            def list_runs(self, arn: str, nextToken: str | None = None) -> dict:
+                events.append("list_runs")
+                return {"runs": []}
+
+            def schedule_run(self, **kwargs) -> dict:
+                events.append("schedule_run")
+                return {"run": {"arn": "arn:run:1"}}
+
+        with mock.patch("subprocess.Popen", side_effect=FakeRemoteLockProc) as popen_mock:
+            result = MODULE.schedule_run_guarded(
+                FakeClient(),
+                lock_path=Path("/unused/local.lock"),
+                ceiling_usd=MODULE.MONTHLY_DENY_USD,
+                projected_new_run_usd=17.0,
+                control_ssh="drmeyers",
+                schedule_kwargs={"name": "remote-run"},
+                now=now,
+            )
+
+        self.assertEqual({"arn": "arn:run:1"}, result)
+        self.assertEqual("ssh", popen_mock.call_args.args[0][0])
+        self.assertEqual("drmeyers", popen_mock.call_args.args[0][1])
+        self.assertIn("flock -x ~/.cache/cassini-devicefarm/schedule.lock", popen_mock.call_args.args[0][2])
+        self.assertEqual(
+            ["lock_acquire:drmeyers", "list_projects", "list_runs", "schedule_run", "lock_release"],
+            events,
+        )
 
     def test_test_spec_validates_arguments_and_rejects_shell_metacharacters(self) -> None:
         spec = MODULE.build_test_spec(
