@@ -22,6 +22,7 @@ import io.codemyriad.cassini.engine.whistle.WhistleRecognizer
 import io.codemyriad.cassini.engine.whistle.WhistleReplay
 import io.codemyriad.cassini.engine.whistle.WhistleResult
 import io.codemyriad.cassini.engine.whistle.WhistleTransport
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -514,10 +515,33 @@ class HandsetQualificationContractTest {
         val exact = floatArrayOf(0.0f, 0.25f, -0.5f, 0.125f, 0.75f)
         HandsetQualificationAudit.verifyBitExactFloatPcmPrefix(live, exact)
 
-        val drifted = exact.copyOf().apply { this[2] += 1e-5f }
+        val oneUlp = exact.copyOf().apply { this[2] = Float.fromBits(this[2].toRawBits() xor 1) }
         assertThrows(AssertionError::class.java) {
-            HandsetQualificationAudit.verifyBitExactFloatPcmPrefix(live, drifted)
+            HandsetQualificationAudit.verifyBitExactFloatPcmPrefix(live, oneUlp)
         }
+    }
+
+    @Test
+    fun reportStoreInitializeClearsStaleReportsEvenWhenZeroReportsEmitted() {
+        val dir = temp.newFolder("qual-reports")
+
+        // Invocation 1 writes a report.
+        HandsetQualificationAudit.ReportStore.initialize(dir)
+        HandsetQualificationAudit.ReportStore.append(dir, JSONObject().put("test", "stale-run"))
+        val file = HandsetQualificationAudit.ReportStore.file(dir)
+        assertEquals(1, JSONArray(file.readText(Charsets.UTF_8)).length())
+
+        // Invocation 2 initializes at runner startup and emits zero reports (e.g. smoke-only or early failure).
+        HandsetQualificationAudit.ReportStore.initialize(dir)
+        assertEquals(0, JSONArray(file.readText(Charsets.UTF_8)).length())
+
+        // Subsequent reports in invocation 2 append cleanly without stale entries.
+        HandsetQualificationAudit.ReportStore.append(dir, JSONObject().put("test", "fresh-1"))
+        HandsetQualificationAudit.ReportStore.append(dir, JSONObject().put("test", "fresh-2"))
+        val fresh = JSONArray(file.readText(Charsets.UTF_8))
+        assertEquals(2, fresh.length())
+        assertEquals("fresh-1", fresh.getJSONObject(0).getString("test"))
+        assertEquals("fresh-2", fresh.getJSONObject(1).getString("test"))
     }
 
     private data class FakeSeg(val start: Long, val end: Long, val sha256: String, val json: String)

@@ -1567,21 +1567,11 @@ class HandsetQualificationDeviceTest {
     }
 
     private fun emitReport(name: String, report: JSONObject) {
-        val reportsFile = File(context.filesDir, "handset-qual-reports.json")
-        val existing = if (reportInitializedInProcess.compareAndSet(false, true)) {
-            JSONArray()
-        } else {
-            runCatching {
-                if (reportsFile.isFile) JSONArray(reportsFile.readText(Charsets.UTF_8)) else JSONArray()
-            }.getOrElse { JSONArray() }
-        }
-        existing.put(report)
-        reportsFile.writeText(existing.toString(2) + "\n", Charsets.UTF_8)
+        HandsetQualificationAudit.ReportStore.append(context.filesDir, report)
         sendStream("\nCASSINI_HANDSET_QUAL_BEGIN:$name\n$report\nCASSINI_HANDSET_QUAL_END:$name\n")
     }
 
     private companion object {
-        val reportInitializedInProcess = AtomicBoolean(false)
         const val TAG = "CassiniHandsetQual"
         const val EVENT_TIMEOUT_MS = 30_000L
         const val BACKGROUND_DURATION_MS = 300_000L

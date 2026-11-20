@@ -1,5 +1,9 @@
 package io.codemyriad.cassini.qualification
 
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+
 /**
  * Deterministic pure-Kotlin qualification validators for D-1126 physical handset checks.
  *
@@ -18,6 +22,31 @@ object HandsetQualificationAudit {
     private const val STOP_REASON_YIELDED = "YIELDED"
     private const val STOP_REASON_OOM = "OUT_OF_MEMORY"
     private const val HEX_RADIX = 16
+    private const val JSON_INDENT = 2
+
+    /**
+     * Manages `handset-qual-reports.json` across instrumentation invocations: [initialize] resets the file to `[]`
+     * once at runner startup so smoke-only or failing invocations never leave stale reports from an earlier run.
+     */
+    object ReportStore {
+        const val FILE_NAME = "handset-qual-reports.json"
+
+        fun file(filesDir: File): File = File(filesDir, FILE_NAME)
+
+        fun initialize(filesDir: File): File = file(filesDir).also { target ->
+            target.parentFile?.mkdirs()
+            target.writeText("[]\n", Charsets.UTF_8)
+        }
+
+        fun append(filesDir: File, report: JSONObject): File = file(filesDir).also { target ->
+            target.parentFile?.mkdirs()
+            val existing = runCatching {
+                if (target.isFile) JSONArray(target.readText(Charsets.UTF_8)) else JSONArray()
+            }.getOrElse { JSONArray() }
+            existing.put(report)
+            target.writeText(existing.toString(JSON_INDENT) + "\n", Charsets.UTF_8)
+        }
+    }
 
     data class PairedEnginePlan(
         val runParakeet: Boolean,
