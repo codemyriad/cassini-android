@@ -87,6 +87,20 @@ class SettingsViewModelTest {
         assertTrue(effects.isEmpty())
     }
 
+    @Test fun helpAndReportAProblemOpenTheirCassiniTalkPagesInTheBrowser() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.onEvent(SettingsEvent.OpenHelp)
+        vm.onEvent(SettingsEvent.OpenReportProblem)
+        advanceUntilIdle()
+        assertEquals(
+            listOf(
+                SettingsEffect.OpenUrl("https://cassini.talk/help"),
+                SettingsEffect.OpenUrl("https://cassini.talk/report"),
+            ),
+            effects,
+        )
+    }
+
     @Test fun failedSpeakerWriteKeepsTheStoredAnswerAndDoesNotDownload() = runTest(dispatcher) {
         ports.speakerFailure = true
         val vm = viewModel()

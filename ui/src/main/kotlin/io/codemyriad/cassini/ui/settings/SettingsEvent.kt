@@ -47,6 +47,9 @@ sealed interface SettingsEvent {
 
     data object OpenHelp : SettingsEvent
 
+    /** About › "Report a problem" (D110): opens the cassini.talk report page; nothing is attached. */
+    data object OpenReportProblem : SettingsEvent
+
     data object OpenSourceCode : SettingsEvent
 
     data object OpenVoices : SettingsEvent
