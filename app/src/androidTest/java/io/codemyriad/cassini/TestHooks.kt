@@ -9,6 +9,7 @@ import io.codemyriad.cassini.core.models.ModelDescriptor
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelFetcher
+import io.codemyriad.cassini.engine.capture.CaptureFactory
 import io.codemyriad.cassini.engine.capture.MicrophoneCapture
 import io.codemyriad.cassini.engine.job.JobEngines
 import io.codemyriad.cassini.engine.job.JobEnvironment
@@ -58,6 +59,10 @@ object TestHooks {
 
     @Volatile var captureSource: CaptureSource? = null
 
+    @Volatile var opusReadHook: CaptureFactory.OpusReadHook? = null
+
+    @Volatile var lastStartedCaptureClass: String? = null
+
     @Volatile var lowMemoryOverride: ((Long?) -> Boolean)? = null
 
     @Volatile var speakerPrefixOverride: (() -> String)? = null
@@ -65,6 +70,8 @@ object TestHooks {
     @Volatile var enginesOverride: ((SpeechModel, JobEngines, Boolean) -> JobEngines)? = null
 
     @Volatile var onWhistleFinish: ((Bundle) -> Unit)? = null
+
+    @Volatile var onWhistleSegment: ((Bundle, Boolean) -> Unit)? = null
 
     @Volatile var onPrecomputeCheckpointed: ((String, Long) -> Unit)? = null
 
@@ -87,11 +94,20 @@ object TestHooks {
     }
 
     fun capture(context: Context): CaptureSource {
-        val real = FactoryCaptureSource(context)
+        val app = context.applicationContext
+        val real = FactoryCaptureSource(app)
         return object : CaptureSource {
             override suspend fun format(): CaptureFormat = (captureSource ?: real).format()
-            override fun start(file: File, onError: () -> Unit): MicrophoneCapture =
-                (captureSource ?: real).start(file, onError)
+            override fun start(file: File, onError: () -> Unit): MicrophoneCapture {
+                val custom = captureSource
+                val started = if (custom != null) {
+                    custom.start(file, onError)
+                } else {
+                    CaptureFactory.create(app, file, onError, opusReadHook)
+                }
+                lastStartedCaptureClass = started.javaClass.simpleName
+                return started
+            }
         }
     }
 
@@ -131,24 +147,19 @@ object TestHooks {
         }
     }
 
-    fun environment(base: JobEnvironment): JobEnvironment {
-        val lowMem = lowMemoryOverride
-        val prefix = speakerPrefixOverride
-        if (lowMem == null && prefix == null) return base
-        return JobEnvironment(
-            placeholderLabel = base.placeholderLabel,
-            inference = base.inference,
-            io = base.io,
-            nanoTime = base.nanoTime,
-            speakerPrefix = prefix ?: base.speakerPrefix,
-            lowMemory = lowMem ?: base.lowMemory,
-            warn = base.warn,
-            syncFile = base.syncFile,
-            maxDurationMs = base.maxDurationMs,
-            maxBodyBytes = base.maxBodyBytes,
-            runAtBackgroundPriority = base.runAtBackgroundPriority,
-        )
-    }
+    fun environment(base: JobEnvironment): JobEnvironment = JobEnvironment(
+        placeholderLabel = base.placeholderLabel,
+        inference = base.inference,
+        io = base.io,
+        nanoTime = base.nanoTime,
+        speakerPrefix = { speakerPrefixOverride?.invoke() ?: base.speakerPrefix() },
+        lowMemory = { durationMs -> lowMemoryOverride?.invoke(durationMs) ?: base.lowMemory(durationMs) },
+        warn = base.warn,
+        syncFile = base.syncFile,
+        maxDurationMs = base.maxDurationMs,
+        maxBodyBytes = base.maxBodyBytes,
+        runAtBackgroundPriority = base.runAtBackgroundPriority,
+    )
 
     fun engines(model: SpeechModel, raw: JobEngines, precompute: Boolean): JobEngines =
         enginesOverride?.invoke(model, raw, precompute) ?: raw
@@ -164,10 +175,13 @@ object TestHooks {
         recordingFreeBytes = null
         jobFactory = null
         captureSource = null
+        opusReadHook = null
+        lastStartedCaptureClass = null
         lowMemoryOverride = null
         speakerPrefixOverride = null
         enginesOverride = null
         onWhistleFinish = null
+        onWhistleSegment = null
         onPrecomputeCheckpointed = null
         onPrecomputeStopped = null
         injectedThermalThrottled.value = false

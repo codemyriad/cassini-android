@@ -67,6 +67,7 @@ class CassiniTestRunner : AndroidJUnitRunner() {
                     environment = TestHooks::environment,
                     engines = TestHooks::engines,
                     onWhistleFinish = { summary -> TestHooks.onWhistleFinish?.invoke(summary) },
+                    onWhistleSegment = { seg, pre -> TestHooks.onWhistleSegment?.invoke(seg, pre) },
                     onPrecomputeCheckpointed = { id, doneMs -> TestHooks.onPrecomputeCheckpointed?.invoke(id, doneMs) },
                     onPrecomputeStopped = { id, reason -> TestHooks.onPrecomputeStopped?.invoke(id, reason) },
                 ),

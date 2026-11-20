@@ -105,8 +105,83 @@ class WhistleStreamTest {
         assertEquals(0, secondTranscribeCalls)
         assertEquals(firstTranscribeCalls, second.cacheHits)
         assertEquals(0, second.neuralTranscribes)
+        assertEquals(first.neuralSpans, second.cacheHitSpans)
+        assertEquals(emptyList<String>(), second.neuralSpans)
         assertEquals(firstSegments, secondSegments)
         assertEquals(firstSummary, secondSummary)
+    }
+
+    @Test
+    fun prefixAuditFailsWhenOneValidCachedPrefixSegmentIsDropped() {
+        val prefixLength = 500_000L
+        val totalLength = 750_000L
+        val cache = LinkedHashMap<Pair<String, Int>, ByteArray>()
+        var preIdx = 0
+        val precompute = WhistleStream(
+            rate = 16000,
+            probability = { 0.9f },
+            transcribe = {
+                preIdx++
+                """{"words":[{"word":"w$preIdx","start":0.01,"end":0.10}]}""".toByteArray()
+            },
+            segment = { range, json, hash ->
+                cache[hash to (range.endSample - range.startSample).toInt()] = json
+            },
+        )
+        feed(precompute, prefixLength)
+        val precomputedSpans = precompute.neuralSpans
+        assertEquals(2, precomputedSpans.size)
+
+        // Intact cache: all precomputed prefix segments hit cache, only tail segments run neural inference.
+        val intact = WhistleStream(
+            rate = 16000,
+            probability = { 0.9f },
+            transcribe = { """{"words":[{"word":"tail","start":0.01,"end":0.10}]}""".toByteArray() },
+            segment = { _, _, _ -> },
+            cachedSegment = { hash, count -> cache[hash to count] },
+        )
+        feed(intact, totalLength)
+        intact.finish()
+        val baselineTotal = intact.cacheHitSpans.size + intact.neuralSpans.size
+        WhistlePrefixAudit.verifyNoNeuralPrefixRedecode(
+            precomputedPrefixSpans = precomputedSpans,
+            postStopCacheHitSpans = intact.cacheHitSpans,
+            postStopNeuralSpans = intact.neuralSpans,
+            baselineTotalSegments = baselineTotal,
+        )
+
+        // Drop ONE valid prefix entry from cache: total segments still equals baselineTotal, so a sum-only check
+        // would pass, whereas WhistlePrefixAudit must fail naming the re-decoded prefix span.
+        val droppedKey = cache.keys.first()
+        val degradedCache = LinkedHashMap(cache).apply { remove(droppedKey) }
+        val degraded = WhistleStream(
+            rate = 16000,
+            probability = { 0.9f },
+            transcribe = { """{"words":[{"word":"redecoded","start":0.01,"end":0.10}]}""".toByteArray() },
+            segment = { _, _, _ -> },
+            cachedSegment = { hash, count -> degradedCache[hash to count] },
+        )
+        feed(degraded, totalLength)
+        degraded.finish()
+        assertEquals(baselineTotal, degraded.cacheHits + degraded.neuralTranscribes)
+        val err = assertThrows(AssertionError::class.java) {
+            WhistlePrefixAudit.verifyNoNeuralPrefixRedecode(
+                precomputedPrefixSpans = precomputedSpans,
+                postStopCacheHitSpans = degraded.cacheHitSpans,
+                postStopNeuralSpans = degraded.neuralSpans,
+                baselineTotalSegments = baselineTotal,
+            )
+        }
+        assertTrue(err.message.orEmpty().contains(precomputedSpans.first()))
+    }
+
+    private fun feed(stream: WhistleStream, length: Long) {
+        var at = 0L
+        while (at < length) {
+            val count = minOf(8192L, length - at).toInt()
+            stream.accept(FloatArray(count) { sample(at + it) })
+            at += count
+        }
     }
 
     private fun sample(index: Long) = ((index % 4093) - 2046).toFloat() / 4096f

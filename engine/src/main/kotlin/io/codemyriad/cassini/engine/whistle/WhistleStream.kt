@@ -33,6 +33,10 @@ class WhistleStream internal constructor(
         private set
     var neuralTranscribes = 0
         private set
+    private val hitSpans = ArrayList<String>()
+    private val inferredSpans = ArrayList<String>()
+    val cacheHitSpans: List<String> get() = hitSpans
+    val neuralSpans: List<String> get() = inferredSpans
     private val rawHash = MessageDigest.getInstance("SHA-256")
     private val vadHash = MessageDigest.getInstance("SHA-256")
     private val gate = WhistleSpeechGate({ frame ->
@@ -72,12 +76,15 @@ class WhistleStream internal constructor(
         val digest = MessageDigest.getInstance("SHA-256")
         updateHash(digest, samples, samples.size)
         val hash = hex(digest.digest())
+        val span = "${range.startSample}-${range.endSample}:$hash"
         val cached = cachedSegment(hash, samples.size)?.takeIf(WhistleSegmentCache::isValidSegmentJson)
         val json = if (cached != null) {
             cacheHits++
+            hitSpans.add(span)
             cached
         } else {
             neuralTranscribes++
+            inferredSpans.add(span)
             transcribe(samples)
         }
         segment(range, json, hash)

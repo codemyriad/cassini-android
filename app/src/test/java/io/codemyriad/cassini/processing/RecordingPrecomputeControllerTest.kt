@@ -200,4 +200,37 @@ class RecordingPrecomputeControllerTest {
 
         h.controller.close()
     }
+
+    @Test fun lowMemorySuppressesRestartForSameRecordingButThermalAllowsResume() = runTest(UnconfinedTestDispatcher()) {
+        val starts = AtomicInteger()
+        val h = Harness(backgroundScope) { noteId, shouldContinue ->
+            starts.incrementAndGet()
+            if (noteId == "note-lm") {
+                PrecomputeStopReason.LOW_MEMORY
+            } else {
+                try {
+                    awaitCancellation()
+                } catch (_: CancellationException) {
+                    if (!shouldContinue()) PrecomputeStopReason.YIELDED else PrecomputeStopReason.CANCELLED
+                }
+            }
+        }
+
+        h.recording.value = active(noteId = "note-lm")
+        runCurrent()
+        assertEquals(1, starts.get())
+        h.recording.value = active(noteId = "note-lm", elapsedMs = 2_000L)
+        runCurrent()
+        assertEquals("LOW_MEMORY must suppress restart on same note", 1, starts.get())
+
+        h.recording.value = active(noteId = "note-th")
+        runCurrent()
+        assertEquals(2, starts.get())
+        h.throttled.value = true
+        runCurrent()
+        h.throttled.value = false
+        runCurrent()
+        assertEquals("Thermal yield must resume once unthrottled", 3, starts.get())
+        h.controller.close()
+    }
 }

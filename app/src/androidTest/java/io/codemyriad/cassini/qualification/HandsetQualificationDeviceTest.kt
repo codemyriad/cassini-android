@@ -37,6 +37,7 @@ import io.codemyriad.cassini.engine.job.JobEngines
 import io.codemyriad.cassini.engine.job.PrecomputeStopReason
 import io.codemyriad.cassini.engine.job.Recognizer
 import io.codemyriad.cassini.engine.job.RecognizerFactory
+import io.codemyriad.cassini.engine.whistle.WhistlePrefixAudit
 import io.codemyriad.cassini.playback.AndroidPlaybackPlatform
 import io.codemyriad.cassini.playback.FocusChange
 import io.codemyriad.cassini.recording.AfterFinish
@@ -532,14 +533,27 @@ class HandsetQualificationDeviceTest {
         )
         assertPairEquivalence(model, baseline, headStart)
 
-        sendStream("[qual] Starting ${model.name} pressure + stall recovery lane...\n")
-        val pressure = runPressureAndStallLane(model, track, totalSeconds, prefixSeconds)
-        assertEquals("${model.name} pressure recovery words & timings", baseline.words, pressure.words)
-        assertEquals("${model.name} pressure recovery turnCount", baseline.turnCount, pressure.turnCount)
-        assertEquals("${model.name} pressure recovery CAM++ matches", baseline.matchedVoices, pressure.matchedVoices)
+        sendStream("[qual] Starting ${model.name} thermal + stall recovery lane...\n")
+        val thermal = runThermalAndStallLane(model, track, totalSeconds, prefixSeconds)
+        assertRecoveryMatchesBaseline(model, "thermal", baseline, thermal.lane)
+
+        sendStream("[qual] Starting ${model.name} dedicated low-memory suppression lane...\n")
+        val lowMemory = runLowMemorySuppressionLane(model, track, totalSeconds)
+        assertRecoveryMatchesBaseline(model, "lowMemory", baseline, lowMemory.lane)
 
         val oomPassed = if (model == SpeechModel.PARAKEET) runOomSuppressionCheck(track) else true
-        return buildEquivalenceReport(model, baseline, headStart, pressure, oomPassed)
+        return buildEquivalenceReport(model, baseline, headStart, thermal, lowMemory, oomPassed)
+    }
+
+    private fun assertRecoveryMatchesBaseline(
+        model: SpeechModel,
+        label: String,
+        baseline: LaneResult,
+        recovered: LaneResult,
+    ) {
+        assertEquals("${model.name} $label recovery words & timings", baseline.words, recovered.words)
+        assertEquals("${model.name} $label recovery turnCount", baseline.turnCount, recovered.turnCount)
+        assertEquals("${model.name} $label recovery CAM++ matches", baseline.matchedVoices, recovered.matchedVoices)
     }
 
     private fun assertPairEquivalence(model: SpeechModel, baseline: LaneResult, headStart: LaneResult) {
@@ -557,20 +571,24 @@ class HandsetQualificationDeviceTest {
             headStart.postStopUnits < baseline.postStopUnits,
         )
         if (model == SpeechModel.INCLUDED) {
-            assertTrue("Whistle must seed cached prefix segments", headStart.whistlePostStopCacheHits > 0)
-            assertEquals(
-                "Whistle must run ZERO neural prefix re-decodes",
-                baseline.whistlePostStopNeural,
-                headStart.whistlePostStopCacheHits + headStart.whistlePostStopNeural,
+            WhistlePrefixAudit.verifyNoNeuralPrefixRedecode(
+                precomputedPrefixSpans = headStart.whistlePrecomputedSpans,
+                postStopCacheHitSpans = headStart.whistlePostStopCacheHitSpans,
+                postStopNeuralSpans = headStart.whistlePostStopNeuralSpans,
+                baselineTotalSegments = baseline.whistlePostStopNeural,
             )
         }
     }
 
+    private data class PressureOutcome(val stopReason: PrecomputeStopReason, val lane: LaneResult)
+
+    @Suppress("LongParameterList")
     private fun buildEquivalenceReport(
         model: SpeechModel,
         baseline: LaneResult,
         headStart: LaneResult,
-        pressure: LaneResult,
+        thermal: PressureOutcome,
+        lowMemory: PressureOutcome,
         oomPassed: Boolean,
     ): JSONObject {
         val speedup = if (headStart.stopToPublishedSec > 0.0) {
@@ -581,7 +599,14 @@ class HandsetQualificationDeviceTest {
         return JSONObject()
             .put("engine", model.name)
             .put("equivalencePassed", true)
-            .put("pressureAndStallPassed", true)
+            .put("thermalAndStallPassed", true)
+            .put("thermalStopReason", thermal.stopReason.name)
+            .put("thermalPrecomputeCheckpoints", thermal.lane.precomputeCheckpoints)
+            .put("thermalPostStopUnits", thermal.lane.postStopUnits)
+            .put("lowMemorySuppressionPassed", true)
+            .put("lowMemoryStopReason", lowMemory.stopReason.name)
+            .put("lowMemoryPrecomputeCheckpoints", lowMemory.lane.precomputeCheckpoints)
+            .put("lowMemoryPostStopUnits", lowMemory.lane.postStopUnits)
             .put("oomSuppressionPassed", oomPassed)
             .put("wordCount", baseline.words.size)
             .put("turnCount", baseline.turnCount)
@@ -592,16 +617,18 @@ class HandsetQualificationDeviceTest {
             .put("speedupFactor", speedup)
             .put("afterStopPostStopUnits", baseline.postStopUnits)
             .put("headStartPostStopUnits", headStart.postStopUnits)
-            .put("pressurePostStopUnits", pressure.postStopUnits)
             .put("headStartPrecomputeCheckpoints", headStart.precomputeCheckpoints)
             .put("headStartResumedFromMs", headStart.resumedFromMs)
             .put("whistleBaselineNeuralSegments", baseline.whistlePostStopNeural)
+            .put("whistlePrecomputedPrefixSegments", headStart.whistlePrecomputedSpans.size)
             .put("whistleHeadStartCacheHits", headStart.whistlePostStopCacheHits)
             .put("whistleHeadStartPostStopNeuralSegments", headStart.whistlePostStopNeural)
+            .put("whistleRedecodedPrefixSegments", 0)
             .put("afterStopTelemetry", baseline.postStopTelemetry.toJson())
             .put("headStartPrecomputeTelemetry", headStart.precomputeTelemetry?.toJson())
             .put("headStartPostStopTelemetry", headStart.postStopTelemetry.toJson())
-            .put("pressurePostStopTelemetry", pressure.postStopTelemetry.toJson())
+            .put("thermalPostStopTelemetry", thermal.lane.postStopTelemetry.toJson())
+            .put("lowMemoryPostStopTelemetry", lowMemory.lane.postStopTelemetry.toJson())
     }
 
     private data class ComparableWord(val text: String, val startMs: Long, val endMs: Long, val speaker: String)
@@ -609,6 +636,9 @@ class HandsetQualificationDeviceTest {
     private data class LaneMetrics(
         val preCheckpoints: Int,
         val postUnits: Int,
+        val whistlePrecomputedSpans: List<String>,
+        val whistleCacheHitSpans: List<String>,
+        val whistleNeuralSpans: List<String>,
         val whistleCacheHits: Int,
         val whistleNeural: Int,
         val stopToPubSec: Double,
@@ -626,6 +656,9 @@ class HandsetQualificationDeviceTest {
         val matchedVoices: List<String>,
         val precomputeCheckpoints: Int,
         val postStopUnits: Int,
+        val whistlePrecomputedSpans: List<String>,
+        val whistlePostStopCacheHitSpans: List<String>,
+        val whistlePostStopNeuralSpans: List<String>,
         val whistlePostStopCacheHits: Int,
         val whistlePostStopNeural: Int,
         val resumedFromMs: Long,
@@ -642,21 +675,59 @@ class HandsetQualificationDeviceTest {
         val checkpointSignal = Channel<Long>(Channel.CONFLATED)
         val whistleSummaries = ArrayList<Bundle>()
         val activeMonitor = AtomicReference<HandsetTelemetryMonitor?>(null)
+        private val livePreWhistleSpans = ArrayList<String>()
+
+        @Volatile var committedWhistleSpans: List<String> = emptyList()
+            private set
+
+        fun recordCheckpoint(doneMs: Long): Int {
+            committedWhistleSpans = synchronized(livePreWhistleSpans) { livePreWhistleSpans.toList() }
+            val count = preCheckpoints.incrementAndGet()
+            lastPreDoneMs.set(doneMs)
+            checkpointSignal.trySend(doneMs)
+            return count
+        }
 
         fun installHooks(onChunk: ((Int) -> Unit)? = null) {
             TestHooks.speakerPrefixOverride = { "diar_d1126_" }
             TestHooks.enginesOverride = { _, raw, precompute ->
                 wrapCountingEngines(raw, precompute, preChunks, postChunks, onChunk)
             }
+            TestHooks.onWhistleSegment = { seg, precompute ->
+                if (precompute) {
+                    val span = WhistlePrefixAudit.spanKey(
+                        seg.getLong("start"),
+                        seg.getLong("end"),
+                        seg.getString("pcmSha256").orEmpty(),
+                    )
+                    synchronized(livePreWhistleSpans) { livePreWhistleSpans.add(span) }
+                }
+            }
             TestHooks.onWhistleFinish = { summary ->
                 synchronized(whistleSummaries) { whistleSummaries.add(summary) }
                 activeMonitor.get()?.recordWhistleWorkerCpuMs(summary.getLong("workerCpuMs"))
             }
-            TestHooks.onPrecomputeCheckpointed = { _, doneMs ->
-                preCheckpoints.incrementAndGet()
-                lastPreDoneMs.set(doneMs)
-                checkpointSignal.trySend(doneMs)
-            }
+            TestHooks.onPrecomputeCheckpointed = { _, doneMs -> recordCheckpoint(doneMs) }
+        }
+
+        fun toMetrics(
+            stopToPubSec: Double,
+            preSnap: HandsetTelemetryMonitor.Snapshot?,
+            postSnap: HandsetTelemetryMonitor.Snapshot,
+        ): LaneMetrics {
+            val postWhistle = synchronized(whistleSummaries) { whistleSummaries.lastOrNull() }
+            return LaneMetrics(
+                preCheckpoints = preCheckpoints.get(),
+                postUnits = postChunks.get(),
+                whistlePrecomputedSpans = committedWhistleSpans,
+                whistleCacheHitSpans = postWhistle?.getStringArrayList("cacheHitSpans")?.toList().orEmpty(),
+                whistleNeuralSpans = postWhistle?.getStringArrayList("neuralSpans")?.toList().orEmpty(),
+                whistleCacheHits = postWhistle?.getInt("cacheHits") ?: 0,
+                whistleNeural = postWhistle?.getInt("neuralTranscribes") ?: 0,
+                stopToPubSec = stopToPubSec,
+                preSnap = preSnap,
+                postSnap = postSnap,
+            )
         }
     }
 
@@ -669,11 +740,7 @@ class HandsetQualificationDeviceTest {
     ): LaneResult {
         TestHooks.reset()
         val counters = LaneCounters().apply { installHooks() }
-        val source = DeterministicOpusCaptureSource(
-            track = track,
-            totalSeconds = totalSeconds,
-            splitAfterSeconds = splitAfterSeconds,
-        )
+        val source = DeterministicOpusCaptureSource(track, totalSeconds, splitAfterSeconds)
         TestHooks.captureSource = source
         graph.speech.choose(model)
         graph.settings.setTranscriptionMode(mode)
@@ -701,83 +768,60 @@ class HandsetQualificationDeviceTest {
         synchronized(counters.whistleSummaries) { counters.whistleSummaries.clear() }
 
         val (doc, stopToPubSec, postSnap) = finishAndMeasureStopToPublished(active.noteId, counters.activeMonitor)
-        val postWhistle = synchronized(counters.whistleSummaries) { counters.whistleSummaries.lastOrNull() }
         val result = inspectPublishedLane(
             noteId = active.noteId,
             model = model,
             doc = doc,
-            metrics = LaneMetrics(
-                preCheckpoints = counters.preCheckpoints.get(),
-                postUnits = counters.postChunks.get(),
-                whistleCacheHits = postWhistle?.getInt("cacheHits") ?: 0,
-                whistleNeural = postWhistle?.getInt("neuralTranscribes") ?: 0,
-                stopToPubSec = stopToPubSec,
-                preSnap = preSnap,
-                postSnap = postSnap,
-            ),
+            metrics = counters.toMetrics(stopToPubSec, preSnap, postSnap),
         )
         cleanupNote(active.noteId)
         TestHooks.reset()
         return result
     }
 
-    private suspend fun runPressureAndStallLane(
+    private suspend fun runThermalAndStallLane(
         model: SpeechModel,
         track: MultiSpeakerSpeechTrack,
         totalSeconds: Int,
         splitAfterSeconds: Int,
-    ): LaneResult {
+    ): PressureOutcome {
         TestHooks.reset()
         val stallEntered = CompletableDeferred<Unit>()
         val releaseStall = CountDownLatch(1)
         val preStopped = Channel<PrecomputeStopReason>(Channel.UNLIMITED)
         val triggerCheckpoint = if (model == SpeechModel.PARAKEET) 2 else 3
-        val counters = installPressureHooks(triggerCheckpoint, stallEntered, releaseStall, preStopped)
+        val counters = installThermalHooks(triggerCheckpoint, stallEntered, releaseStall, preStopped)
         val source = DeterministicOpusCaptureSource(track, totalSeconds, splitAfterSeconds)
         TestHooks.captureSource = source
         graph.speech.choose(model)
         graph.settings.setTranscriptionMode(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING)
 
-        assertTrue(graph.recording.start("D1126 ${model.name} Pressure"))
-        val active = awaitRecordingState("Pressure active") { it is RecordingState.Active } as RecordingState.Active
+        assertTrue(graph.recording.start("D1126 ${model.name} Thermal"))
+        val active = awaitRecordingState("Thermal active") { it is RecordingState.Active } as RecordingState.Active
         withTimeout(ENCODE_TIMEOUT_MS) { source.prefixCommitted.await() }
         withTimeout(PRECOMPUTE_TIMEOUT_MS) { stallEntered.await() }
         assertTrue("Capture stays Active during inference stall", graph.recording.state.value is RecordingState.Active)
         releaseStall.countDown()
 
-        withTimeout(PRECOMPUTE_TIMEOUT_MS) { preStopped.receive() }
+        val stopReason = withTimeout(PRECOMPUTE_TIMEOUT_MS) { preStopped.receive() }
+        assertEquals("Thermal throttling must yield precomputation", PrecomputeStopReason.YIELDED, stopReason)
         assertTrue(
-            "Precompute must pause within 1 unit of pressure (${counters.preCheckpoints.get()} vs $triggerCheckpoint)",
+            "Precompute must pause within 1 unit of thermal (${counters.preCheckpoints.get()} vs $triggerCheckpoint)",
             counters.preCheckpoints.get() <= triggerCheckpoint + 1,
         )
-        TestHooks.injectedThermalThrottled.value = false
-        TestHooks.lowMemoryOverride = null
         source.allowTail()
         withTimeout(ENCODE_TIMEOUT_MS) { source.tailCommitted.await() }
+        TestHooks.injectedThermalThrottled.value = false
 
+        synchronized(counters.whistleSummaries) { counters.whistleSummaries.clear() }
         val (doc, stopToPubSec, postSnap) = finishAndMeasureStopToPublished(active.noteId, counters.activeMonitor)
-        val metrics = buildPressureMetrics(counters, stopToPubSec, postSnap)
-        return inspectPublishedLane(active.noteId, model, doc, metrics).also {
-            cleanupNote(active.noteId)
-            TestHooks.reset()
-        }
+        val lane = inspectPublishedLane(active.noteId, model, doc, counters.toMetrics(stopToPubSec, null, postSnap))
+        cleanupNote(active.noteId)
+        TestHooks.reset()
+        return PressureOutcome(stopReason, lane)
     }
 
-    private fun buildPressureMetrics(
-        counters: LaneCounters,
-        stopToPubSec: Double,
-        postSnap: HandsetTelemetryMonitor.Snapshot,
-    ): LaneMetrics = LaneMetrics(
-        preCheckpoints = counters.preCheckpoints.get(),
-        postUnits = counters.postChunks.get(),
-        whistleCacheHits = 0,
-        whistleNeural = 0,
-        stopToPubSec = stopToPubSec,
-        preSnap = null,
-        postSnap = postSnap,
-    )
-
-    private fun installPressureHooks(
+    private fun installThermalHooks(
         triggerCheckpoint: Int,
         stallEntered: CompletableDeferred<Unit>,
         releaseStall: CountDownLatch,
@@ -791,14 +835,49 @@ class HandsetQualificationDeviceTest {
                 }
             }
         }
-        TestHooks.onPrecomputeCheckpointed = { _, _ ->
-            if (counters.preCheckpoints.incrementAndGet() >= triggerCheckpoint) {
+        TestHooks.onPrecomputeCheckpointed = { _, doneMs ->
+            if (counters.recordCheckpoint(doneMs) >= triggerCheckpoint) {
                 TestHooks.injectedThermalThrottled.value = true
-                TestHooks.lowMemoryOverride = { true }
             }
         }
         TestHooks.onPrecomputeStopped = { _, reason -> preStopped.trySend(reason) }
         return counters
+    }
+
+    private suspend fun runLowMemorySuppressionLane(
+        model: SpeechModel,
+        track: MultiSpeakerSpeechTrack,
+        totalSeconds: Int,
+    ): PressureOutcome {
+        TestHooks.reset()
+        val preStopped = Channel<PrecomputeStopReason>(Channel.UNLIMITED)
+        val counters = LaneCounters().apply { installHooks() }
+        TestHooks.lowMemoryOverride = { true }
+        TestHooks.onPrecomputeStopped = { _, reason -> preStopped.trySend(reason) }
+
+        val source = DeterministicOpusCaptureSource(track, totalSeconds, splitAfterSeconds = null)
+        TestHooks.captureSource = source
+        graph.speech.choose(model)
+        graph.settings.setTranscriptionMode(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING)
+
+        assertTrue(graph.recording.start("D1126 ${model.name} LowMemory"))
+        val active = awaitRecordingState("LowMemory active") { it is RecordingState.Active } as RecordingState.Active
+        withTimeout(ENCODE_TIMEOUT_MS) { source.prefixCommitted.await() }
+        val stopReason = withTimeout(EVENT_TIMEOUT_MS) { preStopped.receive() }
+        assertEquals("Low-memory preflight must report LOW_MEMORY", PrecomputeStopReason.LOW_MEMORY, stopReason)
+        assertEquals("Low-memory suppression must save 0 checkpoints", 0, counters.preCheckpoints.get())
+        assertTrue(
+            "Capture continues uninterrupted under low-memory suppression",
+            graph.recording.state.value is RecordingState.Active,
+        )
+
+        TestHooks.lowMemoryOverride = null
+        synchronized(counters.whistleSummaries) { counters.whistleSummaries.clear() }
+        val (doc, stopToPubSec, postSnap) = finishAndMeasureStopToPublished(active.noteId, counters.activeMonitor)
+        val lane = inspectPublishedLane(active.noteId, model, doc, counters.toMetrics(stopToPubSec, null, postSnap))
+        cleanupNote(active.noteId)
+        TestHooks.reset()
+        return PressureOutcome(stopReason, lane)
     }
 
     private suspend fun finishAndMeasureStopToPublished(
@@ -883,21 +962,24 @@ class HandsetQualificationDeviceTest {
         val counters = LaneCounters().apply { installHooks() }
         ActivityScenario.launch(MainActivity::class.java).use {
             awaitVisible(true)
-            TestHooks.captureSource = RealtimeHardwareMicOpusCaptureSource(track, cfg.longSeconds) { sec ->
+            TestHooks.captureSource = null
+            val observer = ProductionOpusEnduranceObserver(track, cfg.longSeconds) { sec ->
                 sendStream("[30min-$engineArg] ${sec}s/${cfg.longSeconds}s cp=${counters.preCheckpoints.get()}\n")
             }
+            TestHooks.opusReadHook = observer
             val recMonitor = HandsetTelemetryMonitor.start(context).also(counters.activeMonitor::set)
             assertTrue(graph.recording.start("D1126 30min $engineArg"))
             val active = awaitRecordingState("30-min active") { it is RecordingState.Active } as RecordingState.Active
-            val captureSource = TestHooks.captureSource as RealtimeHardwareMicOpusCaptureSource
-            val health = withTimeout((cfg.longSeconds + 300L) * 1_000L) { captureSource.targetReached.await() }
+            assertEquals("OpusCapture", TestHooks.lastStartedCaptureClass)
+            val health = withTimeout((cfg.longSeconds + 300L) * 1_000L) { observer.targetReached.await() }
             val recSnap = recMonitor.finish()
 
             synchronized(counters.whistleSummaries) { counters.whistleSummaries.clear() }
             val (doc, stopToPubSec, postSnap) = finishAndMeasureStopToPublished(active.noteId, counters.activeMonitor)
             assertLongCaptureInvulnerability(health, doc.audioDurationMs, cfg.longSeconds)
-            val lane = buildLongLaneResult(active.noteId, model, doc, counters, stopToPubSec, recSnap, postSnap)
-            assertTrue("30-min transcript must contain words", lane.words.isNotEmpty())
+            val metrics = counters.toMetrics(stopToPubSec, recSnap, postSnap)
+            val lane = inspectPublishedLane(active.noteId, model, doc, metrics)
+            verifyLongLaneOutput(model, lane)
             val report = buildThirtyMinuteReport(
                 engineArg,
                 cfg.longSeconds,
@@ -913,31 +995,15 @@ class HandsetQualificationDeviceTest {
         }
     }
 
-    @Suppress("LongParameterList")
-    private suspend fun buildLongLaneResult(
-        noteId: String,
-        model: SpeechModel,
-        doc: CassiniDocument,
-        counters: LaneCounters,
-        stopToPubSec: Double,
-        recSnap: HandsetTelemetryMonitor.Snapshot,
-        postSnap: HandsetTelemetryMonitor.Snapshot,
-    ): LaneResult {
-        val postWhistle = synchronized(counters.whistleSummaries) { counters.whistleSummaries.lastOrNull() }
-        return inspectPublishedLane(
-            noteId = noteId,
-            model = model,
-            doc = doc,
-            metrics = LaneMetrics(
-                preCheckpoints = counters.preCheckpoints.get(),
-                postUnits = counters.postChunks.get(),
-                whistleCacheHits = postWhistle?.getInt("cacheHits") ?: 0,
-                whistleNeural = postWhistle?.getInt("neuralTranscribes") ?: 0,
-                stopToPubSec = stopToPubSec,
-                preSnap = recSnap,
-                postSnap = postSnap,
-            ),
-        )
+    private fun verifyLongLaneOutput(model: SpeechModel, lane: LaneResult) {
+        assertTrue("30-min transcript must contain words", lane.words.isNotEmpty())
+        if (model == SpeechModel.INCLUDED) {
+            WhistlePrefixAudit.verifyNoNeuralPrefixRedecode(
+                precomputedPrefixSpans = lane.whistlePrecomputedSpans,
+                postStopCacheHitSpans = lane.whistlePostStopCacheHitSpans,
+                postStopNeuralSpans = lane.whistlePostStopNeuralSpans,
+            )
+        }
     }
 
     private suspend fun prepareLongRunModel(engineArg: String): SpeechModel {
@@ -957,19 +1023,18 @@ class HandsetQualificationDeviceTest {
     }
 
     private fun assertLongCaptureInvulnerability(
-        health: RealtimeHardwareMicOpusCaptureSource.CaptureHealth,
+        health: ProductionOpusEnduranceObserver.CaptureHealth,
         publishedDurationMs: Long,
         expectedSeconds: Int,
     ) {
-        assertEquals("Zero AudioRecord read errors", 0, health.readErrors)
         assertEquals("Zero dropped AudioRecord buffers", 0, health.droppedBuffers)
         assertTrue(
-            "Max AudioRecord read block (${health.maxReadBlockMs} ms) < ring (${health.ringBufferMs} ms)",
-            health.maxReadBlockMs < health.ringBufferMs,
+            "Max OpusCapture frame interval (${health.maxFrameIntervalMs} ms) < ring (${health.ringBufferMs} ms)",
+            health.maxFrameIntervalMs < health.ringBufferMs,
         )
         assertTrue(
-            "Published duration ($publishedDurationMs ms) must match ${expectedSeconds * 1000L} ms",
-            abs(publishedDurationMs - expectedSeconds * 1_000L) <= 600L,
+            "Published duration ($publishedDurationMs ms) within 2s of ${expectedSeconds * 1000L} ms",
+            abs(publishedDurationMs - expectedSeconds * 1_000L) <= 2_000L,
         )
     }
 
@@ -980,10 +1045,11 @@ class HandsetQualificationDeviceTest {
         enrolledNames: List<String>,
         preUnitsDecoded: Int,
         publishedDurationMs: Long,
-        health: RealtimeHardwareMicOpusCaptureSource.CaptureHealth,
+        health: ProductionOpusEnduranceObserver.CaptureHealth,
         lane: LaneResult,
     ): JSONObject = JSONObject()
         .put("test", "test03ThirtyMinuteContinuousQualification")
+        .put("captureClass", "OpusCapture")
         .put("engine", engineArg)
         .put("audioSeconds", longSeconds)
         .put("enrolledVoices", JSONArray(enrolledNames))
@@ -991,8 +1057,10 @@ class HandsetQualificationDeviceTest {
         .put("precomputeUnitsDecoded", preUnitsDecoded)
         .put("postStopUnitsDecoded", lane.postStopUnits)
         .put("resumedFromMs", lane.resumedFromMs)
+        .put("whistlePrecomputedPrefixSegments", lane.whistlePrecomputedSpans.size)
         .put("whistlePostStopCacheHits", lane.whistlePostStopCacheHits)
         .put("whistlePostStopNeuralSegments", lane.whistlePostStopNeural)
+        .put("whistleRedecodedPrefixSegments", 0)
         .put("stopToPublishedSeconds", lane.stopToPublishedSec)
         .put("wordCount", lane.words.size)
         .put("turnCount", lane.turnCount)
@@ -1002,11 +1070,11 @@ class HandsetQualificationDeviceTest {
         .put(
             "captureHealth",
             JSONObject()
+                .put("captureClass", "OpusCapture")
                 .put("capturedSamples", health.capturedSamples)
                 .put("capturedSeconds", health.capturedSeconds)
-                .put("readErrors", health.readErrors)
                 .put("droppedBuffers", health.droppedBuffers)
-                .put("maxReadBlockMs", health.maxReadBlockMs)
+                .put("maxFrameIntervalMs", health.maxFrameIntervalMs)
                 .put("ringBufferMs", health.ringBufferMs)
                 .put("micPeakAmplitude", health.micPeakAmplitude),
         )
@@ -1138,6 +1206,9 @@ class HandsetQualificationDeviceTest {
             matchedVoices = matchedVoices,
             precomputeCheckpoints = metrics.preCheckpoints,
             postStopUnits = metrics.postUnits,
+            whistlePrecomputedSpans = metrics.whistlePrecomputedSpans,
+            whistlePostStopCacheHitSpans = metrics.whistleCacheHitSpans,
+            whistlePostStopNeuralSpans = metrics.whistleNeuralSpans,
             whistlePostStopCacheHits = metrics.whistleCacheHits,
             whistlePostStopNeural = metrics.whistleNeural,
             resumedFromMs = resumedFromMs,

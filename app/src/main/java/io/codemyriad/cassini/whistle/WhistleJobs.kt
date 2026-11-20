@@ -16,7 +16,7 @@ import java.io.File
 /** Binds one immutable job to Included's decoder and worker, preserving its optional speaker/print seams. */
 object WhistleJobs {
     @RequiresApi(Build.VERSION_CODES.Q)
-    @Suppress("LongParameterList") // One explicit seam per collaborator plus optional worker-summary callback.
+    @Suppress("LongParameterList") // One explicit seam per collaborator plus optional worker callbacks.
     fun of(
         context: Context,
         base: JobEngines,
@@ -24,12 +24,13 @@ object WhistleJobs {
         file: File,
         segmentCacheFile: File? = null,
         onWorkerFinished: (Bundle) -> Unit = {},
+        onWorkerSegment: (Bundle) -> Unit = {},
     ): JobEngines {
         val source = DecoderAudioSource(AudioDecoder(context.contentResolver, cache, included = true))
         val replay = WhistleReplay { samples, sink -> prefix(source, file, samples, sink) }
         val store = segmentCacheFile?.let(::FileWhistleSegmentStore)
         return JobEngines(
-            WhistleRecognizers(context, replay, store, onWorkerFinished),
+            WhistleRecognizers(context, replay, store, onWorkerFinished, onWorkerSegment),
             base.diarizers,
             base.prints,
             source,

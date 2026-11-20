@@ -7,15 +7,25 @@ import io.codemyriad.cassini.core.checkpoint.CheckpointState
 import io.codemyriad.cassini.core.checkpoint.CommittedPrefix
 import io.codemyriad.cassini.core.checkpoint.PrefixDecision
 import io.codemyriad.cassini.core.checkpoint.RecognitionState
+import io.codemyriad.cassini.core.checkpoint.WhistleCachedSegment
+import io.codemyriad.cassini.core.checkpoint.WhistleSegmentCache
 import io.codemyriad.cassini.core.checkpoint.WordLogRef
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.OggOpus
 import io.codemyriad.cassini.core.format.OggOpusPrefixScanner
 import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.SpeechModel
+import io.codemyriad.cassini.engine.job.Recognizer
+import io.codemyriad.cassini.engine.whistle.FileWhistleSegmentStore
+import io.codemyriad.cassini.engine.whistle.WhistlePrefixAudit
+import io.codemyriad.cassini.engine.whistle.WhistleRecognizer
+import io.codemyriad.cassini.engine.whistle.WhistleReplay
+import io.codemyriad.cassini.engine.whistle.WhistleResult
+import io.codemyriad.cassini.engine.whistle.WhistleTransport
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -94,6 +104,160 @@ class HandsetQualificationContractTest {
             aacFallback.spawnWorkerDuringRecording,
         )
         assertTrue("AAC capture must still auto-enqueue post-Stop transcription", aacFallback.autoEnqueueOnStop)
+    }
+
+    @Test
+    fun whistleQualificationFailsWhenOneValidPrefixCacheEntryIsLost() {
+        val segFile = temp.newFile("whistle-segments.json")
+        val prefixSegments = listOf(
+            FakeSeg(0L, 16_000L, "a".repeat(64), """{"words":[{"word":"uno","start":0.05,"end":0.40}]}"""),
+            FakeSeg(16_000L, 32_000L, "b".repeat(64), """{"words":[{"word":"due","start":0.05,"end":0.40}]}"""),
+            FakeSeg(32_000L, 48_000L, "c".repeat(64), """{"words":[{"word":"tre","start":0.05,"end":0.40}]}"""),
+        )
+        val tail = FakeSeg(
+            48_000L,
+            64_000L,
+            "d".repeat(64),
+            """{"words":[{"word":"quattro","start":0.05,"end":0.40}]}""",
+        )
+        val allSegments = prefixSegments + tail
+        val fullPcm = FloatArray(64_000) { i -> ((i % 251) - 125) / 512f }
+
+        // 1. Precompute settles 3 prefix segments into FileWhistleSegmentStore + RecognitionState checkpoint.
+        val (savedRecognition, precomputedSpans) = precomputeWhistlePrefix(segFile, prefixSegments, fullPcm)
+        assertEquals(3, precomputedSpans.size)
+
+        // 2. Intact post-Stop resume: all 3 prefix segments hit cache, only 1 tail segment runs neural inference.
+        val intactPost = runPostStopWhistle(savedRecognition, FileWhistleSegmentStore(segFile), allSegments, fullPcm)
+        WhistlePrefixAudit.verifyNoNeuralPrefixRedecode(
+            precomputedPrefixSpans = precomputedSpans,
+            postStopCacheHitSpans = intactPost.cacheHitSpans,
+            postStopNeuralSpans = intactPost.neuralSpans,
+            baselineTotalSegments = 4,
+        )
+
+        // 3. Lose ONE valid prefix cache entry (segment #2) before Stop: total (2 hits + 2 neural = 4) still equals
+        //    baseline 4, yet WhistlePrefixAudit must fail qualification naming the re-decoded prefix segment.
+        dropSingleCachedSegment(segFile, prefixSegments[1].sha256)
+        val degradedPost = runPostStopWhistle(savedRecognition, FileWhistleSegmentStore(segFile), allSegments, fullPcm)
+        assertEquals(4, degradedPost.cacheHitSpans.size + degradedPost.neuralSpans.size)
+        val err = assertThrows(AssertionError::class.java) {
+            WhistlePrefixAudit.verifyNoNeuralPrefixRedecode(
+                precomputedPrefixSpans = precomputedSpans,
+                postStopCacheHitSpans = degradedPost.cacheHitSpans,
+                postStopNeuralSpans = degradedPost.neuralSpans,
+                baselineTotalSegments = 4,
+            )
+        }
+        assertTrue(err.message.orEmpty().contains(precomputedSpans[1]))
+    }
+
+    private fun precomputeWhistlePrefix(
+        segFile: File,
+        prefixSegments: List<FakeSeg>,
+        fullPcm: FloatArray,
+    ): Pair<RecognitionState, List<String>> {
+        val preTransport = FakeWhistleTransport(prefixSegments)
+        val preRec = WhistleRecognizer(
+            restored = null,
+            callbacks = noopCallbacks(),
+            replay = WhistleReplay { _, _ -> },
+            open = { emit -> preTransport.bind(emit) },
+            segmentStore = FileWhistleSegmentStore(segFile),
+        )
+        preRec.accept(fullPcm, 48_000)
+        val saved = preRec.checkpoint()
+        preRec.close()
+        return saved to preTransport.neuralSpans.toList()
+    }
+
+    private fun dropSingleCachedSegment(segFile: File, droppedSha256: String) {
+        val trimmed = WhistleSegmentCache(WhistleRecognizer.PIPELINE).apply {
+            WhistleSegmentCache.readFrom(segFile, WhistleRecognizer.PIPELINE).entries()
+                .filter { it.pcmSha256 != droppedSha256 }
+                .forEach { put(it.pcmSha256, it.sampleCount, it.json) }
+        }
+        trimmed.writeTo(segFile)
+    }
+
+    private fun noopCallbacks() = Recognizer.Callbacks(
+        onChunk = { _, _, words -> words },
+        onStage = { _, _, _ -> },
+        onProgress = {},
+    )
+
+    @Test
+    fun whistleQualificationRejectsPartialHitRatioEvenWhenSegmentTotalMatchesBaseline() {
+        val prefix38 = (0 until 38).map { "seg-$it:sha$it" }
+        val tail6 = (38 until 44).map { "seg-$it:sha$it" }
+        assertThrows(AssertionError::class.java) {
+            WhistlePrefixAudit.verifyNoNeuralPrefixRedecode(
+                precomputedPrefixSpans = prefix38,
+                postStopCacheHitSpans = prefix38.take(1),
+                postStopNeuralSpans = prefix38.drop(1) + tail6,
+                baselineTotalSegments = 44,
+            )
+        }
+    }
+
+    private data class FakeSeg(val start: Long, val end: Long, val sha256: String, val json: String)
+
+    private class FakeWhistleTransport(private val segments: List<FakeSeg>) : WhistleTransport {
+        private val seeded = HashMap<Pair<String, Int>, ByteArray>()
+        private var accepted = 0L
+        private var nextIdx = 0
+        private lateinit var emit: (WhistleResult) -> Unit
+        val cacheHitSpans = ArrayList<String>()
+        val neuralSpans = ArrayList<String>()
+
+        fun bind(sink: (WhistleResult) -> Unit): WhistleTransport {
+            emit = sink
+            return this
+        }
+
+        override fun seedCache(entries: List<WhistleCachedSegment>) {
+            entries.forEach { seeded[it.pcmSha256 to it.sampleCount] = it.json }
+        }
+
+        override fun accept(samples: FloatArray, count: Int) {
+            accepted += count
+            while (nextIdx < segments.size && segments[nextIdx].end <= accepted) {
+                val seg = segments[nextIdx++]
+                val span = WhistlePrefixAudit.spanKey(seg.start, seg.end, seg.sha256)
+                val cached = seeded[seg.sha256 to (seg.end - seg.start).toInt()]
+                val payload = if (cached != null) {
+                    cacheHitSpans.add(span)
+                    cached
+                } else {
+                    neuralSpans.add(span)
+                    seg.json.toByteArray()
+                }
+                emit(WhistleResult(seg.start, seg.end, payload, seg.sha256))
+            }
+        }
+
+        override fun finish() = Unit
+        override fun close() = Unit
+    }
+
+    private fun runPostStopWhistle(
+        restored: RecognitionState,
+        store: FileWhistleSegmentStore,
+        segments: List<FakeSeg>,
+        fullPcm: FloatArray,
+    ): FakeWhistleTransport {
+        val transport = FakeWhistleTransport(segments)
+        val rec = WhistleRecognizer(
+            restored = restored,
+            callbacks = noopCallbacks(),
+            replay = WhistleReplay { limit, sink -> sink(fullPcm, limit.toInt()) },
+            open = { emit -> transport.bind(emit) },
+            segmentStore = store,
+        )
+        rec.accept(fullPcm.copyOfRange(48_000, 64_000), 16_000)
+        rec.finish(4_000L)
+        rec.close()
+        return transport
     }
 
     private fun opusHead(): ByteArray = ByteArray(19).also { h ->

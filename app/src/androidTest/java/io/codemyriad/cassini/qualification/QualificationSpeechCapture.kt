@@ -1,13 +1,10 @@
 package io.codemyriad.cassini.qualification
 
-import android.annotation.SuppressLint
 import android.content.Context
-import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTimestamp
 import android.media.MediaCodec
 import android.media.MediaFormat
-import android.media.MediaRecorder
 import android.net.Uri
 import android.os.SystemClock
 import io.codemyriad.cassini.AppGraph
@@ -402,327 +399,114 @@ internal class DeterministicOpusCaptureSource(
 }
 
 /**
- * Real-time 1.0x continuous hardware-microphone `AudioRecord(MIC, 48 kHz)` + 3-speaker speech capture source
- * for the 30-minute (`1,800 s`) capture invulnerability run.
+ * Post-read observer installed on production `OpusCapture` (`CaptureFactory.OpusReadHook`) for the 30-minute
+ * (`1,800 s`) capture invulnerability run.
  *
- * Paced 100% by the handset's physical 48 kHz `AudioRecord` DMA stream (zero fixed sleep calls), monitoring
- * `readErrors`, worst-case read turnaround (`maxReadBlockMs` vs 2,000 ms ring buffer), and `AudioTimestamp`
- * HAL frame continuity (`droppedBuffers`).
+ * Production `OpusCapture` owns its actual 1-second `AudioRecord` buffer (`maxOf(minimum, RATE * 2)` bytes =
+ * `48,000` samples), capture thread, `MediaCodec`, `OggOpus.LiveMuxer`, flush/sync cadence, and pause/stop
+ * lifecycle. This hook inspects HAL `AudioTimestamp` continuity + inter-frame cadence against `OpusCapture`'s
+ * actual ring buffer and overlays 3-speaker speech onto silent rack-room mic audio so full VAD/ASR/diarization
+ * precomputation executes simultaneously.
  */
-@Suppress("TooManyFunctions")
-internal class RealtimeHardwareMicOpusCaptureSource(
+internal class ProductionOpusEnduranceObserver(
     private val track: MultiSpeakerSpeechTrack,
     private val targetSeconds: Int,
     private val onProgressSeconds: (Int) -> Unit = {},
-) : CaptureSource {
+) : CaptureFactory.OpusReadHook {
     val targetReached = CompletableDeferred<CaptureHealth>()
-    private val readErrorsCount = AtomicInteger(0)
+    private val speechFrame = ShortArray(FRAME)
+    private val timestamp = AudioTimestamp()
     private val droppedBuffersCount = AtomicInteger(0)
-    private val maxReadBlockMsValue = AtomicLong(0L)
+    private val maxFrameIntervalMsValue = AtomicLong(0L)
     private val micPeakValue = AtomicInteger(0)
+
+    @Volatile private var baseHalFrame: Long? = null
+
+    @Volatile private var lastFrameAtMs: Long = 0L
+
+    @Volatile private var lastReportedSec: Int = 0
 
     data class CaptureHealth(
         val capturedSamples: Long,
         val capturedSeconds: Double,
-        val readErrors: Int,
         val droppedBuffers: Int,
-        val maxReadBlockMs: Long,
+        val maxFrameIntervalMs: Long,
         val ringBufferMs: Long,
         val micPeakAmplitude: Int,
     )
 
-    override suspend fun format(): CaptureFormat = CaptureFormat.OPUS
-
-    override fun start(file: File, onError: () -> Unit): MicrophoneCapture = Capture(file, onError)
-
-    private inner class Capture(override val file: File, private val onError: () -> Unit) : MicrophoneCapture {
-        private val output = FileOutputStream(file)
-        private val stream = output.buffered(1 shl 16)
-        private val codec = MediaCodec.createEncoderByType("audio/opus")
-        private val record: AudioRecord
-        private val ringSamples: Int
-
-        @Volatile private var samples = 0L
-
-        @Volatile private var running = true
-
-        @Volatile override var paused = false
-            private set
-
-        @Volatile private var failure: Throwable? = null
-
-        private var muxer: OggOpus.LiveMuxer? = null
-        private val thread: Thread
-
-        override val opus = true
-        override val sessionId: Int get() = record.audioSessionId
-        override val elapsedMs: Long get() = samples * 1000L / RATE
-        override val amplitude: Int get() = if (paused) 0 else 8_000
-
-        init {
-            codec.configure(
-                MediaFormat.createAudioFormat("audio/opus", RATE, 1).apply {
-                    setInteger(MediaFormat.KEY_BIT_RATE, BIT_RATE)
-                    setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, FRAME * 2)
-                },
-                null,
-                null,
-                MediaCodec.CONFIGURE_FLAG_ENCODE,
-            )
-            codec.start()
-            val minimum = AudioRecord.getMinBufferSize(
-                RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-            )
-            val bufferBytes = maxOf(minimum, RATE * 2 * 2)
-            ringSamples = bufferBytes / 2
-            @SuppressLint("MissingPermission")
-            val audio = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                bufferBytes,
-            )
-            check(audio.state == AudioRecord.STATE_INITIALIZED) { "Physical AudioRecord(MIC) failed to initialize" }
-            record = audio
-            record.startRecording()
-            check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-                "Physical AudioRecord(MIC) did not start"
-            }
-            thread = Thread(::captureLoop, "cassini-qual-30min-mic").apply {
-                priority = Thread.MAX_PRIORITY
-                start()
-            }
+    override fun onRead(
+        record: AudioRecord,
+        ringSamples: Int,
+        frame: ShortArray,
+        count: Int,
+        sampleOffset: Long,
+    ) {
+        val now = SystemClock.elapsedRealtime()
+        val ringMs = ringSamples * 1000L / RATE
+        val prevAt = lastFrameAtMs
+        if (prevAt > 0L) {
+            val intervalMs = (now - prevAt).coerceAtLeast(0L)
+            maxFrameIntervalMsValue.accumulateAndGet(intervalMs, ::maxOf)
+            if (intervalMs > ringMs) droppedBuffersCount.incrementAndGet()
         }
+        lastFrameAtMs = now
 
-        private fun captureLoop() {
-            val micFrame = ShortArray(FRAME)
-            val speechFrame = ShortArray(FRAME)
-            val mixedFrame = ShortArray(FRAME)
-            val info = MediaCodec.BufferInfo()
-            val timestamp = AudioTimestamp()
-            var baseHalFrame: Long? = null
-            var flushed = SystemClock.elapsedRealtime()
-            var synced = flushed
-            var lastReportedSec = 0
-            val targetSamples = targetSeconds.toLong() * RATE
+        mixSpeechOverMic(frame, count, sampleOffset)
+        val nextSamples = sampleOffset + count
+        checkHalTimestamp(record, ringSamples, nextSamples)
+        reportProgressAndTarget(ringMs, nextSamples)
+    }
 
-            try {
-                while (running) {
-                    val n = readMicFrame(micFrame)
-                    if (n > 0) {
-                        mixSpeechWithMic(micFrame, speechFrame, mixedFrame, n)
-                        queue(mixedFrame, n, 0, info)
-                        samples += n
-                        drain(info, 0L)
-                        baseHalFrame = checkHalTimestamp(timestamp, baseHalFrame)
-                        lastReportedSec = reportAndCheckTarget(lastReportedSec, targetSamples)
-                        val times = flushAndSyncIfDue(flushed, synced)
-                        flushed = times.first
-                        synced = times.second
-                    }
-                }
-                sealEos(mixedFrame, info)
-                if (!targetReached.isCompleted) targetReached.complete(snapshotHealth())
-            } catch (@Suppress("TooGenericExceptionCaught") err: Throwable) {
-                failure = err
-                targetReached.completeExceptionally(err)
-                runCatching { muxer?.finish() }
-            } finally {
-                closeResources()
-            }
-            if (failure != null && running) onError()
+    private fun mixSpeechOverMic(frame: ShortArray, count: Int, sampleOffset: Long) {
+        val step = minOf(count, speechFrame.size)
+        track.readFrames48k(sampleOffset, speechFrame, step)
+        var sum = 0L
+        for (i in 0 until step) sum += frame[i]
+        val mean = (sum / step).toInt()
+        for (i in 0 until step) {
+            val ac = abs(frame[i] - mean)
+            if (ac > micPeakValue.get()) micPeakValue.set(ac)
+            val mixed = speechFrame[i].toInt() + ((frame[i] - mean) / 64)
+            frame[i] = mixed.coerceIn(-32768, 32767).toShort()
         }
+    }
 
-        private fun readMicFrame(micFrame: ShortArray): Int {
-            var n = 0
-            val readStart = SystemClock.elapsedRealtime()
-            while (n < FRAME && running) {
-                val got = record.read(micFrame, n, FRAME - n)
-                if (got < 0) {
-                    readErrorsCount.incrementAndGet()
-                    error("AudioRecord.read error: $got")
-                }
-                n += got
-            }
-            if (n > 0) {
-                val blockMs = (SystemClock.elapsedRealtime() - readStart).coerceAtLeast(0L)
-                maxReadBlockMsValue.accumulateAndGet(blockMs, ::maxOf)
-                if (blockMs > ringSamples * 1000L / RATE) {
-                    droppedBuffersCount.incrementAndGet()
-                }
-            }
-            return n
-        }
-
-        private fun mixSpeechWithMic(
-            micFrame: ShortArray,
-            speechFrame: ShortArray,
-            mixedFrame: ShortArray,
-            n: Int,
+    private fun checkHalTimestamp(record: AudioRecord, ringSamples: Int, nextSamples: Long) {
+        if (nextSamples % RATE != 0L ||
+            record.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC) != AudioRecord.SUCCESS
         ) {
-            track.readFrames48k(samples, speechFrame, n)
-            var sum = 0L
-            for (i in 0 until n) sum += micFrame[i]
-            val mean = (sum / n).toInt()
-            for (i in 0 until n) {
-                val ac = abs(micFrame[i] - mean)
-                if (ac > micPeakValue.get()) micPeakValue.set(ac)
-                val mixed = speechFrame[i].toInt() + ((micFrame[i] - mean) / 64)
-                mixedFrame[i] = mixed.coerceIn(-32768, 32767).toShort()
-            }
+            return
         }
-
-        private fun checkHalTimestamp(timestamp: AudioTimestamp, currentBase: Long?): Long? {
-            if (samples % RATE != 0L ||
-                record.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC) != AudioRecord.SUCCESS
-            ) {
-                return currentBase
-            }
-            val base = currentBase ?: timestamp.framePosition
-            if (timestamp.framePosition - base - samples > ringSamples) {
-                droppedBuffersCount.incrementAndGet()
-            }
-            return base
+        val base = baseHalFrame ?: timestamp.framePosition.also { baseHalFrame = it }
+        if (timestamp.framePosition - base - nextSamples > ringSamples) {
+            droppedBuffersCount.incrementAndGet()
         }
+    }
 
-        private fun reportAndCheckTarget(lastReportedSec: Int, targetSamples: Long): Int {
-            val secNow = (samples / RATE).toInt()
-            var updated = lastReportedSec
-            if (secNow >= lastReportedSec + 30) {
-                updated = secNow
-                onProgressSeconds(secNow)
-            }
-            if (!targetReached.isCompleted && samples >= targetSamples) {
-                targetReached.complete(snapshotHealth())
-            }
-            return updated
+    private fun reportProgressAndTarget(ringMs: Long, nextSamples: Long) {
+        val secNow = (nextSamples / RATE).toInt()
+        if (secNow >= lastReportedSec + 30) {
+            lastReportedSec = secNow
+            onProgressSeconds(secNow)
         }
-
-        private fun flushAndSyncIfDue(flushed: Long, synced: Long): Pair<Long, Long> {
-            val now = SystemClock.elapsedRealtime()
-            var nextFlushed = flushed
-            var nextSynced = synced
-            if (now - flushed >= 1000L) {
-                stream.flush()
-                nextFlushed = now
-            }
-            if (now - synced >= 5000L) {
-                output.fd.sync()
-                nextSynced = now
-            }
-            return nextFlushed to nextSynced
-        }
-
-        private fun sealEos(frame: ShortArray, info: MediaCodec.BufferInfo) {
-            queue(ShortArray(FRAME), FRAME, 0, info)
-            queue(frame, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM, info)
-            val deadline = SystemClock.elapsedRealtime() + 5000L
-            while (!drain(info, DRAIN_US) && SystemClock.elapsedRealtime() < deadline) Unit
-            muxer?.let { it.finish(it.preSkip + samples) }
-        }
-
-        private fun closeResources() {
-            runCatching {
-                stream.flush()
-                output.fd.sync()
-            }
-            runCatching { stream.close() }
-            runCatching { record.stop() }
-            record.release()
-            runCatching { codec.stop() }
-            codec.release()
-        }
-
-        private fun snapshotHealth() = CaptureHealth(
-            capturedSamples = samples,
-            capturedSeconds = samples.toDouble() / RATE,
-            readErrors = readErrorsCount.get(),
-            droppedBuffers = droppedBuffersCount.get(),
-            maxReadBlockMs = maxReadBlockMsValue.get(),
-            ringBufferMs = ringSamples * 1000L / RATE,
-            micPeakAmplitude = micPeakValue.get(),
-        )
-
-        private fun queue(pcm: ShortArray, n: Int, flags: Int, info: MediaCodec.BufferInfo) {
-            var index: Int
-            do {
-                index = codec.dequeueInputBuffer(DRAIN_US)
-                if (index < 0) drain(info, 0L)
-            } while (index < 0)
-            val input = codec.getInputBuffer(index)!!.apply {
-                clear()
-                order(ByteOrder.LITTLE_ENDIAN)
-            }
-            for (i in 0 until n) input.putShort(pcm[i])
-            codec.queueInputBuffer(index, 0, n * 2, samples * 1_000_000L / RATE, flags)
-        }
-
-        private fun drain(info: MediaCodec.BufferInfo, timeoutUs: Long): Boolean {
-            while (true) {
-                val index = codec.dequeueOutputBuffer(info, timeoutUs)
-                if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                    codec.outputFormat.getByteBuffer("csd-0")?.let { b ->
-                        val bytes = ByteArray(b.remaining())
-                        b.get(bytes)
-                        config(bytes)
-                    }
-                    continue
-                }
-                if (index < 0) return false
-                val buffer = codec.getOutputBuffer(index)!!
-                buffer.position(info.offset)
-                buffer.limit(info.offset + info.size)
-                val bytes = ByteArray(info.size)
-                buffer.get(bytes)
-                if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
-                    config(bytes)
-                } else if (bytes.isNotEmpty()) {
-                    (muxer ?: error("No OpusHead from platform encoder")).add(bytes)
-                }
-                codec.releaseOutputBuffer(index, false)
-                if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return true
-            }
-        }
-
-        private fun config(bytes: ByteArray) {
-            if (muxer != null) return
-            val marker = "OpusHead".toByteArray()
-            val start = (0..(bytes.size - 19)).firstOrNull { p ->
-                marker.indices.all { bytes[p + it] == marker[it] }
-            } ?: return
-            muxer = OggOpus.LiveMuxer(
-                stream,
-                bytes.copyOfRange(start, start + 19),
-                CassiniDocument.tagsPacket(emptyList()),
+        if (!targetReached.isCompleted && nextSamples >= targetSeconds.toLong() * RATE) {
+            targetReached.complete(
+                CaptureHealth(
+                    capturedSamples = nextSamples,
+                    capturedSeconds = nextSamples.toDouble() / RATE,
+                    droppedBuffers = droppedBuffersCount.get(),
+                    maxFrameIntervalMs = maxFrameIntervalMsValue.get(),
+                    ringBufferMs = ringMs,
+                    micPeakAmplitude = micPeakValue.get(),
+                ),
             )
-        }
-
-        override fun togglePause() {
-            paused = !paused
-        }
-
-        override suspend fun stop(): File = runInterruptible(Dispatchers.IO) {
-            running = false
-            thread.join(15_000L)
-            check(!thread.isAlive) { "30-min AudioRecord capture thread did not stop" }
-            failure?.let { throw IllegalStateException("30-min AudioRecord capture failed", it) }
-            file
-        }
-
-        override fun release() {
-            running = false
-            thread.join(15_000L)
         }
     }
 
     companion object {
         private const val RATE = 48_000
         private const val FRAME = RATE / 50
-        private const val BIT_RATE = 48_000
-        private const val DRAIN_US = 10_000L
     }
 }
 

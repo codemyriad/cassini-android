@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.engine.capture
 
 import android.content.Context
+import android.media.AudioRecord
 import android.media.MediaCodecList
 import android.os.Build
 import kotlinx.coroutines.Dispatchers
@@ -9,6 +10,11 @@ import java.io.File
 
 /** Chooses the capture format once per process and starts captures in it. */
 object CaptureFactory {
+    /** Optional test-only post-read hook invoked inside [OpusCapture] after `AudioRecord.read`; null in production. */
+    fun interface OpusReadHook {
+        fun onRead(record: AudioRecord, ringSamples: Int, frame: ShortArray, count: Int, sampleOffset: Long)
+    }
+
     @Volatile private var platformOpus: Boolean? = null
 
     /**
@@ -27,6 +33,11 @@ object CaptureFactory {
     suspend fun extension(): String = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && platformOpusEncoder()) "opus" else "m4a"
 
     /** Starts capturing into [file], whose extension came from [extension]. [onError] runs on the capture thread. */
-    fun create(context: Context, file: File, onError: () -> Unit): MicrophoneCapture =
-        if (file.extension == "opus") OpusCapture(file, onError) else AacCapture(context, file, onError)
+    fun create(
+        context: Context,
+        file: File,
+        onError: () -> Unit,
+        opusReadHook: OpusReadHook? = null,
+    ): MicrophoneCapture =
+        if (file.extension == "opus") OpusCapture(file, onError, opusReadHook) else AacCapture(context, file, onError)
 }

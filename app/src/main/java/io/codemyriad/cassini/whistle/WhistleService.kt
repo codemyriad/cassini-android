@@ -99,6 +99,8 @@ class WhistleService : Service() {
                 putFloat("maxProbability", hashes.maximum)
                 putInt("cacheHits", activeStream.cacheHits)
                 putInt("neuralTranscribes", activeStream.neuralTranscribes)
+                putStringArrayList("cacheHitSpans", ArrayList(activeStream.cacheHitSpans))
+                putStringArrayList("neuralSpans", ArrayList(activeStream.neuralSpans))
                 putLong("workerCpuMs", Process.getElapsedCpuTime())
             }
         }

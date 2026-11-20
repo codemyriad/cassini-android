@@ -21,6 +21,7 @@ class WhistleRecognizers(
     private val replay: WhistleReplay,
     private val segmentStore: WhistleSegmentStore? = null,
     private val onWorkerFinished: (Bundle) -> Unit = {},
+    private val onWorkerSegment: (Bundle) -> Unit = {},
 ) : RecognizerFactory {
     override fun open(restored: RecognitionState?, callbacks: Recognizer.Callbacks): Recognizer =
         WhistleRecognizer(
@@ -29,6 +30,7 @@ class WhistleRecognizers(
             replay,
             { segment ->
                 val worker = WhistleWorker(context, RATE) {
+                    onWorkerSegment(it)
                     segment(
                         WhistleResult(
                             start = it.getLong("start"),
