@@ -26,6 +26,7 @@ import json
 import math
 import os
 import re
+import shlex
 import subprocess
 import time
 import urllib.request
@@ -337,10 +338,10 @@ def validate_runner_args(test_class: str, extra_args: dict[str, str]) -> list[st
     return flags
 
 
-def parse_test_selectors(resolved_test_class: str) -> tuple[list[tuple[str, str]], bool]:
-    """Parses comma-separated selectors into `(explicit_class_methods, has_whole_class)`."""
+def parse_test_selectors(resolved_test_class: str) -> tuple[list[tuple[str, str]], list[str]]:
+    """Parses comma-separated selectors into `(explicit_class_methods, whole_classes)`."""
     explicit: list[tuple[str, str]] = []
-    has_whole_class = False
+    whole_classes: list[str] = []
     for raw in resolved_test_class.split(","):
         sel = raw.strip()
         if not sel:
@@ -349,12 +350,18 @@ def parse_test_selectors(resolved_test_class: str) -> tuple[list[tuple[str, str]
             cls, method = sel.split("#", 1)
             explicit.append((cls, method))
         else:
-            has_whole_class = True
-    return explicit, has_whole_class
+            whole_classes.append(sel)
+    return explicit, whole_classes
+
+
+def _min_expected_test_count(explicit: list[tuple[str, str]], whole_classes: list[str]) -> int:
+    explicit_classes = {cls for cls, _ in explicit}
+    uncovered_whole = sum(1 for cls in whole_classes if cls not in explicit_classes)
+    return max(1, len(explicit) + uncovered_whole)
 
 
 def verify_expected_methods_in_log(log_text: str, resolved_test_class: str) -> None:
-    """Verifies instrumentation log ran cleanly and every requested class#method completed with status code 0."""
+    """Verifies instrumentation log ran cleanly and every requested selector completed with status code 0."""
     bad_markers = (
         "FAILURES!!!",
         "INSTRUMENTATION_FAILED",
@@ -389,32 +396,40 @@ def verify_expected_methods_in_log(log_text: str, resolved_test_class: str) -> N
     if not ok_matches:
         raise SystemExit("Instrumentation log missing final 'OK (N tests)' summary.")
     ok_count = int(ok_matches[-1])
-    explicit, has_whole_class = parse_test_selectors(resolved_test_class)
-    if explicit and not has_whole_class:
+    explicit, whole_classes = parse_test_selectors(resolved_test_class)
+    min_expected = _min_expected_test_count(explicit, whole_classes)
+    if explicit and not whole_classes:
         if ok_count != len(explicit):
             raise SystemExit(
                 f"Instrumentation ran OK ({ok_count} tests), expected {len(explicit)} requested methods.",
             )
-    elif ok_count < max(1, len(explicit)):
+    elif ok_count < min_expected:
         raise SystemExit(
-            f"Instrumentation ran OK ({ok_count} tests), expected >= {max(1, len(explicit))}.",
+            f"Instrumentation ran OK ({ok_count} tests), expected >= {min_expected}.",
         )
-    missing = [f"{cls}#{method}" for cls, method in explicit if (cls, method) not in passed_pairs]
-    if missing:
-        raise SystemExit(f"Instrumentation log missing passed test(s): {missing}.")
+    missing_methods = [f"{cls}#{method}" for cls, method in explicit if (cls, method) not in passed_pairs]
+    if missing_methods:
+        raise SystemExit(f"Instrumentation log missing passed test(s): {missing_methods}.")
+    passed_classes = {cls for cls, _ in passed_pairs}
+    missing_classes = [cls for cls in whole_classes if cls not in passed_classes]
+    if missing_classes:
+        raise SystemExit(f"Instrumentation log missing passed class(es): {missing_classes}.")
 
 
 def build_test_spec(test_class: str, extra_args: dict[str, str]) -> str:
     """Builds the Amazon Linux 2 Device Farm Instrumentation TestSpec YAML."""
-    runner_flags = " ".join(validate_runner_args(test_class, extra_args))
-    explicit, has_whole_class = parse_test_selectors(test_class)
-    exact_mode = bool(explicit) and not has_whole_class
-    min_expected = len(explicit) if explicit else 1
+    device_runner_flags = " ".join(shlex.quote(arg) for arg in validate_runner_args(test_class, extra_args))
+    host_quoted_flags = shlex.quote(device_runner_flags)
+    banner_text = shlex.quote(f"Running Cassini Android handset qualification ({test_class})")
+    explicit, whole_classes = parse_test_selectors(test_class)
+    exact_mode = bool(explicit) and not whole_classes
+    min_expected = len(explicit) if exact_mode else _min_expected_test_count(explicit, whole_classes)
     ok_cmp = "-eq" if exact_mode else "-ge"
-    method_check_block = ""
+    selector_checks: list[str] = []
     if explicit:
-        pair_list = " ".join(f"{cls}#{method}" for cls, method in explicit)
-        method_check_block = f"""
+        pair_list = " ".join(shlex.quote(f"{cls}#{method}") for cls, method in explicit)
+        selector_checks.append(
+            f"""
         for pair in {pair_list}; do
           cls="${{pair%%#*}}"
           m="${{pair#*#}}"
@@ -428,7 +443,26 @@ def build_test_spec(test_class: str, extra_args: dict[str, str]) -> str:
             }}
             END {{ exit(found ? 0 : 1) }}
           ' "$DEVICEFARM_LOG_DIR/instrument.log" || {{ echo "Missing passed test: $pair"; exit 1; }}
-        done"""
+        done""",
+        )
+    if whole_classes:
+        class_list = " ".join(shlex.quote(cls) for cls in whole_classes)
+        selector_checks.append(
+            f"""
+        for cls in {class_list}; do
+          awk -v tc="$cls" '
+            /^INSTRUMENTATION_STATUS: class=/ {{ cc = substr($0, 31); gsub(/\\r/, "", cc) }}
+            /^INSTRUMENTATION_STATUS: test=/ {{ ct = substr($0, 30); gsub(/\\r/, "", ct) }}
+            /^INSTRUMENTATION_STATUS_CODE:/ {{
+              if ($0 ~ /^INSTRUMENTATION_STATUS_CODE: 0([[:space:]]|$)/ && cc == tc && ct != "") found = 1
+              cc = ""
+              ct = ""
+            }}
+            END {{ exit(found ? 0 : 1) }}
+          ' "$DEVICEFARM_LOG_DIR/instrument.log" || {{ echo "Missing passed class: $cls"; exit 1; }}
+        done""",
+        )
+    method_check_block = "".join(selector_checks)
     return f"""version: 0.1
 android_test_host: amazon_linux_2
 
@@ -454,10 +488,10 @@ phases:
 
   test:
     commands:
-      - echo "Running Cassini Android handset qualification ({test_class})"
+      - echo {banner_text}
       - >-
         adb -s "$DEVICEFARM_DEVICE_UDID" shell
-        "am instrument -r -w --no-window-animation {runner_flags}
+        "am instrument -r -w --no-window-animation "{host_quoted_flags}"
         $DEVICEFARM_TEST_PACKAGE_NAME/$DEVICEFARM_TEST_PACKAGE_RUNNER 2>&1
         || echo INSTRUMENTATION_SHELL_FAILED"
         | tee "$DEVICEFARM_LOG_DIR/instrument.log"

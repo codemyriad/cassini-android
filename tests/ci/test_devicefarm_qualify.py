@@ -580,12 +580,74 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         smoke_only_mixed_log = self._instrument_log([("pkg.A", "smoke")])
         with self.assertRaises(SystemExit) as mixed_err:
             MODULE.verify_expected_methods_in_log(smoke_only_mixed_log, mixed_selector)
-        self.assertIn("pkg.B#required", str(mixed_err.exception))
+        self.assertIn("expected >= 2", str(mixed_err.exception))
         self.assertNotEqual(0, self._run_testspec_check(mixed_selector, smoke_only_mixed_log))
+
+        missing_whole_class_only_b = self._instrument_log([("pkg.B", "required")])
+        with self.assertRaises(SystemExit):
+            MODULE.verify_expected_methods_in_log(missing_whole_class_only_b, mixed_selector)
+        self.assertNotEqual(0, self._run_testspec_check(mixed_selector, missing_whole_class_only_b))
+
+        missing_whole_class_two_tests = self._instrument_log([("pkg.B", "required"), ("pkg.C", "other")])
+        with self.assertRaises(SystemExit) as cls_err:
+            MODULE.verify_expected_methods_in_log(missing_whole_class_two_tests, mixed_selector)
+        self.assertIn("pkg.A", str(cls_err.exception))
+        self.assertNotEqual(0, self._run_testspec_check(mixed_selector, missing_whole_class_two_tests))
 
         passing_mixed_log = self._instrument_log([("pkg.A", "smoke"), ("pkg.B", "required")])
         MODULE.verify_expected_methods_in_log(passing_mixed_log, mixed_selector)
         self.assertEqual(0, self._run_testspec_check(mixed_selector, passing_mixed_log))
+
+    def test_nested_dollar_class_selector_is_preserved_through_adb_shell_and_verifier_loop(self) -> None:
+        import os
+        import subprocess
+        import tempfile
+
+        selector = "pkg.Outer$Inner#check"
+        spec = MODULE.build_test_spec(selector, {"cassiniHandsetQual": "true"})
+
+        # 1) Verifier loop must match literal pkg.Outer$Inner#check and reject expanded pkg.Outer#check.
+        expanded_log = self._instrument_log([("pkg.Outer", "check")])
+        with self.assertRaises(SystemExit):
+            MODULE.verify_expected_methods_in_log(expanded_log, selector)
+        self.assertNotEqual(0, self._run_testspec_check(selector, expanded_log))
+
+        literal_log = self._instrument_log([("pkg.Outer$Inner", "check")])
+        MODULE.verify_expected_methods_in_log(literal_log, selector)
+        self.assertEqual(0, self._run_testspec_check(selector, literal_log))
+
+        # 2) Folded adb shell command must preserve literal pkg.Outer$Inner#check across host bash AND device sh.
+        test_phase = spec.split("  test:\n    commands:\n", 1)[1].split("\n      - |-\n", 1)[0]
+        folded_lines = [
+            line.strip()
+            for line in test_phase.split("      - >-\n", 1)[1].splitlines()
+            if line.strip()
+        ]
+        adb_cmd = " ".join(folded_lines)
+        with tempfile.TemporaryDirectory() as tmp:
+            harness = (
+                'adb() { shift 2; shift; sh -c \'am() { printf "%s\\n" "$@"; }; eval "$1"\' _ "$1"; }\n'
+                f"{adb_cmd}\n"
+            )
+            env = dict(
+                os.environ,
+                DEVICEFARM_DEVICE_UDID="dev1",
+                DEVICEFARM_TEST_PACKAGE_NAME="io.test",
+                DEVICEFARM_TEST_PACKAGE_RUNNER="io.test.Runner",
+                DEVICEFARM_LOG_DIR=tmp,
+                Inner="EXPANDED_BUG",
+            )
+            proc = subprocess.run(
+                ["bash", "-euo", "pipefail", "-c", harness],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        argv = proc.stdout.splitlines()
+        self.assertIn("pkg.Outer$Inner#check", argv)
+        self.assertNotIn("pkg.OuterEXPANDED_BUG#check", argv)
+        self.assertNotIn("pkg.Outer#check", argv)
 
     def test_extract_reports_from_text_parses_multiple_framed_blocks(self) -> None:
         log = (
