@@ -171,7 +171,7 @@ class DeviceFarmQualifyTest(unittest.TestCase):
     def test_timeout_minutes_scales_for_combined_long_lanes_and_validates_explicit_bounds(self) -> None:
         core_args = MODULE.build_parser().parse_args([])
         core_selector = MODULE.resolve_test_class(core_args.test_class, core_args.long_engine)
-        self.assertEqual(75, MODULE.resolve_timeout_minutes(core_args.timeout_minutes, core_selector, core_args.long_engine))
+        self.assertEqual(105, MODULE.resolve_timeout_minutes(core_args.timeout_minutes, core_selector, core_args.long_engine))
 
         for engine in ("parakeet", "whistle"):
             # Implicit combined selector (core + test03) -> 150 min.
@@ -231,6 +231,105 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         with self.assertRaises(SystemExit) as ctx2:
             MODULE.check_budget(outstanding_client, now=now, projected_new_run_usd=two_device_150m_usd)
         self.assertIn("$222.00", str(ctx2.exception))
+
+    def test_budget_guard_counts_prior_month_outstanding_runs_and_fails_check_budget_only(self) -> None:
+        from unittest import mock
+
+        p1 = MODULE.PROJECT_ARN
+        now = dt.datetime(2026, 11, 1, 0, 5, tzinfo=dt.timezone.utc)
+        # Created in October, still PENDING in November: 8 devices x 150 min x $0.17 = $204.00 > $200.00.
+        prior_month_pending = {
+            "created": dt.datetime(2026, 10, 31, 23, 55, tzinfo=dt.timezone.utc),
+            "status": "PENDING",
+            "totalJobs": 8,
+            "jobTimeoutMinutes": 150,
+            "deviceMinutes": {"metered": 0.0},
+        }
+        client = FakeDeviceFarmClient(
+            project_pages=[{"projects": [{"arn": p1}]}],
+            run_pages_by_project={p1: [{"runs": [prior_month_pending]}]},
+        )
+        one_device_150m_usd = MODULE.project_run_cost_usd(device_count=1, timeout_minutes=150)
+        with self.assertRaises(SystemExit) as submit_err:
+            MODULE.check_budget(client, now=now, projected_new_run_usd=one_device_150m_usd)
+        self.assertIn("$229.50", str(submit_err.exception))
+
+        # --check-budget-only must also exit non-zero when metered + outstanding exceeds $200.00.
+        with mock.patch.object(MODULE, "open_client", return_value=client):
+            with self.assertRaises(SystemExit) as cli_err:
+                MODULE.main(["--check-budget-only"])
+        self.assertIn("$204.00", str(cli_err.exception))
+
+    def test_schedule_run_guarded_serializes_concurrent_submissions_under_200_usd(self) -> None:
+        import tempfile
+        import threading
+
+        p1 = MODULE.PROJECT_ARN
+        now = dt.datetime(2026, 11, 20, 14, 0, tzinfo=dt.timezone.utc)
+
+        class ThreadSafeFakeClient:
+            def __init__(self) -> None:
+                self._lock = threading.Lock()
+                self._runs: list[dict] = [_run(2026, 11, 15, 10, 159.0 / MODULE.RATE_PER_MINUTE)]
+                self.scheduled_count = 0
+
+            def list_projects(self, nextToken: str | None = None) -> dict:
+                return {"projects": [{"arn": p1}]}
+
+            def list_runs(self, arn: str, nextToken: str | None = None) -> dict:
+                with self._lock:
+                    return {"runs": list(self._runs)}
+
+            def schedule_run(self, **kwargs) -> dict:
+                with self._lock:
+                    self.scheduled_count += 1
+                    run_arn = f"arn:aws:devicefarm:us-west-2:1:run:{self.scheduled_count}"
+                    self._runs.append(
+                        {
+                            "arn": run_arn,
+                            "created": now,
+                            "status": "SCHEDULING",
+                            "totalJobs": 1,
+                            "jobTimeoutMinutes": kwargs["executionConfiguration"]["jobTimeoutMinutes"],
+                            "deviceMinutes": {"metered": 0.0},
+                        },
+                    )
+                    return {"run": {"arn": run_arn}}
+
+        fake = ThreadSafeFakeClient()
+        one_device_150m_usd = MODULE.project_run_cost_usd(device_count=1, timeout_minutes=150)
+        barrier = threading.Barrier(2)
+        outcomes: list[str] = []
+        outcomes_lock = threading.Lock()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            lock_path = Path(tmp) / "schedule.lock"
+
+            def worker(idx: int) -> None:
+                barrier.wait(timeout=5.0)
+                try:
+                    MODULE.schedule_run_guarded(
+                        fake,
+                        lock_path=lock_path,
+                        ceiling_usd=MODULE.MONTHLY_DENY_USD,
+                        projected_new_run_usd=one_device_150m_usd,
+                        schedule_kwargs={"executionConfiguration": {"jobTimeoutMinutes": 150}, "name": f"run-{idx}"},
+                        now=now,
+                    )
+                    result = "admitted"
+                except SystemExit:
+                    result = "denied"
+                with outcomes_lock:
+                    outcomes.append(result)
+
+            threads = [threading.Thread(target=worker, args=(i,)) for i in range(2)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=10.0)
+
+        self.assertEqual(1, fake.scheduled_count)
+        self.assertEqual(["admitted", "denied"], sorted(outcomes))
 
     def test_test_spec_validates_arguments_and_rejects_shell_metacharacters(self) -> None:
         spec = MODULE.build_test_spec(

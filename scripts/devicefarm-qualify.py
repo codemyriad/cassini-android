@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import datetime as dt
+import fcntl
 import json
 import math
 import os
@@ -42,9 +44,10 @@ DEFAULT_CORE_METHODS = (
     "test02PairedFiveMinuteEquivalenceAndPressure",
 )
 LONG_METHOD = "test03ThirtyMinuteContinuousQualification"
-DEFAULT_CORE_TIMEOUT_MINUTES = 75
+DEFAULT_CORE_TIMEOUT_MINUTES = 105
 DEFAULT_COMBINED_LONG_TIMEOUT_MINUTES = 150
 MAX_DEVICE_FARM_TIMEOUT_MINUTES = 150
+DEFAULT_SCHEDULE_LOCK_PATH = Path.home() / ".cache/cassini-devicefarm/schedule.lock"
 APP_PACKAGE = "io.codemyriad.cassini.talk.debug"
 
 SAFE_CLASS_RE = re.compile(r"^[A-Za-z0-9_.$#,-]+$")
@@ -200,14 +203,14 @@ def check_budget(
         runs = paginate(df.list_runs, "runs", arn=project_arn)
         for run in runs:
             created = _to_utc(run["created"])
+            run_metered = float(run.get("deviceMinutes", {}).get("metered", 0.0) or 0.0)
             if created.year == now_utc.year and created.month == now_utc.month:
-                run_metered = float(run.get("deviceMinutes", {}).get("metered", 0.0) or 0.0)
                 metered_minutes += run_metered
-                status = str(run.get("status", "COMPLETED") or "COMPLETED").upper()
-                if status != "COMPLETED":
-                    total_jobs = int(run.get("totalJobs") or 1)
-                    run_timeout = float(run.get("jobTimeoutMinutes") or MAX_DEVICE_FARM_TIMEOUT_MINUTES)
-                    outstanding_projected_minutes += max(0.0, total_jobs * run_timeout - run_metered)
+            status = str(run.get("status", "COMPLETED") or "COMPLETED").upper()
+            if status != "COMPLETED":
+                total_jobs = int(run.get("totalJobs") or 1)
+                run_timeout = float(run.get("jobTimeoutMinutes") or MAX_DEVICE_FARM_TIMEOUT_MINUTES)
+                outstanding_projected_minutes += max(0.0, total_jobs * run_timeout - run_metered)
 
     spent_usd = metered_minutes * RATE_PER_MINUTE
     outstanding_usd = outstanding_projected_minutes * RATE_PER_MINUTE
@@ -223,13 +226,44 @@ def check_budget(
         raise SystemExit(
             f"Budget guard (D89/D-1126): ${spent_usd:.2f} >= ${ceiling_usd:.2f} monthly scheduling deny threshold.",
         )
-    if projected_new_run_usd > 0.0 and total_projected_usd > MONTHLY_BUDGET_USD:
+    if total_projected_usd > MONTHLY_BUDGET_USD:
         raise SystemExit(
             f"Budget guard (D89/D-1126): projected monthly total ${total_projected_usd:.2f} "
             f"(metered=${spent_usd:.2f} + outstanding=${outstanding_usd:.2f} + new=${projected_new_run_usd:.2f}) "
             f"> ${MONTHLY_BUDGET_USD:.2f} monthly budget.",
         )
     return spent_usd
+
+
+@contextlib.contextmanager
+def _schedule_lock(lock_path: Path):
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def schedule_run_guarded(
+    df: Any,
+    *,
+    lock_path: Path,
+    ceiling_usd: float,
+    projected_new_run_usd: float,
+    schedule_kwargs: dict[str, Any],
+    now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    """Serializes the final budget check and schedule_run call with an exclusive file lock."""
+    with _schedule_lock(lock_path):
+        check_budget(
+            df,
+            now=now,
+            ceiling_usd=ceiling_usd,
+            projected_new_run_usd=projected_new_run_usd,
+        )
+        return df.schedule_run(**schedule_kwargs)["run"]
 
 
 def validate_runner_args(test_class: str, extra_args: dict[str, str]) -> list[str]:
@@ -545,9 +579,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--timeout-minutes",
         type=int,
         default=None,
-        help="Device Farm job timeout in minutes (defaults to 75 for core lanes, 150 when combined with --long-engine).",
+        help="Device Farm job timeout in minutes (defaults to 105 for core lanes, 150 when combined with --long-engine).",
     )
     parser.add_argument("--ceiling-usd", type=float, default=MONTHLY_DENY_USD)
+    parser.add_argument(
+        "--lock-file",
+        type=Path,
+        default=Path(os.environ.get("CASSINI_DEVICEFARM_LOCK_FILE", str(DEFAULT_SCHEDULE_LOCK_PATH))),
+        help="Exclusive lock file serializing final budget check and schedule_run.",
+    )
     parser.add_argument("--out-dir", type=Path, help="Output directory for logs and extracted reports.")
     parser.add_argument("--control-ssh", help="Optional SSH host holding AWS credentials (control-plane only).")
     parser.add_argument("--aws-profile", default=os.environ.get("AWS_PROFILE", "cassini-devicefarm"))
@@ -637,21 +677,25 @@ def main(argv: list[str] | None = None) -> None:
     spec_arn = upload_file(df, spec_path, "INSTRUMENTATION_TEST_SPEC")
     pool_arn = ensure_device_pool(df, args.pool_name, args.device_arn)
 
-    # Re-verify budget immediately prior to scheduling in case parallel runs started or finished during upload.
-    check_budget(df, ceiling_usd=args.ceiling_usd, projected_new_run_usd=projected_new_run_usd)
-
-    scheduled = df.schedule_run(
-        projectArn=PROJECT_ARN,
-        appArn=app_arn,
-        devicePoolArn=pool_arn,
-        name=args.name,
-        test={
-            "type": "INSTRUMENTATION",
-            "testPackageArn": test_arn,
-            "testSpecArn": spec_arn,
+    # Re-verify budget and schedule under an exclusive lock so concurrent invocations cannot oversubscribe $200.
+    scheduled = schedule_run_guarded(
+        df,
+        lock_path=args.lock_file,
+        ceiling_usd=args.ceiling_usd,
+        projected_new_run_usd=projected_new_run_usd,
+        schedule_kwargs={
+            "projectArn": PROJECT_ARN,
+            "appArn": app_arn,
+            "devicePoolArn": pool_arn,
+            "name": args.name,
+            "test": {
+                "type": "INSTRUMENTATION",
+                "testPackageArn": test_arn,
+                "testSpecArn": spec_arn,
+            },
+            "executionConfiguration": {"jobTimeoutMinutes": job_timeout_minutes},
         },
-        executionConfiguration={"jobTimeoutMinutes": job_timeout_minutes},
-    )["run"]
+    )
     run_arn = scheduled["arn"]
     (out_dir / "scheduled.json").write_text(
         json.dumps(
