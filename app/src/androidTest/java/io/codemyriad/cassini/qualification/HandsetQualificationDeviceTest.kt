@@ -676,6 +676,8 @@ class HandsetQualificationDeviceTest {
         val whistleSummaries = ArrayList<Bundle>()
         val activeMonitor = AtomicReference<HandsetTelemetryMonitor?>(null)
         private val livePreWhistleSpans = ArrayList<String>()
+        private val postCacheHitSpans = ArrayList<String>()
+        private val postNeuralSpans = ArrayList<String>()
 
         @Volatile var committedWhistleSpans: List<String> = emptyList()
             private set
@@ -688,26 +690,38 @@ class HandsetQualificationDeviceTest {
             return count
         }
 
+        fun clearPostStopWhistle() {
+            synchronized(whistleSummaries) { whistleSummaries.clear() }
+            synchronized(postCacheHitSpans) { postCacheHitSpans.clear() }
+            synchronized(postNeuralSpans) { postNeuralSpans.clear() }
+        }
+
         fun installHooks(onChunk: ((Int) -> Unit)? = null) {
             TestHooks.speakerPrefixOverride = { "diar_d1126_" }
             TestHooks.enginesOverride = { _, raw, precompute ->
                 wrapCountingEngines(raw, precompute, preChunks, postChunks, onChunk)
             }
-            TestHooks.onWhistleSegment = { seg, precompute ->
-                if (precompute) {
-                    val span = WhistlePrefixAudit.spanKey(
-                        seg.getLong("start"),
-                        seg.getLong("end"),
-                        seg.getString("pcmSha256").orEmpty(),
-                    )
-                    synchronized(livePreWhistleSpans) { livePreWhistleSpans.add(span) }
-                }
-            }
+            TestHooks.onWhistleSegment = { seg, precompute -> recordWhistleSegment(seg, precompute) }
             TestHooks.onWhistleFinish = { summary ->
                 synchronized(whistleSummaries) { whistleSummaries.add(summary) }
                 activeMonitor.get()?.recordWhistleWorkerCpuMs(summary.getLong("workerCpuMs"))
             }
             TestHooks.onPrecomputeCheckpointed = { _, doneMs -> recordCheckpoint(doneMs) }
+        }
+
+        private fun recordWhistleSegment(seg: Bundle, precompute: Boolean) {
+            val span = WhistlePrefixAudit.spanKey(
+                seg.getLong("start"),
+                seg.getLong("end"),
+                seg.getString("pcmSha256").orEmpty(),
+            )
+            if (precompute) {
+                synchronized(livePreWhistleSpans) { livePreWhistleSpans.add(span) }
+            } else if (seg.getBoolean("cacheHit")) {
+                synchronized(postCacheHitSpans) { postCacheHitSpans.add(span) }
+            } else {
+                synchronized(postNeuralSpans) { postNeuralSpans.add(span) }
+            }
         }
 
         fun toMetrics(
@@ -716,12 +730,14 @@ class HandsetQualificationDeviceTest {
             postSnap: HandsetTelemetryMonitor.Snapshot,
         ): LaneMetrics {
             val postWhistle = synchronized(whistleSummaries) { whistleSummaries.lastOrNull() }
+            val hitSpans = synchronized(postCacheHitSpans) { postCacheHitSpans.toList() }
+            val inferredSpans = synchronized(postNeuralSpans) { postNeuralSpans.toList() }
             return LaneMetrics(
                 preCheckpoints = preCheckpoints.get(),
                 postUnits = postChunks.get(),
                 whistlePrecomputedSpans = committedWhistleSpans,
-                whistleCacheHitSpans = postWhistle?.getStringArrayList("cacheHitSpans")?.toList().orEmpty(),
-                whistleNeuralSpans = postWhistle?.getStringArrayList("neuralSpans")?.toList().orEmpty(),
+                whistleCacheHitSpans = hitSpans,
+                whistleNeuralSpans = inferredSpans,
                 whistleCacheHits = postWhistle?.getInt("cacheHits") ?: 0,
                 whistleNeural = postWhistle?.getInt("neuralTranscribes") ?: 0,
                 stopToPubSec = stopToPubSec,
@@ -765,7 +781,7 @@ class HandsetQualificationDeviceTest {
             assertEquals("AFTER_STOP must not run precompute", 0, counters.preCheckpoints.get())
         }
         val preSnap = preMon?.finish()
-        synchronized(counters.whistleSummaries) { counters.whistleSummaries.clear() }
+        counters.clearPostStopWhistle()
 
         val (doc, stopToPubSec, postSnap) = finishAndMeasureStopToPublished(active.noteId, counters.activeMonitor)
         val result = inspectPublishedLane(
@@ -813,7 +829,7 @@ class HandsetQualificationDeviceTest {
         withTimeout(ENCODE_TIMEOUT_MS) { source.tailCommitted.await() }
         TestHooks.injectedThermalThrottled.value = false
 
-        synchronized(counters.whistleSummaries) { counters.whistleSummaries.clear() }
+        counters.clearPostStopWhistle()
         val (doc, stopToPubSec, postSnap) = finishAndMeasureStopToPublished(active.noteId, counters.activeMonitor)
         val lane = inspectPublishedLane(active.noteId, model, doc, counters.toMetrics(stopToPubSec, null, postSnap))
         cleanupNote(active.noteId)
@@ -872,7 +888,7 @@ class HandsetQualificationDeviceTest {
         )
 
         TestHooks.lowMemoryOverride = null
-        synchronized(counters.whistleSummaries) { counters.whistleSummaries.clear() }
+        counters.clearPostStopWhistle()
         val (doc, stopToPubSec, postSnap) = finishAndMeasureStopToPublished(active.noteId, counters.activeMonitor)
         val lane = inspectPublishedLane(active.noteId, model, doc, counters.toMetrics(stopToPubSec, null, postSnap))
         cleanupNote(active.noteId)
@@ -974,7 +990,7 @@ class HandsetQualificationDeviceTest {
             val health = withTimeout((cfg.longSeconds + 300L) * 1_000L) { observer.targetReached.await() }
             val recSnap = recMonitor.finish()
 
-            synchronized(counters.whistleSummaries) { counters.whistleSummaries.clear() }
+            counters.clearPostStopWhistle()
             val (doc, stopToPubSec, postSnap) = finishAndMeasureStopToPublished(active.noteId, counters.activeMonitor)
             assertLongCaptureInvulnerability(health, doc.audioDurationMs, cfg.longSeconds)
             val metrics = counters.toMetrics(stopToPubSec, recSnap, postSnap)

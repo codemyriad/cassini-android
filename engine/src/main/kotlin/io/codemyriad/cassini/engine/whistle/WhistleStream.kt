@@ -14,12 +14,20 @@ class WhistleStream internal constructor(
     rate: Int,
     private val probability: (FloatArray) -> Float,
     private val transcribe: (FloatArray) -> ByteArray,
-    private val segment: (WhistleSpeechSegment, ByteArray, String) -> Unit,
+    private val segment: (WhistleSpeechSegment, ByteArray, String, Boolean) -> Unit,
     private val cachedSegment: (String, Int) -> ByteArray? = { _, _ -> null },
 ) {
+    internal constructor(
+        rate: Int,
+        probability: (FloatArray) -> Float,
+        transcribe: (FloatArray) -> ByteArray,
+        segment: (WhistleSpeechSegment, ByteArray, String) -> Unit,
+        cachedSegment: (String, Int) -> ByteArray? = { _, _ -> null },
+    ) : this(rate, probability, transcribe, { range, json, hash, _ -> segment(range, json, hash) }, cachedSegment)
+
     constructor(
         rate: Int,
-        segment: (WhistleSpeechSegment, ByteArray, String) -> Unit,
+        segment: (WhistleSpeechSegment, ByteArray, String, Boolean) -> Unit,
         cachedSegment: (String, Int) -> ByteArray? = { _, _ -> null },
     ) : this(rate, WhistleNative::probability, WhistleNative::transcribe, segment, cachedSegment)
 
@@ -33,10 +41,6 @@ class WhistleStream internal constructor(
         private set
     var neuralTranscribes = 0
         private set
-    private val hitSpans = ArrayList<String>()
-    private val inferredSpans = ArrayList<String>()
-    val cacheHitSpans: List<String> get() = hitSpans
-    val neuralSpans: List<String> get() = inferredSpans
     private val rawHash = MessageDigest.getInstance("SHA-256")
     private val vadHash = MessageDigest.getInstance("SHA-256")
     private val gate = WhistleSpeechGate({ frame ->
@@ -76,18 +80,15 @@ class WhistleStream internal constructor(
         val digest = MessageDigest.getInstance("SHA-256")
         updateHash(digest, samples, samples.size)
         val hash = hex(digest.digest())
-        val span = "${range.startSample}-${range.endSample}:$hash"
         val cached = cachedSegment(hash, samples.size)?.takeIf(WhistleSegmentCache::isValidSegmentJson)
         val json = if (cached != null) {
             cacheHits++
-            hitSpans.add(span)
             cached
         } else {
             neuralTranscribes++
-            inferredSpans.add(span)
             transcribe(samples)
         }
-        segment(range, json, hash)
+        segment(range, json, hash, cached != null)
     }
 
     companion object {

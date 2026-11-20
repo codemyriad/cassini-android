@@ -91,18 +91,12 @@ class WhistleService : Service() {
         WhistleProtocol.FINISH -> {
             val activeStream = requireNotNull(stream)
             val hashes = activeStream.finish()
-            Bundle().apply {
-                putString("rawSha256", hashes.rawSha256)
-                putString("vadSha256", hashes.vadSha256)
-                putInt("vadFrames", hashes.frames)
-                putInt("voicedFrames", hashes.voiced)
-                putFloat("maxProbability", hashes.maximum)
-                putInt("cacheHits", activeStream.cacheHits)
-                putInt("neuralTranscribes", activeStream.neuralTranscribes)
-                putStringArrayList("cacheHitSpans", ArrayList(activeStream.cacheHitSpans))
-                putStringArrayList("neuralSpans", ArrayList(activeStream.neuralSpans))
-                putLong("workerCpuMs", Process.getElapsedCpuTime())
-            }
+            WhistleProtocol.finishBundle(
+                hashes = hashes,
+                cacheHits = activeStream.cacheHits,
+                neuralTranscribes = activeStream.neuralTranscribes,
+                workerCpuMs = Process.getElapsedCpuTime(),
+            )
         }
         else -> error("Invalid Whistle worker command")
     }
@@ -141,15 +135,8 @@ class WhistleService : Service() {
         }
     }
 
-    private fun segment(range: WhistleSpeechSegment, json: ByteArray, hash: String) {
-        val message = Bundle().apply {
-            putLong("start", range.startSample)
-            putLong("end", range.endSample)
-            putString("reason", range.reason)
-            putString("pcmSha256", hash)
-            putByteArray("json", json)
-        }
-        segments.add(message)
+    private fun segment(range: WhistleSpeechSegment, json: ByteArray, hash: String, cacheHit: Boolean) {
+        segments.add(WhistleProtocol.segmentBundle(range, json, hash, cacheHit))
     }
 
     private fun failure(reply: Messenger, message: String, code: Int = WhistleProtocol.ERROR_CODE_GENERIC) {
