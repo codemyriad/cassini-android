@@ -491,6 +491,42 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             MODULE.build_test_spec("io.codemyriad.Test", {"badKey": "$(whoami)"})
 
+    def test_expected_method_verification_rejects_smoke_only_log_for_three_method_request(self) -> None:
+        default_selector = MODULE.resolve_test_class(None, "none")
+        spec = MODULE.build_test_spec(default_selector, {"cassiniHandsetQual": "true"})
+        self.assertIn('if [ "$STARTED" -lt 3 ]', spec)
+        self.assertIn('! [ "$OK_COUNT" -eq 3 ]', spec)
+        self.assertIn("test01HardwareCaptureLifecycleInterruptionsAndAacControl", spec)
+        self.assertIn("test02PairedFiveMinuteEquivalenceAndPressure", spec)
+
+        smoke_only_log = (
+            "INSTRUMENTATION_STATUS: test=qualificationHarnessTelemetryAndPrefixContractSmoke\n"
+            "INSTRUMENTATION_STATUS_CODE: 1\n"
+            "INSTRUMENTATION_STATUS: test=qualificationHarnessTelemetryAndPrefixContractSmoke\n"
+            "INSTRUMENTATION_STATUS_CODE: 0\n"
+            "OK (1 test)\n"
+        )
+        with self.assertRaises(SystemExit) as err:
+            MODULE.verify_expected_methods_in_log(smoke_only_log, default_selector)
+        self.assertIn("expected 3", str(err.exception))
+
+        full_three_method_log = (
+            "INSTRUMENTATION_STATUS: test=qualificationHarnessTelemetryAndPrefixContractSmoke\n"
+            "INSTRUMENTATION_STATUS_CODE: 1\n"
+            "INSTRUMENTATION_STATUS: test=qualificationHarnessTelemetryAndPrefixContractSmoke\n"
+            "INSTRUMENTATION_STATUS_CODE: 0\n"
+            "INSTRUMENTATION_STATUS: test=test01HardwareCaptureLifecycleInterruptionsAndAacControl\n"
+            "INSTRUMENTATION_STATUS_CODE: 1\n"
+            "INSTRUMENTATION_STATUS: test=test01HardwareCaptureLifecycleInterruptionsAndAacControl\n"
+            "INSTRUMENTATION_STATUS_CODE: 0\n"
+            "INSTRUMENTATION_STATUS: test=test02PairedFiveMinuteEquivalenceAndPressure\n"
+            "INSTRUMENTATION_STATUS_CODE: 1\n"
+            "INSTRUMENTATION_STATUS: test=test02PairedFiveMinuteEquivalenceAndPressure\n"
+            "INSTRUMENTATION_STATUS_CODE: 0\n"
+            "OK (3 tests)\n"
+        )
+        MODULE.verify_expected_methods_in_log(full_three_method_log, default_selector)
+
     def test_extract_reports_from_text_parses_multiple_framed_blocks(self) -> None:
         log = (
             "INSTRUMENTATION_STATUS: stream=\n"

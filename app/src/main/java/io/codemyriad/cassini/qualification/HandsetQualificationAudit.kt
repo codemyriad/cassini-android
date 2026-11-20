@@ -11,6 +11,7 @@ import java.io.File
  * `testReleaseUnitTest`) and device tests (`androidTest`) share the exact same assertions (R8 strips unused
  * qualification helpers from minified release builds).
  */
+@Suppress("TooManyFunctions") // Central namespace of deterministic D-1126 qualification validators.
 object HandsetQualificationAudit {
     private const val MIN_HAL_SAMPLES_FOR_DELTA = 2
     private const val LATE_PRECOMPUTE_RATIO = 0.75
@@ -52,6 +53,40 @@ object HandsetQualificationAudit {
         val runParakeet: Boolean,
         val runWhistle: Boolean,
     )
+
+    data class DrainResult(
+        val committedBytes: Long,
+        val samplesDecodedBeyondOffset: Long,
+        val pollCount: Int,
+    )
+
+    /**
+     * Repeatedly invokes [pollOnce] (returning `(committedBytes, newlyDecodedSamples)`) until `committedBytes`
+     * advances strictly past [targetOffsetBytes] AND at least one PCM sample has been decoded beyond that offset.
+     */
+    suspend fun drainUntilPastOffset(
+        targetOffsetBytes: Long,
+        pollOnce: () -> Pair<Long, Long>,
+        awaitMoreData: suspend () -> Unit,
+    ): DrainResult {
+        var polls = 0
+        var lastCommitted = -1L
+        var samplesPastOffset = 0L
+        while (true) {
+            val (committed, decodedThisPoll) = pollOnce()
+            polls++
+            if (committed > targetOffsetBytes) {
+                samplesPastOffset += decodedThisPoll
+                if (samplesPastOffset > 0L) {
+                    return DrainResult(committed, samplesPastOffset, polls)
+                }
+            }
+            if (committed <= lastCommitted) {
+                awaitMoreData()
+            }
+            lastCommitted = committed
+        }
+    }
 
     fun resolvePairedEngines(
         runParakeet: Boolean,

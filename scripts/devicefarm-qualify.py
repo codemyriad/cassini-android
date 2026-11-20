@@ -337,9 +337,73 @@ def validate_runner_args(test_class: str, extra_args: dict[str, str]) -> list[st
     return flags
 
 
+def expected_test_methods(resolved_test_class: str) -> list[str]:
+    """Extracts explicit method names from class#method selectors (empty list when a whole class is selected)."""
+    selectors = [part.strip() for part in resolved_test_class.split(",") if part.strip()]
+    if not selectors or any("#" not in sel for sel in selectors):
+        return []
+    return [sel.split("#", 1)[1] for sel in selectors]
+
+
+def verify_expected_methods_in_log(log_text: str, resolved_test_class: str) -> None:
+    """Verifies instrumentation log ran cleanly and every requested class#method completed with status code 0."""
+    bad_markers = (
+        "FAILURES!!!",
+        "INSTRUMENTATION_FAILED",
+        "INSTRUMENTATION_SHELL_FAILED",
+        "shortMsg=Process crashed",
+    )
+    for marker in bad_markers:
+        if marker in log_text:
+            raise SystemExit(f"Instrumentation log contains failure marker {marker!r}.")
+
+    passed_methods: set[str] = set()
+    current_method: str | None = None
+    for raw_line in log_text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("INSTRUMENTATION_STATUS: test="):
+            current_method = line.removeprefix("INSTRUMENTATION_STATUS: test=").strip()
+        elif line.startswith("INSTRUMENTATION_STATUS_CODE:"):
+            code = line.removeprefix("INSTRUMENTATION_STATUS_CODE:").strip()
+            if code in {"-1", "-2", "-3", "-4"}:
+                raise SystemExit(f"Instrumentation reported non-passing status code {code} for {current_method!r}.")
+            if code == "0" and current_method:
+                passed_methods.add(current_method)
+
+    ok_matches = re.findall(r"^OK \((\d+) tests?\)", log_text, flags=re.MULTILINE)
+    if not ok_matches:
+        raise SystemExit("Instrumentation log missing final 'OK (N tests)' summary.")
+    ok_count = int(ok_matches[-1])
+    expected = expected_test_methods(resolved_test_class)
+    if expected:
+        if ok_count != len(expected):
+            raise SystemExit(
+                f"Instrumentation ran OK ({ok_count} tests), expected {len(expected)} requested methods: {expected}.",
+            )
+        missing = [method for method in expected if method not in passed_methods]
+        if missing:
+            raise SystemExit(f"Instrumentation log missing passed method(s): {missing}.")
+    elif ok_count < 1:
+        raise SystemExit(f"Instrumentation ran OK ({ok_count} tests), expected >= 1.")
+
+
 def build_test_spec(test_class: str, extra_args: dict[str, str]) -> str:
     """Builds the Amazon Linux 2 Device Farm Instrumentation TestSpec YAML."""
     runner_flags = " ".join(validate_runner_args(test_class, extra_args))
+    expected = expected_test_methods(test_class)
+    min_expected = len(expected) if expected else 1
+    ok_cmp = "-eq" if expected else "-ge"
+    method_check_block = ""
+    if expected:
+        method_list = " ".join(expected)
+        method_check_block = f"""
+        for m in {method_list}; do
+          awk -v target="$m" '
+            /^INSTRUMENTATION_STATUS: test=/ {{ cur = substr($0, 30); gsub(/\\r/, "", cur) }}
+            /^INSTRUMENTATION_STATUS_CODE: 0([[:space:]]|$)/ {{ if (cur == target) found = 1 }}
+            END {{ exit(found ? 0 : 1) }}
+          ' "$DEVICEFARM_LOG_DIR/instrument.log" || {{ echo "Missing passed test method: $m"; exit 1; }}
+        done"""
     return f"""version: 0.1
 android_test_host: amazon_linux_2
 
@@ -379,7 +443,7 @@ phases:
         IGNORED=$(grep -c "INSTRUMENTATION_STATUS_CODE: -3" "$DEVICEFARM_LOG_DIR/instrument.log" || true)
         SKIPPED=$(grep -c "INSTRUMENTATION_STATUS_CODE: -4" "$DEVICEFARM_LOG_DIR/instrument.log" || true)
         echo "Instrumentation: started=$STARTED errored=$ERRORED failed=$FAILED ignored=$IGNORED skipped=$SKIPPED"
-        if [ "$STARTED" -lt 1 ] || [ "$ERRORED" -ne 0 ] || [ "$FAILED" -ne 0 ]; then
+        if [ "$STARTED" -lt {min_expected} ] || [ "$ERRORED" -ne 0 ] || [ "$FAILED" -ne 0 ]; then
           exit 1
         fi
         if [ "$IGNORED" -ne 0 ] || [ "$SKIPPED" -ne 0 ]; then
@@ -389,7 +453,11 @@ phases:
         if grep -Eq "$BAD_PAT" "$DEVICEFARM_LOG_DIR/instrument.log"; then
           exit 1
         fi
-        grep -Eq "^OK \\([1-9][0-9]* tests?\\)" "$DEVICEFARM_LOG_DIR/instrument.log"
+        OK_COUNT=$(sed -nE 's/^OK \\(([0-9]+) tests?\\).*/\\1/p' "$DEVICEFARM_LOG_DIR/instrument.log" | tail -n 1)
+        if [ -z "$OK_COUNT" ] || ! [ "$OK_COUNT" {ok_cmp} {min_expected} ]; then
+          echo "Unexpected OK count: got=$OK_COUNT expected={min_expected}"
+          exit 1
+        fi{method_check_block}
 
   post_test:
     commands:

@@ -22,6 +22,7 @@ import io.codemyriad.cassini.engine.whistle.WhistleRecognizer
 import io.codemyriad.cassini.engine.whistle.WhistleReplay
 import io.codemyriad.cassini.engine.whistle.WhistleResult
 import io.codemyriad.cassini.engine.whistle.WhistleTransport
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -542,6 +543,31 @@ class HandsetQualificationContractTest {
         assertEquals(2, fresh.length())
         assertEquals("fresh-1", fresh.getJSONObject(0).getString("test"))
         assertEquals("fresh-2", fresh.getJSONObject(1).getString("test"))
+    }
+
+    @Test
+    fun drainUntilPastOffsetDrainsMultiPollBacklogBeforeSucceeding() = runBlocking {
+        val postResumeOffset = 800_000L
+        val scriptedPolls = ArrayDeque(
+            listOf(
+                256_000L to 64_000L, // Poll 1: backlog from 5-min backgrounding (must NOT stop here)
+                512_000L to 64_000L, // Poll 2: still backlog
+                768_000L to 64_000L, // Poll 3: still backlog
+                800_000L to 8_000L, // Poll 4: caught up to postResumeOffset, not yet past it
+                800_000L to 0L, // Poll 5: stalled waiting for post-resume flush -> triggers awaitMoreData
+                840_000L to 1_600L, // Poll 6: strictly past postResumeOffset with post-resume samples!
+            ),
+        )
+        var awaits = 0
+        val result = HandsetQualificationAudit.drainUntilPastOffset(
+            targetOffsetBytes = postResumeOffset,
+            pollOnce = { scriptedPolls.removeFirst() },
+            awaitMoreData = { awaits++ },
+        )
+        assertEquals(840_000L, result.committedBytes)
+        assertEquals(1_600L, result.samplesDecodedBeyondOffset)
+        assertEquals(6, result.pollCount)
+        assertEquals(1, awaits)
     }
 
     private data class FakeSeg(val start: Long, val end: Long, val sha256: String, val json: String)

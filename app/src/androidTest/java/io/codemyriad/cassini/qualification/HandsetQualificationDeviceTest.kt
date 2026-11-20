@@ -231,10 +231,9 @@ class HandsetQualificationDeviceTest {
             val (next, bgEvidence) = exercisePauseResumeAndBackground(screen!!, whistleEligible, precomputeWatch)
             screen = next
             val focusObserved = exerciseInterruptionsAndRouteLoss()
-            val committed2 = pollPostInterruptionPrefix(decoder, livePcmOut, liveSamplesCount, committed1.first)
+            val committed2 = pollPostResumePrefix(decoder, livePcmOut, liveSamplesCount, captureFile, committed1.first)
             decoder.close()
-            livePcmOut.close()
-            livePcmOut = null
+            livePcmOut.close().also { livePcmOut = null }
 
             val sealed = stopAndVerifyOpusPrefixAndPcm(
                 captureFile,
@@ -325,22 +324,33 @@ class HandsetQualificationDeviceTest {
         return committed to decoder.committedSha256()
     }
 
-    private suspend fun pollPostInterruptionPrefix(
+    private suspend fun pollPostResumePrefix(
         decoder: CommittedOggOpusDecoder,
         livePcmOut: DataOutputStream,
         liveSamplesCount: LongArray,
+        captureFile: File,
         previousBytes: Long,
     ): Pair<Long, String> {
-        var committed = previousBytes
-        awaitPolicyTicksUntil("Post-interruption Ogg Opus pages committed") {
-            decoder.poll { samples, count ->
-                for (i in 0 until count) livePcmOut.writeFloat(samples[i])
-                liveSamplesCount[0] += count
-            }
-            committed = decoder.committedBytes
-            committed > previousBytes
+        val postResumeOffsetBytes = maxOf(previousBytes, captureFile.length())
+        var seenTick = TestHooks.policyTicks.value
+        val drained = withTimeout(EVENT_TIMEOUT_MS) {
+            HandsetQualificationAudit.drainUntilPastOffset(
+                targetOffsetBytes = postResumeOffsetBytes,
+                pollOnce = {
+                    var decoded = 0L
+                    decoder.poll { samples, count ->
+                        for (i in 0 until count) livePcmOut.writeFloat(samples[i])
+                        liveSamplesCount[0] += count
+                        decoded += count
+                    }
+                    decoder.committedBytes to decoded
+                },
+                awaitMoreData = {
+                    seenTick = TestHooks.policyTicks.first { it > seenTick }
+                },
+            )
         }
-        return committed to decoder.committedSha256()
+        return drained.committedBytes to decoder.committedSha256()
     }
 
     private suspend fun exercisePauseResumeAndBackground(
