@@ -2,6 +2,7 @@ package io.codemyriad.cassini.whistle
 
 import android.content.Context
 import android.os.Build
+import android.os.Bundle
 import androidx.annotation.RequiresApi
 import io.codemyriad.cassini.core.checkpoint.RecognitionState
 import io.codemyriad.cassini.core.checkpoint.WhistleCachedSegment
@@ -19,6 +20,8 @@ class WhistleRecognizers(
     private val context: Context,
     private val replay: WhistleReplay,
     private val segmentStore: WhistleSegmentStore? = null,
+    private val onWorkerFinished: (Bundle) -> Unit = {},
+    private val onWorkerSegment: (Bundle) -> Unit = {},
 ) : RecognizerFactory {
     override fun open(restored: RecognitionState?, callbacks: Recognizer.Callbacks): Recognizer =
         WhistleRecognizer(
@@ -27,6 +30,7 @@ class WhistleRecognizers(
             replay,
             { segment ->
                 val worker = WhistleWorker(context, RATE) {
+                    onWorkerSegment(it)
                     segment(
                         WhistleResult(
                             start = it.getLong("start"),
@@ -39,7 +43,9 @@ class WhistleRecognizers(
                 object : WhistleTransport {
                     override fun seedCache(entries: List<WhistleCachedSegment>) = worker.seedCache(entries)
                     override fun accept(samples: FloatArray, count: Int) = worker.accept(samples, count)
-                    override fun finish() { worker.finish() }
+                    override fun finish() {
+                        onWorkerFinished(worker.finish())
+                    }
                     override fun close() = worker.close()
                 }
             },

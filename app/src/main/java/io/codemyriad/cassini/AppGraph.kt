@@ -167,6 +167,13 @@ class AppGraph(context: Context, val config: Config) {
         val visibility: AppVisibility? = null,
         val battery: BatterySource? = null,
         val sdkInt: Int = Build.VERSION.SDK_INT,
+        val thermal: ThermalMonitor? = null,
+        val environment: ((JobEnvironment) -> JobEnvironment)? = null,
+        val engines: ((SpeechModel, JobEngines, Boolean) -> JobEngines)? = null,
+        val onWhistleFinish: ((android.os.Bundle) -> Unit)? = null,
+        val onWhistleSegment: ((android.os.Bundle, Boolean) -> Unit)? = null,
+        val onPrecomputeCheckpointed: ((String, Long) -> Unit)? = null,
+        val onPrecomputeStopped: ((String, PrecomputeStopReason) -> Unit)? = null,
     )
 
     /**
@@ -232,16 +239,35 @@ class AppGraph(context: Context, val config: Config) {
             }
         }
     }
-    val jobEnvironment: JobEnvironment by lazy { InstalledEngines.environment(app) }
+    private val baseJobEnvironment: JobEnvironment by lazy { InstalledEngines.environment(app) }
+    val jobEnvironment: JobEnvironment
+        get() = config.processing.environment?.invoke(baseJobEnvironment) ?: baseJobEnvironment
 
-    suspend fun jobEngines(model: SpeechModel, file: java.io.File, segmentCacheFile: java.io.File? = null): JobEngines {
-        if (model == SpeechModel.PARAKEET) return engines
-        requireUser(speech.included.await(), Failure.INCLUDED_UNAVAILABLE)
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            WhistleJobs.of(app, engines, paths.cache, file, segmentCacheFile)
+    suspend fun jobEngines(
+        model: SpeechModel,
+        file: java.io.File,
+        segmentCacheFile: java.io.File? = null,
+        precompute: Boolean = false,
+    ): JobEngines {
+        val raw = if (model == SpeechModel.PARAKEET) {
+            engines
         } else {
-            throw UserFacingException(Failure.INCLUDED_UNAVAILABLE)
+            requireUser(speech.included.await(), Failure.INCLUDED_UNAVAILABLE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                WhistleJobs.of(
+                    app,
+                    engines,
+                    paths.cache,
+                    file,
+                    segmentCacheFile,
+                    config.processing.onWhistleFinish ?: {},
+                    { seg -> config.processing.onWhistleSegment?.invoke(seg, precompute) },
+                )
+            } else {
+                throw UserFacingException(Failure.INCLUDED_UNAVAILABLE)
+            }
         }
+        return config.processing.engines?.invoke(model, raw, precompute) ?: raw
     }
 
     suspend fun transcriptionConsented(noteId: String? = null): Boolean {
@@ -277,7 +303,7 @@ class AppGraph(context: Context, val config: Config) {
     private val recorderThread: ExecutorService = Executors.newSingleThreadExecutor { task ->
         Thread(task, "cassini-recorder").apply { isDaemon = true }
     }
-    private val thermalHolder = lazy<ThermalMonitor> { AndroidThermalMonitor(app) }
+    private val thermalHolder = lazy<ThermalMonitor> { config.processing.thermal ?: AndroidThermalMonitor(app) }
     private val foregroundBusy = MutableStateFlow(false)
     private val recordingPrecompute = AtomicReference<RecordingPrecomputeController?>(null)
     private val recordingHolder = lazy { createRecording() }
@@ -566,32 +592,58 @@ class AppGraph(context: Context, val config: Config) {
     }
 
     private suspend fun runRecordingPrecompute(noteId: String, shouldContinue: () -> Boolean): PrecomputeStopReason {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return PrecomputeStopReason.YIELDED
-        ready.await()
-        val catalogue = awaitCatalogue()
-        val audioFile = catalogue.jobStorage.audioFile(noteId)
-        return if (audioFile.extension != "opus") {
-            PrecomputeStopReason.YIELDED
-        } else {
-            val model = speech.selected()
-            val engines = jobEngines(model, audioFile, catalogue.jobStorage.whistleSegmentCache(noteId))
-            val choices = settings.speakerChoices.first()
-            RecordingPrecomputer(
-                noteId = noteId,
-                audioFile = audioFile,
-                speechModel = model,
-                storage = catalogue.jobStorage,
-                voices = catalogue.jobVoices,
-                models = SelectedModelAccess(modelAccess, choices),
-                engines = engines,
-                env = jobEnvironment,
-                shouldContinue = shouldContinue,
-                waitForMoreBytes = {
-                    delay(PRECOMPUTE_POLL_MS)
-                    shouldContinue()
-                },
-            ).run()
+        val reason = try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                PrecomputeStopReason.YIELDED
+            } else {
+                ready.await()
+                val catalogue = awaitCatalogue()
+                val audioFile = catalogue.jobStorage.audioFile(noteId)
+                if (audioFile.extension != "opus") {
+                    PrecomputeStopReason.YIELDED
+                } else {
+                    openAndRunPrecomputer(noteId, audioFile, catalogue, shouldContinue)
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            val stopReason = if (!shouldContinue()) PrecomputeStopReason.YIELDED else PrecomputeStopReason.CANCELLED
+            config.processing.onPrecomputeStopped?.invoke(noteId, stopReason)
+            throw cancelled
         }
+        config.processing.onPrecomputeStopped?.invoke(noteId, reason)
+        return reason
+    }
+
+    private suspend fun openAndRunPrecomputer(
+        noteId: String,
+        audioFile: java.io.File,
+        catalogue: Catalogue,
+        shouldContinue: () -> Boolean,
+    ): PrecomputeStopReason {
+        val model = speech.selected()
+        val engines = jobEngines(
+            model,
+            audioFile,
+            catalogue.jobStorage.whistleSegmentCache(noteId),
+            precompute = true,
+        )
+        val choices = settings.speakerChoices.first()
+        return RecordingPrecomputer(
+            noteId = noteId,
+            audioFile = audioFile,
+            speechModel = model,
+            storage = catalogue.jobStorage,
+            voices = catalogue.jobVoices,
+            models = SelectedModelAccess(modelAccess, choices),
+            engines = engines,
+            env = jobEnvironment,
+            shouldContinue = shouldContinue,
+            waitForMoreBytes = {
+                delay(PRECOMPUTE_POLL_MS)
+                shouldContinue()
+            },
+            onCheckpointed = { doneMs -> config.processing.onPrecomputeCheckpointed?.invoke(noteId, doneMs) },
+        ).run()
     }
 
     /** "Voice note 8 Oct, 08:14" in the app language (features.md section 2). */

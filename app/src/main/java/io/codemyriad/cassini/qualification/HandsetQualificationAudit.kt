@@ -1,0 +1,431 @@
+package io.codemyriad.cassini.qualification
+
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+
+/**
+ * Deterministic pure-Kotlin qualification validators for D-1126 physical handset checks.
+ *
+ * Pure Kotlin with no Android dependencies so both debug and release JVM unit tests (`testDebugUnitTest`,
+ * `testReleaseUnitTest`) and device tests (`androidTest`) share the exact same assertions (R8 strips unused
+ * qualification helpers from minified release builds).
+ */
+@Suppress("TooManyFunctions") // Central namespace of deterministic D-1126 qualification validators.
+object HandsetQualificationAudit {
+    private const val MIN_HAL_SAMPLES_FOR_DELTA = 2
+    private const val LATE_PRECOMPUTE_RATIO = 0.75
+    private const val TAIL_WORD_RATIO = 0.90
+    private const val MATCHED_VOICE_NAME_INDEX = 1
+    private const val FOCUS_LOST_PERMANENT = "LOST"
+    private const val FOCUS_LOST_TRANSIENT = "LOST_FOR_NOW"
+    private const val FOCUS_GAINED = "GAINED"
+    private const val STOP_REASON_YIELDED = "YIELDED"
+    private const val STOP_REASON_OOM = "OUT_OF_MEMORY"
+    private const val HEX_RADIX = 16
+    private const val JSON_INDENT = 2
+    private const val OPUS_TO_16K_RATIO = 3L
+
+    /**
+     * Manages `handset-qual-reports.json` across instrumentation invocations: [initialize] resets the file to `[]`
+     * once at runner startup so smoke-only or failing invocations never leave stale reports from an earlier run.
+     */
+    object ReportStore {
+        const val FILE_NAME = "handset-qual-reports.json"
+
+        fun file(filesDir: File): File = File(filesDir, FILE_NAME)
+
+        fun initialize(filesDir: File): File = file(filesDir).also { target ->
+            target.parentFile?.mkdirs()
+            target.writeText("[]\n", Charsets.UTF_8)
+        }
+
+        fun append(filesDir: File, report: JSONObject): File = file(filesDir).also { target ->
+            target.parentFile?.mkdirs()
+            val existing = runCatching {
+                if (target.isFile) JSONArray(target.readText(Charsets.UTF_8)) else JSONArray()
+            }.getOrElse { JSONArray() }
+            existing.put(report)
+            target.writeText(existing.toString(JSON_INDENT) + "\n", Charsets.UTF_8)
+        }
+    }
+
+    data class PairedEnginePlan(
+        val runParakeet: Boolean,
+        val runWhistle: Boolean,
+    )
+
+    data class DrainResult(
+        val committedBytes: Long,
+        val totalEmittedSamples16k: Long,
+        val pollCount: Int,
+    )
+
+    /** Converts a 48 kHz Ogg Opus granule (minus pre-skip) to its 16 kHz sample boundary (rounded up). */
+    fun granule48kToSamples16k(committedGranule48k: Long, preSkip48k: Int): Long {
+        val audio48k = (committedGranule48k - preSkip48k.toLong()).coerceAtLeast(0L)
+        return (audio48k + OPUS_TO_16K_RATIO - 1L) / OPUS_TO_16K_RATIO
+    }
+
+    /**
+     * Repeatedly invokes [pollOnce] (returning `(committedBytes, totalEmittedSamples16k)`) until `committedBytes`
+     * advances strictly past [targetOffsetBytes] AND `totalEmittedSamples16k` advances strictly past
+     * [targetSamplePosition16k], ensuring a crossing poll that emits only older queued PCM does not satisfy the drain.
+     */
+    suspend fun drainUntilPastOffset(
+        targetOffsetBytes: Long,
+        targetSamplePosition16k: Long,
+        pollOnce: () -> Pair<Long, Long>,
+        awaitMoreData: suspend () -> Unit,
+    ): DrainResult {
+        var polls = 0
+        var lastCommitted = -1L
+        var lastEmitted = -1L
+        while (true) {
+            val (committed, totalEmitted) = pollOnce()
+            polls++
+            if (committed > targetOffsetBytes && totalEmitted > targetSamplePosition16k) {
+                return DrainResult(committed, totalEmitted, polls)
+            }
+            if (committed <= lastCommitted && totalEmitted <= lastEmitted) {
+                awaitMoreData()
+            }
+            lastCommitted = committed
+            lastEmitted = totalEmitted
+        }
+    }
+
+    fun resolvePairedEngines(
+        runParakeet: Boolean,
+        runWhistle: Boolean,
+        whistleEligible: Boolean,
+    ): PairedEnginePlan {
+        val effectiveWhistle = runWhistle && whistleEligible
+        if (!runParakeet && !effectiveWhistle) {
+            throw AssertionError(
+                "No requested paired engine can execute on this handset " +
+                    "(runParakeet=$runParakeet, runWhistle=$runWhistle, whistleEligible=$whistleEligible)",
+            )
+        }
+        return PairedEnginePlan(runParakeet = runParakeet, runWhistle = effectiveWhistle)
+    }
+
+    fun verifyBitExactFloatPcmSample(index: Long, live: Float, finalized: Float) {
+        if (live.toRawBits() != finalized.toRawBits()) {
+            throw AssertionError(
+                "Live vs finalized float32 PCM diverged at sample $index " +
+                    "(live=$live [0x${live.toRawBits().toString(HEX_RADIX)}], " +
+                    "finalized=$finalized [0x${finalized.toRawBits().toString(HEX_RADIX)}])",
+            )
+        }
+    }
+
+    fun verifyBitExactFloatPcmPrefix(live: FloatArray, finalized: FloatArray) {
+        if (finalized.size < live.size) {
+            throw AssertionError("Finalized PCM (${finalized.size}) shorter than live prefix (${live.size})")
+        }
+        for (i in live.indices) {
+            verifyBitExactFloatPcmSample(i.toLong(), live[i], finalized[i])
+        }
+    }
+
+    /**
+     * Tracks a fresh precompute worker start after user Resume, verifies that the worker is still active when
+     * `KEYCODE_HOME` is issued, and requires a subsequent `YIELDED` stop after Home (ignoring stale Pause stops and
+     * rejecting pre-Home yields).
+     */
+    class PrecomputeBackgroundYieldTracker {
+        private var awaitingPostResumeStart = false
+        private var postResumeWorkerStarted = false
+        private var postResumeWorkerActive = false
+        private var homeIssued = false
+        private var stoppedBeforeHome = false
+        private val postHomeStops = ArrayList<String>()
+
+        @Synchronized
+        fun markResumed() {
+            awaitingPostResumeStart = true
+            postResumeWorkerStarted = false
+            postResumeWorkerActive = false
+            homeIssued = false
+            stoppedBeforeHome = false
+            postHomeStops.clear()
+        }
+
+        @Synchronized
+        fun onWorkerStarted(): Boolean {
+            if (awaitingPostResumeStart) {
+                postResumeWorkerStarted = true
+                postResumeWorkerActive = true
+            }
+            return postResumeWorkerStarted
+        }
+
+        @Synchronized
+        fun markHomeIssued() {
+            homeIssued = true
+            if (postResumeWorkerStarted && !postResumeWorkerActive) {
+                stoppedBeforeHome = true
+            }
+        }
+
+        @Synchronized
+        fun onWorkerStopped(reason: String): Boolean = when {
+            !postResumeWorkerStarted -> false
+            !homeIssued -> {
+                postResumeWorkerActive = false
+                stoppedBeforeHome = true
+                false
+            }
+            else -> {
+                postResumeWorkerActive = false
+                postHomeStops.add(reason)
+                true
+            }
+        }
+
+        @Synchronized
+        fun verifyYieldedAfterBackground() {
+            val failure = when {
+                !postResumeWorkerStarted ->
+                    "Precompute worker did not start fresh after Resume before Home backgrounding"
+                stoppedBeforeHome ->
+                    "Post-Resume precompute worker stopped before KEYCODE_HOME was issued"
+                !homeIssued ->
+                    "KEYCODE_HOME was not marked before verifying background yield"
+                postHomeStops.isEmpty() ->
+                    "Expected $STOP_REASON_YIELDED after KEYCODE_HOME, got no post-Home stop event"
+                postHomeStops.first() != STOP_REASON_YIELDED ->
+                    "Expected $STOP_REASON_YIELDED after KEYCODE_HOME, got ${postHomeStops.first()}"
+                else -> null
+            }
+            if (failure != null) throw AssertionError(failure)
+        }
+    }
+
+    /**
+     * Evaluates the OOM suppression check outcome: returns `null` when OOM was not exercised for an engine, returns
+     * `true` only when `OUT_OF_MEMORY` was actually observed, and throws [AssertionError] otherwise.
+     */
+    fun evaluateOomSuppression(exercised: Boolean, observedStopReason: String?): Boolean? {
+        if (!exercised) return null
+        if (observedStopReason != STOP_REASON_OOM) {
+            throw AssertionError("Expected PrecomputeStopReason.$STOP_REASON_OOM, got $observedStopReason")
+        }
+        return true
+    }
+
+    data class HalDropSummary(
+        val halTimestampSamples: Int,
+        val halTimestampAvailable: Boolean,
+        val halDropEvents: Int,
+        val maxHalFrameDeficit: Long,
+        val timingDropEvents: Int,
+        val droppedBuffers: Int?,
+    )
+
+    /**
+     * Tracks HAL `AudioTimestamp.framePosition` continuity against the application sample counter.
+     *
+     * Saves both counters at the first valid HAL timestamp and compares deltas (`halDelta - appDelta`) on subsequent
+     * samples so initial capture latency before the first valid timestamp cannot hide later buffer overruns.
+     */
+    class HalTimestampDropTracker {
+        private var baseHalFrame: Long? = null
+        private var baseAppSamples: Long = 0L
+        private var validSamples: Int = 0
+        private var halDrops: Int = 0
+        private var maxDeficit: Long = 0L
+
+        @Synchronized
+        fun record(halFramePosition: Long, appSamples: Long, ringSamples: Int): Boolean {
+            validSamples++
+            val firstHal = baseHalFrame
+            return if (firstHal == null) {
+                baseHalFrame = halFramePosition
+                baseAppSamples = appSamples
+                false
+            } else {
+                val halDelta = halFramePosition - firstHal
+                val appDelta = appSamples - baseAppSamples
+                val deficit = halDelta - appDelta
+                if (deficit > maxDeficit) maxDeficit = deficit
+                val dropped = deficit > ringSamples
+                if (dropped) halDrops++
+                dropped
+            }
+        }
+
+        @Synchronized
+        fun snapshot(timingDropEvents: Int): HalDropSummary {
+            val available = validSamples >= MIN_HAL_SAMPLES_FOR_DELTA
+            return HalDropSummary(
+                halTimestampSamples = validSamples,
+                halTimestampAvailable = available,
+                halDropEvents = halDrops,
+                maxHalFrameDeficit = maxDeficit,
+                timingDropEvents = timingDropEvents,
+                droppedBuffers = if (available) timingDropEvents + halDrops else null,
+            )
+        }
+    }
+
+    data class ComparableWord(
+        val text: String,
+        val startMs: Long,
+        val endMs: Long,
+        val speaker: String,
+    )
+
+    data class ComparableTurn(
+        val speaker: Int,
+        val startMs: Long,
+        val endMs: Long,
+    )
+
+    data class EquivalenceSnapshot(
+        val captureOpusSha256: String,
+        val decodedPcmSha256: String,
+        val words: List<ComparableWord>,
+        val turns: List<ComparableTurn>,
+        val turnCount: Int,
+        val speakerCount: Int,
+        val speakerLabels: Map<String, String>,
+        val matchedVoices: List<String>,
+    )
+
+    data class LongLaneProgress(
+        val expectedDurationMs: Long,
+        val precomputeCheckpoints: Int,
+        val resumedFromMs: Long,
+        val wordCount: Int,
+        val lastWordEndMs: Long,
+    )
+
+    fun verifyCaptureHealth(summary: HalDropSummary, maxFrameIntervalMs: Long, ringBufferMs: Long) {
+        val dropped = summary.droppedBuffers
+        val failure = when {
+            !summary.halTimestampAvailable || dropped == null ->
+                "HAL AudioTimestamp continuity evidence unavailable " +
+                    "(validSamples=${summary.halTimestampSamples}, need >= $MIN_HAL_SAMPLES_FOR_DELTA)"
+            dropped != 0 ->
+                "Expected zero dropped AudioRecord buffers, got $dropped " +
+                    "(halDrops=${summary.halDropEvents}, timingDrops=${summary.timingDropEvents}, " +
+                    "maxHalFrameDeficit=${summary.maxHalFrameDeficit})"
+            maxFrameIntervalMs >= ringBufferMs ->
+                "Max OpusCapture frame interval ($maxFrameIntervalMs ms) must be < ring ($ringBufferMs ms)"
+            else -> null
+        }
+        if (failure != null) throw AssertionError(failure)
+    }
+
+    fun verifyNonEmptyBaseline(
+        label: String,
+        baseline: EquivalenceSnapshot,
+        expectedEnrolledVoices: List<String>,
+    ) {
+        val failure = when {
+            baseline.captureOpusSha256.isBlank() -> "$label baseline capture.opus SHA-256 is blank"
+            baseline.decodedPcmSha256.isBlank() -> "$label baseline decoded PCM SHA-256 is blank"
+            baseline.words.isEmpty() -> "$label baseline must contain non-empty transcript words"
+            baseline.turnCount <= 0 -> "$label baseline must contain positive diarization turns"
+            baseline.turns.isEmpty() || baseline.turns.size != baseline.turnCount ->
+                "$label baseline turns (${baseline.turns.size}) must match positive turnCount (${baseline.turnCount})"
+            baseline.speakerCount < expectedEnrolledVoices.size ->
+                "$label baseline speakerCount (${baseline.speakerCount}) < expected (${expectedEnrolledVoices.size})"
+            baseline.speakerLabels.isEmpty() -> "$label baseline must contain non-empty speaker labels"
+            else -> findMissingVoicesError(label, baseline.matchedVoices, expectedEnrolledVoices)
+        }
+        if (failure != null) throw AssertionError(failure)
+    }
+
+    private fun findMissingVoicesError(
+        label: String,
+        matchedVoices: List<String>,
+        expectedEnrolledVoices: List<String>,
+    ): String? {
+        val matchedNames = matchedVoices.mapNotNull { entry ->
+            val parts = entry.split(':')
+            if (parts.size > MATCHED_VOICE_NAME_INDEX) parts[MATCHED_VOICE_NAME_INDEX] else null
+        }.toSet()
+        val missing = expectedEnrolledVoices.filter { it !in matchedNames }
+        return if (missing.isNotEmpty()) {
+            "$label baseline missing CAM++ matches for enrolled voices $missing (observed=$matchedVoices)"
+        } else {
+            null
+        }
+    }
+
+    fun verifyLaneEquivalence(
+        label: String,
+        baseline: EquivalenceSnapshot,
+        candidate: EquivalenceSnapshot,
+        expectedEnrolledVoices: List<String>,
+    ) {
+        verifyNonEmptyBaseline(label, baseline, expectedEnrolledVoices)
+        val failure = when {
+            baseline.captureOpusSha256 != candidate.captureOpusSha256 ->
+                "$label capture.opus SHA-256 mismatch: ${baseline.captureOpusSha256} != ${candidate.captureOpusSha256}"
+            baseline.decodedPcmSha256 != candidate.decodedPcmSha256 ->
+                "$label decoded .opus PCM SHA-256 mismatch: ${baseline.decodedPcmSha256} != ${candidate.decodedPcmSha256}"
+            baseline.words != candidate.words ->
+                "$label words & timings mismatch (baseline=${baseline.words.size}, candidate=${candidate.words.size})"
+            baseline.turnCount != candidate.turnCount ->
+                "$label diarization turnCount mismatch: ${baseline.turnCount} != ${candidate.turnCount}"
+            baseline.turns != candidate.turns ->
+                "$label ordered Sortformer turns mismatch (baseline=${baseline.turns.size}, candidate=${candidate.turns.size})"
+            baseline.speakerCount != candidate.speakerCount ->
+                "$label diarization speakerCount mismatch: ${baseline.speakerCount} != ${candidate.speakerCount}"
+            baseline.speakerLabels != candidate.speakerLabels ->
+                "$label speaker labels mismatch: ${baseline.speakerLabels} != ${candidate.speakerLabels}"
+            baseline.matchedVoices != candidate.matchedVoices ->
+                "$label CAM++ saved-voice matches mismatch: ${baseline.matchedVoices} != ${candidate.matchedVoices}"
+            else -> null
+        }
+        if (failure != null) throw AssertionError(failure)
+    }
+
+    fun verifyLongLaneProgress(progress: LongLaneProgress) {
+        val minLateResumedMs = (progress.expectedDurationMs * LATE_PRECOMPUTE_RATIO).toLong()
+        val minTailWordEndMs = (progress.expectedDurationMs * TAIL_WORD_RATIO).toLong()
+        val failure = when {
+            progress.wordCount <= 0 -> "30-min transcript must contain words"
+            progress.precomputeCheckpoints <= 0 ->
+                "30-min lane must save recording-time precompute checkpoints (got ${progress.precomputeCheckpoints})"
+            progress.resumedFromMs <= 0L ->
+                "30-min lane must resume from a positive recording-time checkpoint (resumedFromMs=${progress.resumedFromMs})"
+            progress.resumedFromMs < minLateResumedMs ->
+                "30-min lane precomputation did not progress late into the recording " +
+                    "(resumedFromMs=${progress.resumedFromMs} < $minLateResumedMs)"
+            progress.lastWordEndMs < minTailWordEndMs ->
+                "30-min transcript does not cover the recording tail " +
+                    "(lastWordEndMs=${progress.lastWordEndMs} < $minTailWordEndMs)"
+            else -> null
+        }
+        if (failure != null) throw AssertionError(failure)
+    }
+
+    fun verifyTransientAudioFocusTransition(
+        primaryGranted: Boolean,
+        competingGranted: Boolean,
+        observedEvents: List<String>,
+    ) {
+        val lostIdx = observedEvents.indexOf(FOCUS_LOST_TRANSIENT)
+        val gainedAfterLostIdx = if (lostIdx >= 0) {
+            observedEvents.subList(lostIdx + 1, observedEvents.size).indexOf(FOCUS_GAINED)
+        } else {
+            -1
+        }
+        val failure = when {
+            !primaryGranted -> "Primary audio-focus request was not granted"
+            !competingGranted -> "Competing transient audio-focus request was not granted"
+            observedEvents.isEmpty() -> "Expected ordered $FOCUS_LOST_TRANSIENT -> $FOCUS_GAINED callbacks, got none"
+            FOCUS_LOST_PERMANENT in observedEvents ->
+                "Unexpected permanent audio-focus $FOCUS_LOST_PERMANENT callback in transient check: $observedEvents"
+            lostIdx < 0 || gainedAfterLostIdx < 0 ->
+                "Expected ordered $FOCUS_LOST_TRANSIENT -> $FOCUS_GAINED callbacks, got $observedEvents"
+            else -> null
+        }
+        if (failure != null) throw AssertionError(failure)
+    }
+}

@@ -14,12 +14,20 @@ class WhistleStream internal constructor(
     rate: Int,
     private val probability: (FloatArray) -> Float,
     private val transcribe: (FloatArray) -> ByteArray,
-    private val segment: (WhistleSpeechSegment, ByteArray, String) -> Unit,
+    private val segment: (WhistleSpeechSegment, ByteArray, String, Boolean) -> Unit,
     private val cachedSegment: (String, Int) -> ByteArray? = { _, _ -> null },
 ) {
+    internal constructor(
+        rate: Int,
+        probability: (FloatArray) -> Float,
+        transcribe: (FloatArray) -> ByteArray,
+        segment: (WhistleSpeechSegment, ByteArray, String) -> Unit,
+        cachedSegment: (String, Int) -> ByteArray? = { _, _ -> null },
+    ) : this(rate, probability, transcribe, { range, json, hash, _ -> segment(range, json, hash) }, cachedSegment)
+
     constructor(
         rate: Int,
-        segment: (WhistleSpeechSegment, ByteArray, String) -> Unit,
+        segment: (WhistleSpeechSegment, ByteArray, String, Boolean) -> Unit,
         cachedSegment: (String, Int) -> ByteArray? = { _, _ -> null },
     ) : this(rate, WhistleNative::probability, WhistleNative::transcribe, segment, cachedSegment)
 
@@ -29,6 +37,10 @@ class WhistleStream internal constructor(
     private var frames = 0
     private var voiced = 0
     private var maximum = 0f
+    var cacheHits = 0
+        private set
+    var neuralTranscribes = 0
+        private set
     private val rawHash = MessageDigest.getInstance("SHA-256")
     private val vadHash = MessageDigest.getInstance("SHA-256")
     private val gate = WhistleSpeechGate({ frame ->
@@ -69,8 +81,14 @@ class WhistleStream internal constructor(
         updateHash(digest, samples, samples.size)
         val hash = hex(digest.digest())
         val cached = cachedSegment(hash, samples.size)?.takeIf(WhistleSegmentCache::isValidSegmentJson)
-        val json = cached ?: transcribe(samples)
-        segment(range, json, hash)
+        val json = if (cached != null) {
+            cacheHits++
+            cached
+        } else {
+            neuralTranscribes++
+            transcribe(samples)
+        }
+        segment(range, json, hash, cached != null)
     }
 
     companion object {

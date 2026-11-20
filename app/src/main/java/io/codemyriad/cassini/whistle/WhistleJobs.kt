@@ -2,6 +2,7 @@ package io.codemyriad.cassini.whistle
 
 import android.content.Context
 import android.os.Build
+import android.os.Bundle
 import androidx.annotation.RequiresApi
 import io.codemyriad.cassini.engine.decode.AudioDecoder
 import io.codemyriad.cassini.engine.job.AudioSource
@@ -15,12 +16,21 @@ import java.io.File
 /** Binds one immutable job to Included's decoder and worker, preserving its optional speaker/print seams. */
 object WhistleJobs {
     @RequiresApi(Build.VERSION_CODES.Q)
-    fun of(context: Context, base: JobEngines, cache: File, file: File, segmentCacheFile: File? = null): JobEngines {
+    @Suppress("LongParameterList") // One explicit seam per collaborator plus optional worker callbacks.
+    fun of(
+        context: Context,
+        base: JobEngines,
+        cache: File,
+        file: File,
+        segmentCacheFile: File? = null,
+        onWorkerFinished: (Bundle) -> Unit = {},
+        onWorkerSegment: (Bundle) -> Unit = {},
+    ): JobEngines {
         val source = DecoderAudioSource(AudioDecoder(context.contentResolver, cache, included = true))
         val replay = WhistleReplay { samples, sink -> prefix(source, file, samples, sink) }
         val store = segmentCacheFile?.let(::FileWhistleSegmentStore)
         return JobEngines(
-            WhistleRecognizers(context, replay, store),
+            WhistleRecognizers(context, replay, store, onWorkerFinished, onWorkerSegment),
             base.diarizers,
             base.prints,
             source,

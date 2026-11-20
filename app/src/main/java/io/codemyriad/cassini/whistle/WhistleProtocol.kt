@@ -1,6 +1,8 @@
 package io.codemyriad.cassini.whistle
 
 import android.os.Bundle
+import io.codemyriad.cassini.core.asr.whistle.WhistleSpeechSegment
+import io.codemyriad.cassini.engine.whistle.WhistleStream
 
 /** One outstanding command at a time; the client waits on replies, never sleeps or an unbounded PCM queue. */
 internal object WhistleProtocol {
@@ -21,6 +23,38 @@ internal object WhistleProtocol {
     fun ownsProcess(packageName: String, processName: String): Boolean {
         val prefix = "$packageName$SERVICE_PROCESS"
         return processName == prefix || processName.startsWith("$prefix:")
+    }
+
+    /** Per-segment IPC payload; strictly O(1) metadata plus the single segment's JSON bytes. */
+    fun segmentBundle(
+        range: WhistleSpeechSegment,
+        json: ByteArray,
+        hash: String,
+        cacheHit: Boolean,
+    ): Bundle = Bundle().apply {
+        putLong("start", range.startSample)
+        putLong("end", range.endSample)
+        putString("reason", range.reason)
+        putString("pcmSha256", hash)
+        putBoolean("cacheHit", cacheHit)
+        putByteArray("json", json)
+    }
+
+    /** Final stream summary; strictly O(1) scalar counters regardless of recording length or segment count. */
+    fun finishBundle(
+        hashes: WhistleStream.Summary,
+        cacheHits: Int,
+        neuralTranscribes: Int,
+        workerCpuMs: Long,
+    ): Bundle = Bundle().apply {
+        putString("rawSha256", hashes.rawSha256)
+        putString("vadSha256", hashes.vadSha256)
+        putInt("vadFrames", hashes.frames)
+        putInt("voicedFrames", hashes.voiced)
+        putFloat("maxProbability", hashes.maximum)
+        putInt("cacheHits", cacheHits)
+        putInt("neuralTranscribes", neuralTranscribes)
+        putLong("workerCpuMs", workerCpuMs)
     }
 
     fun errorBundle(message: String, code: Int = ERROR_CODE_GENERIC): Bundle = Bundle().apply {

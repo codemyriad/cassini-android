@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.test.runner.AndroidJUnitRunner
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.models.ModelFetcher
+import io.codemyriad.cassini.qualification.HandsetQualificationAudit
 import java.io.File
 
 /**
@@ -43,6 +44,7 @@ class CassiniTestRunner : AndroidJUnitRunner() {
         removeLeftovers(app.filesDir)
         removeLeftovers(app.cacheDir)
         removeLeftovers(File(app.cacheDir, app.filesDir.path))
+        HandsetQualificationAudit.ReportStore.initialize(app.filesDir)
         val scratch = File(app.filesDir, run).also { root = it }
         val scratchCache = File(app.cacheDir, run).also { cache = it }
         locks = File(app.cacheDir, scratch.path)
@@ -57,8 +59,20 @@ class CassiniTestRunner : AndroidJUnitRunner() {
                     ModelFetcher.network(AppGraph.MODEL_USER_AGENT)
                 },
                 network = TestHooks.network(application),
-                recording = AppGraph.RecordingHooks(platform = TestHooks.recordingPlatform(application)),
-                processing = AppGraph.ProcessingHooks(jobs = TestHooks::jobs),
+                recording = AppGraph.RecordingHooks(
+                    capture = TestHooks.capture(application),
+                    platform = TestHooks.recordingPlatform(application),
+                ),
+                processing = AppGraph.ProcessingHooks(
+                    jobs = TestHooks::jobs,
+                    thermal = TestHooks.thermal(application),
+                    environment = TestHooks::environment,
+                    engines = TestHooks::engines,
+                    onWhistleFinish = { summary -> TestHooks.onWhistleFinish?.invoke(summary) },
+                    onWhistleSegment = { seg, pre -> TestHooks.onWhistleSegment?.invoke(seg, pre) },
+                    onPrecomputeCheckpointed = { id, doneMs -> TestHooks.onPrecomputeCheckpointed?.invoke(id, doneMs) },
+                    onPrecomputeStopped = { id, reason -> TestHooks.onPrecomputeStopped?.invoke(id, reason) },
+                ),
             )
             AppGraph(application, config).also {
                 graph = it

@@ -94,7 +94,7 @@ class RecordingPrecomputer(
         } catch (_: OutOfMemoryError) {
             PrecomputeStopReason.OUT_OF_MEMORY
         } catch (_: CancellationException) {
-            PrecomputeStopReason.CANCELLED
+            if (!shouldContinue()) PrecomputeStopReason.YIELDED else PrecomputeStopReason.CANCELLED
         } catch (_: ProcessingPaused) {
             PrecomputeStopReason.YIELDED
         } catch (error: UserFacingException) {
@@ -124,7 +124,7 @@ class RecordingPrecomputer(
 
     private fun classifyUserFailure(error: UserFacingException): PrecomputeStopReason =
         if (error.failure == Failure.CANCELLED) {
-            PrecomputeStopReason.CANCELLED
+            if (!shouldContinue()) PrecomputeStopReason.YIELDED else PrecomputeStopReason.CANCELLED
         } else {
             env.warn("Recording precomputation stopped cleanly", error)
             PrecomputeStopReason.DECODE_ERROR
@@ -146,6 +146,10 @@ class RecordingPrecomputer(
     private suspend fun driveLoop(session: Session): PrecomputeStopReason {
         var stopReason: PrecomputeStopReason? = null
         while (stopReason == null && currentCoroutineContext().isActive && shouldContinue()) {
+            if (env.lowMemory(null)) {
+                stopReason = PrecomputeStopReason.LOW_MEMORY
+                break
+            }
             stopReason = when (onBackgroundInference { step(session) }) {
                 StepStatus.PROGRESSED -> null
                 StepStatus.IDLE -> if (shouldContinue() && waitForMoreBytes()) null else PrecomputeStopReason.YIELDED
@@ -353,8 +357,8 @@ class RecordingPrecomputer(
     }
 
     private fun checkPrecomputeActive() {
-        requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
         if (!shouldContinue()) throw ProcessingPaused()
+        requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
     }
 
     private fun oneVoice(session: Session, words: Transcript): Transcript =

@@ -749,4 +749,63 @@ class RecordingPrecomputerEquivalenceTest {
         assertEquals(JobOutcome.Done, runBatchJob(batch, SpeechModel.INCLUDED, batchEngines))
         assertEquivalentSealedOutputs(batch, pre)
     }
+
+    @Test fun lowMemoryPreflightAndDynamicMidRunSuppressionReturnLowMemoryAndRecoverPostStop() = runBlocking {
+        val totalSeconds = 70
+        val totalPackets = totalSeconds * 50
+        val precomputePackets = 60 * 50
+        val track = FloatArray(totalSeconds * Limits.ASR_RATE) { i -> ((i / (10 * Limits.ASR_RATE)) % 3 + 1) * 0.1f }
+        val (audioFile, out, muxer) = openLiveOpus("lowmem-pre.opus", precomputePackets)
+
+        val lowMemFlag = AtomicBoolean(true)
+        val baseLane = newLane("pre-lowmem", "note-lowmem", audioFile, SpeechModel.PARAKEET, "diar_lm_")
+        val lane = Lane(
+            noteId = baseLane.noteId,
+            storage = baseLane.storage,
+            voices = baseLane.voices,
+            script = baseLane.script,
+            env = JobEnvironment(
+                placeholderLabel = { "Speaker $it" },
+                inference = inference,
+                speakerPrefix = { "diar_lm_" },
+                lowMemory = { lowMemFlag.get() },
+            ),
+            precomputeModels = baseLane.precomputeModels,
+        )
+        val preEngines = parakeetEngines(lane.script, track, totalSeconds)
+
+        // 1. Preflight low memory stops immediately with LOW_MEMORY and 0 checkpoints.
+        assertEquals(
+            PrecomputeStopReason.LOW_MEMORY,
+            runSinglePassPrecompute(lane, audioFile, SpeechModel.PARAKEET, preEngines, track),
+        )
+        assertTrue(lane.storage.saved.isEmpty())
+
+        // 2. Dynamic mid-run low memory set on first checkpoint stops at next step with LOW_MEMORY.
+        lowMemFlag.set(false)
+        val midStopReason = RecordingPrecomputer(
+            noteId = lane.noteId,
+            audioFile = audioFile,
+            speechModel = SpeechModel.PARAKEET,
+            storage = lane.storage,
+            voices = lane.voices,
+            models = lane.precomputeModels,
+            engines = preEngines,
+            env = lane.env,
+            openDecoder = { file, _, start -> ScriptedOggPrefixDecoder(file, track, start) },
+            onCheckpointed = { lowMemFlag.set(true) },
+        ).run()
+        assertEquals(PrecomputeStopReason.LOW_MEMORY, midStopReason)
+        assertTrue(lane.storage.saved.isNotEmpty())
+
+        // 3. Clearing dynamic lowMemory allows post-Stop TranscriptionJob to finish identically to batch.
+        lowMemFlag.set(false)
+        finishLiveOpus(out, muxer, precomputePackets, totalPackets)
+        assertEquals(JobOutcome.Done, runBatchJob(lane, SpeechModel.PARAKEET, preEngines))
+
+        val batch = newLane("batch-lowmem", "note-lowmem", audioFile, SpeechModel.PARAKEET, "diar_lm_")
+        val batchEngines = parakeetEngines(batch.script, track, totalSeconds)
+        assertEquals(JobOutcome.Done, runBatchJob(batch, SpeechModel.PARAKEET, batchEngines))
+        assertEquivalentSealedOutputs(batch, lane)
+    }
 }
