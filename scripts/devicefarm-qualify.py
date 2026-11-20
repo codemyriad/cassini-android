@@ -4,7 +4,8 @@
 Usage:
   AWS_PROFILE=cassini-devicefarm uv run --with boto3 python3 scripts/devicefarm-qualify.py \\
       --device-arn <ARN> --pool-name d1126-pixel8-api35 --name d1126-pixel8-5min \\
-      --test-class io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test02PairedFiveMinuteEquivalenceAndPressure
+      --test-class \\
+      io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test02PairedFiveMinuteEquivalenceAndPressure
 
 When AWS credentials live on a separate control host (such as drmeyers) with tight local disk, pass
 `--control-ssh drmeyers`: control-plane API calls run over SSH while APK uploads and log downloads stream
@@ -214,13 +215,22 @@ def check_budget(
         runs = paginate(df.list_runs, "runs", arn=project_arn)
         for run in runs:
             run_metered = float(run.get("deviceMinutes", {}).get("metered", 0.0) or 0.0)
-            if _run_overlaps_month(run, now_utc.year, now_utc.month):
+            overlaps_month = _run_overlaps_month(run, now_utc.year, now_utc.month)
+            if overlaps_month:
                 metered_minutes += run_metered
             status = str(run.get("status", "COMPLETED") or "COMPLETED").upper()
             if status != "COMPLETED":
-                total_jobs = int(run.get("totalJobs") or 1)
+                raw_total_jobs = run.get("totalJobs")
+                if raw_total_jobs is None or int(raw_total_jobs) <= 0:
+                    run_id = run.get("arn") or run.get("name") or "<unknown>"
+                    raise SystemExit(
+                        f"Budget guard (D89/D-1126): outstanding run {run_id} ({status}) has unknown device "
+                        f"count (totalJobs={raw_total_jobs!r}); wait for it to finish or report totalJobs.",
+                    )
+                total_jobs = int(raw_total_jobs)
                 run_timeout = float(run.get("jobTimeoutMinutes") or MAX_DEVICE_FARM_TIMEOUT_MINUTES)
-                outstanding_projected_minutes += max(0.0, total_jobs * run_timeout - run_metered)
+                already_counted_metered = run_metered if overlaps_month else 0.0
+                outstanding_projected_minutes += max(0.0, total_jobs * run_timeout - already_counted_metered)
 
     spent_usd = metered_minutes * RATE_PER_MINUTE
     outstanding_usd = outstanding_projected_minutes * RATE_PER_MINUTE
@@ -626,7 +636,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--timeout-minutes",
         type=int,
         default=None,
-        help="Device Farm job timeout in minutes (defaults to 105 for core lanes, 150 when combined with --long-engine).",
+        help="Job timeout in minutes (defaults to 105 for core lanes, 150 when combined with --long-engine).",
     )
     parser.add_argument("--ceiling-usd", type=float, default=MONTHLY_DENY_USD)
     parser.add_argument(

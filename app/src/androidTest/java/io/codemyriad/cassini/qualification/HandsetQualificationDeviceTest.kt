@@ -33,10 +33,12 @@ import io.codemyriad.cassini.engine.asr.WhistleDeviceCapability
 import io.codemyriad.cassini.engine.capture.CaptureFactory
 import io.codemyriad.cassini.engine.decode.AudioDecoder
 import io.codemyriad.cassini.engine.decode.CommittedOggOpusDecoder
+import io.codemyriad.cassini.engine.job.DiarizerFactory
 import io.codemyriad.cassini.engine.job.JobEngines
 import io.codemyriad.cassini.engine.job.PrecomputeStopReason
 import io.codemyriad.cassini.engine.job.Recognizer
 import io.codemyriad.cassini.engine.job.RecognizerFactory
+import io.codemyriad.cassini.engine.job.StreamingDiarizer
 import io.codemyriad.cassini.engine.whistle.WhistlePrefixAudit
 import io.codemyriad.cassini.playback.AndroidPlaybackPlatform
 import io.codemyriad.cassini.playback.FocusChange
@@ -746,6 +748,7 @@ class HandsetQualificationDeviceTest {
         val whistleNeuralSpans: List<String>,
         val whistleCacheHits: Int,
         val whistleNeural: Int,
+        val diarizerTurns: List<HandsetQualificationAudit.ComparableTurn>,
         val stopToPubSec: Double,
         val preSnap: HandsetTelemetryMonitor.Snapshot?,
         val postSnap: HandsetTelemetryMonitor.Snapshot,
@@ -755,6 +758,7 @@ class HandsetQualificationDeviceTest {
         val captureOpusSha256: String,
         val decodedPcmSha256: String,
         val words: List<HandsetQualificationAudit.ComparableWord>,
+        val turns: List<HandsetQualificationAudit.ComparableTurn>,
         val turnCount: Int,
         val speakerCount: Int,
         val speakerLabels: Map<String, String>,
@@ -775,6 +779,7 @@ class HandsetQualificationDeviceTest {
             captureOpusSha256 = captureOpusSha256,
             decodedPcmSha256 = decodedPcmSha256,
             words = words,
+            turns = turns,
             turnCount = turnCount,
             speakerCount = speakerCount,
             speakerLabels = speakerLabels,
@@ -790,6 +795,7 @@ class HandsetQualificationDeviceTest {
         val checkpointSignal = Channel<Long>(Channel.CONFLATED)
         val whistleSummaries = ArrayList<Bundle>()
         val activeMonitor = AtomicReference<HandsetTelemetryMonitor?>(null)
+        val finalDiarizerTurns = AtomicReference<List<HandsetQualificationAudit.ComparableTurn>>(emptyList())
         private val livePreWhistleSpans = ArrayList<String>()
         private val postCacheHitSpans = ArrayList<String>()
         private val postNeuralSpans = ArrayList<String>()
@@ -809,12 +815,13 @@ class HandsetQualificationDeviceTest {
             synchronized(whistleSummaries) { whistleSummaries.clear() }
             synchronized(postCacheHitSpans) { postCacheHitSpans.clear() }
             synchronized(postNeuralSpans) { postNeuralSpans.clear() }
+            finalDiarizerTurns.set(emptyList())
         }
 
         fun installHooks(onChunk: ((Int) -> Unit)? = null) {
             TestHooks.speakerPrefixOverride = { "diar_d1126_" }
             TestHooks.enginesOverride = { _, raw, precompute ->
-                wrapCountingEngines(raw, precompute, preChunks, postChunks, onChunk)
+                wrapCountingEngines(raw, precompute, preChunks, postChunks, finalDiarizerTurns, onChunk)
             }
             TestHooks.onWhistleSegment = { seg, precompute -> recordWhistleSegment(seg, precompute) }
             TestHooks.onWhistleFinish = { summary ->
@@ -855,6 +862,7 @@ class HandsetQualificationDeviceTest {
                 whistleNeuralSpans = inferredSpans,
                 whistleCacheHits = postWhistle?.getInt("cacheHits") ?: 0,
                 whistleNeural = postWhistle?.getInt("neuralTranscribes") ?: 0,
+                diarizerTurns = finalDiarizerTurns.get(),
                 stopToPubSec = stopToPubSec,
                 preSnap = preSnap,
                 postSnap = postSnap,
@@ -1355,6 +1363,7 @@ class HandsetQualificationDeviceTest {
             words = selected.words.map {
                 HandsetQualificationAudit.ComparableWord(it.text, it.startMs, it.endMs, it.speaker)
             },
+            turns = metrics.diarizerTurns,
             turnCount = diar?.optInt("turnCount", 0) ?: 0,
             speakerCount = diar?.optInt("speakerCount", 0) ?: 0,
             speakerLabels = speakerLabels,
@@ -1578,11 +1587,13 @@ class HandsetQualificationDeviceTest {
         const val PUBLISH_TIMEOUT_MS = 1_800_000L
         const val FINISH_TIMEOUT_MS = 30_000L
 
+        @Suppress("LongParameterList")
         fun wrapCountingEngines(
             raw: JobEngines,
             precompute: Boolean,
             preChunks: AtomicInteger,
             postChunks: AtomicInteger,
+            finalDiarizerTurns: AtomicReference<List<HandsetQualificationAudit.ComparableTurn>>,
             onPrecomputeChunk: ((Int) -> Unit)?,
         ): JobEngines = JobEngines(
             recognizers = RecognizerFactory { restored, cb ->
@@ -1604,7 +1615,23 @@ class HandsetQualificationDeviceTest {
                     ),
                 )
             },
-            diarizers = raw.diarizers,
+            diarizers = if (precompute) {
+                raw.diarizers
+            } else {
+                DiarizerFactory { restored ->
+                    val delegate = raw.diarizers.open(restored)
+                    object : StreamingDiarizer by delegate {
+                        override fun close() {
+                            finalDiarizerTurns.set(
+                                delegate.turns.map {
+                                    HandsetQualificationAudit.ComparableTurn(it.speaker, it.startMs, it.endMs)
+                                },
+                            )
+                            delegate.close()
+                        }
+                    }
+                }
+            },
             prints = raw.prints,
             audio = raw.audio,
             encoders = raw.encoders,

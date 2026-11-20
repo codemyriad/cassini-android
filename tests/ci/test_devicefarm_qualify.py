@@ -1,4 +1,4 @@
-"""Unit tests for scripts/devicefarm-qualify.py: paginated $160 D-1126/$200 D89 budget guard, TestSpec, and report parsing."""
+"""Unit tests for scripts/devicefarm-qualify.py: $160 D-1126/$200 D89 budget guard, TestSpec, and report parsing."""
 
 from __future__ import annotations
 
@@ -160,36 +160,53 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         long_selector = MODULE.resolve_test_class(long_args.test_class, long_args.long_engine)
         self.assertIn("test03ThirtyMinuteContinuousQualification", long_selector)
 
-        explicit_args = MODULE.build_parser().parse_args(
-            ["--test-class", "io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test01HardwareCaptureLifecycleInterruptionsAndAacControl"],
+        explicit_target = (
+            "io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest"
+            "#test01HardwareCaptureLifecycleInterruptionsAndAacControl"
         )
+        explicit_args = MODULE.build_parser().parse_args(["--test-class", explicit_target])
         self.assertEqual(
-            "io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test01HardwareCaptureLifecycleInterruptionsAndAacControl",
+            explicit_target,
             MODULE.resolve_test_class(explicit_args.test_class, explicit_args.long_engine),
         )
 
     def test_timeout_minutes_scales_for_combined_long_lanes_and_validates_explicit_bounds(self) -> None:
         core_args = MODULE.build_parser().parse_args([])
         core_selector = MODULE.resolve_test_class(core_args.test_class, core_args.long_engine)
-        self.assertEqual(105, MODULE.resolve_timeout_minutes(core_args.timeout_minutes, core_selector, core_args.long_engine))
+        self.assertEqual(
+            105,
+            MODULE.resolve_timeout_minutes(core_args.timeout_minutes, core_selector, core_args.long_engine),
+        )
 
         for engine in ("parakeet", "whistle"):
             # Implicit combined selector (core + test03) -> 150 min.
             implicit = MODULE.build_parser().parse_args(["--long-engine", engine])
             implicit_sel = MODULE.resolve_test_class(implicit.test_class, implicit.long_engine)
-            self.assertEqual(150, MODULE.resolve_timeout_minutes(implicit.timeout_minutes, implicit_sel, implicit.long_engine))
+            self.assertEqual(
+                150,
+                MODULE.resolve_timeout_minutes(implicit.timeout_minutes, implicit_sel, implicit.long_engine),
+            )
 
             # Explicit whole-class selector alongside --long-engine -> 150 min.
-            explicit_full = MODULE.build_parser().parse_args(["--test-class", MODULE.DEFAULT_TEST_CLASS, "--long-engine", engine])
+            explicit_full = MODULE.build_parser().parse_args(
+                ["--test-class", MODULE.DEFAULT_TEST_CLASS, "--long-engine", engine],
+            )
             explicit_full_sel = MODULE.resolve_test_class(explicit_full.test_class, explicit_full.long_engine)
             self.assertEqual(
                 150,
-                MODULE.resolve_timeout_minutes(explicit_full.timeout_minutes, explicit_full_sel, explicit_full.long_engine),
+                MODULE.resolve_timeout_minutes(
+                    explicit_full.timeout_minutes,
+                    explicit_full_sel,
+                    explicit_full.long_engine,
+                ),
             )
 
         explicit_args = MODULE.build_parser().parse_args(["--long-engine", "whistle", "--timeout-minutes", "85"])
         explicit_sel = MODULE.resolve_test_class(explicit_args.test_class, explicit_args.long_engine)
-        self.assertEqual(85, MODULE.resolve_timeout_minutes(explicit_args.timeout_minutes, explicit_sel, explicit_args.long_engine))
+        self.assertEqual(
+            85,
+            MODULE.resolve_timeout_minutes(explicit_args.timeout_minutes, explicit_sel, explicit_args.long_engine),
+        )
 
         with self.assertRaises(SystemExit):
             MODULE.resolve_timeout_minutes(151, MODULE.DEFAULT_TEST_CLASS, "whistle")
@@ -211,7 +228,7 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         self.assertIn("$210.00", str(ctx.exception))
 
         # $120.00 metered + 1 outstanding RUNNING 2-device 150-min run ($51.00) = $171.00 committed.
-        # Adding a 1-device 150-min run ($25.50 -> $196.50 <= $200.00) is admitted; 2-device ($51.00 -> $222.00) is denied.
+        # Adding 1-device ($25.50 -> $196.50 <= $200) is admitted; 2-device ($51 -> $222) is denied.
         outstanding_run = {
             "created": dt.datetime(2026, 11, 20, 13, 0, tzinfo=dt.timezone.utc),
             "status": "RUNNING",
@@ -276,6 +293,47 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         with self.assertRaises(SystemExit) as rollover_err:
             MODULE.check_budget(rollover_client, now=now, projected_new_run_usd=two_device_150m_usd)
         self.assertIn("$163.20 >= $160.00", str(rollover_err.exception))
+
+    def test_budget_guard_rejects_unknown_total_jobs_and_keeps_full_prior_month_active_reservation(self) -> None:
+        p1 = MODULE.PROJECT_ARN
+        now = dt.datetime(2026, 11, 1, 0, 5, tzinfo=dt.timezone.utc)
+
+        # 1. Outstanding run with missing totalJobs must fail closed (cannot assume 1 device).
+        unknown_jobs_run = {
+            "arn": "arn:aws:devicefarm:us-west-2:1:run:pending-unknown",
+            "created": now,
+            "status": "SCHEDULING",
+            "deviceMinutes": {"metered": 0.0},
+        }
+        unknown_client = FakeDeviceFarmClient(
+            project_pages=[{"projects": [{"arn": p1}]}],
+            run_pages_by_project={p1: [{"runs": [unknown_jobs_run]}]},
+        )
+        with self.assertRaises(SystemExit) as unknown_err:
+            MODULE.check_budget(unknown_client, now=now, projected_new_run_usd=17.0)
+        self.assertIn("unknown device count", str(unknown_err.exception))
+
+        # 2. Active prior-month-timestamped run with 100 metered min NOT counted in Nov's metered_minutes:
+        #    must keep its full 150-min ($25.50) reservation rather than subtracting 100 min ($8.50).
+        #    $150.00 Nov metered + $25.50 full active reservation + $25.50 new run = $201.00 > $200.00 -> DENIED.
+        prior_month_active = {
+            "created": dt.datetime(2026, 10, 31, 22, 0, tzinfo=dt.timezone.utc),
+            "started": dt.datetime(2026, 10, 31, 22, 5, tzinfo=dt.timezone.utc),
+            "status": "RUNNING",
+            "totalJobs": 1,
+            "jobTimeoutMinutes": 150,
+            "deviceMinutes": {"metered": 100.0},
+        }
+        active_rollover_client = FakeDeviceFarmClient(
+            project_pages=[{"projects": [{"arn": p1}]}],
+            run_pages_by_project={
+                p1: [{"runs": [_run(2026, 11, 1, 0, 150.0 / MODULE.RATE_PER_MINUTE), prior_month_active]}],
+            },
+        )
+        one_device_150m_usd = MODULE.project_run_cost_usd(device_count=1, timeout_minutes=150)
+        with self.assertRaises(SystemExit) as active_err:
+            MODULE.check_budget(active_rollover_client, now=now, projected_new_run_usd=one_device_150m_usd)
+        self.assertIn("$201.00", str(active_err.exception))
 
     def test_schedule_run_guarded_serializes_concurrent_submissions_under_200_usd(self) -> None:
         import fcntl

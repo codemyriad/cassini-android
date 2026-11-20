@@ -166,10 +166,17 @@ object HandsetQualificationAudit {
         val speaker: String,
     )
 
+    data class ComparableTurn(
+        val speaker: Int,
+        val startMs: Long,
+        val endMs: Long,
+    )
+
     data class EquivalenceSnapshot(
         val captureOpusSha256: String,
         val decodedPcmSha256: String,
         val words: List<ComparableWord>,
+        val turns: List<ComparableTurn>,
         val turnCount: Int,
         val speakerCount: Int,
         val speakerLabels: Map<String, String>,
@@ -211,6 +218,8 @@ object HandsetQualificationAudit {
             baseline.decodedPcmSha256.isBlank() -> "$label baseline decoded PCM SHA-256 is blank"
             baseline.words.isEmpty() -> "$label baseline must contain non-empty transcript words"
             baseline.turnCount <= 0 -> "$label baseline must contain positive diarization turns"
+            baseline.turns.isEmpty() || baseline.turns.size != baseline.turnCount ->
+                "$label baseline turns (${baseline.turns.size}) must match positive turnCount (${baseline.turnCount})"
             baseline.speakerCount < expectedEnrolledVoices.size ->
                 "$label baseline speakerCount (${baseline.speakerCount}) < expected (${expectedEnrolledVoices.size})"
             baseline.speakerLabels.isEmpty() -> "$label baseline must contain non-empty speaker labels"
@@ -252,6 +261,8 @@ object HandsetQualificationAudit {
                 "$label words & timings mismatch (baseline=${baseline.words.size}, candidate=${candidate.words.size})"
             baseline.turnCount != candidate.turnCount ->
                 "$label diarization turnCount mismatch: ${baseline.turnCount} != ${candidate.turnCount}"
+            baseline.turns != candidate.turns ->
+                "$label ordered Sortformer turns mismatch (baseline=${baseline.turns.size}, candidate=${candidate.turns.size})"
             baseline.speakerCount != candidate.speakerCount ->
                 "$label diarization speakerCount mismatch: ${baseline.speakerCount} != ${candidate.speakerCount}"
             baseline.speakerLabels != candidate.speakerLabels ->

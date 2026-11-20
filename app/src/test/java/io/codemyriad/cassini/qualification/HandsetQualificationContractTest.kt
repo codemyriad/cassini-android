@@ -287,17 +287,44 @@ class HandsetQualificationContractTest {
     }
 
     @Test
-    fun laneEquivalenceValidatorRequiresNonEmptyBaselineVoicesAndExactHashesAndSpeakerMetadata() {
+    fun laneEquivalenceValidatorRejectsShiftedTurnBoundaryInSpeechGap() {
         val enrolled = listOf("Voice_A", "Voice_B", "Voice_C")
-        val baseline = HandsetQualificationAudit.EquivalenceSnapshot(
+        val baseline = sampleBaselineEquivalence()
+        val shiftedGapTurns = listOf(
+            HandsetQualificationAudit.ComparableTurn(speaker = 0, startMs = 0L, endMs = 560L),
+            HandsetQualificationAudit.ComparableTurn(speaker = 1, startMs = 700L, endMs = 1_200L),
+        )
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLaneEquivalence(
+                "PARAKEET",
+                baseline,
+                baseline.copy(turns = shiftedGapTurns),
+                enrolled,
+            )
+        }
+    }
+
+    private fun sampleBaselineEquivalence(): HandsetQualificationAudit.EquivalenceSnapshot {
+        val baselineTurns = listOf(
+            HandsetQualificationAudit.ComparableTurn(speaker = 0, startMs = 0L, endMs = 500L),
+            HandsetQualificationAudit.ComparableTurn(speaker = 1, startMs = 700L, endMs = 1_200L),
+        )
+        return HandsetQualificationAudit.EquivalenceSnapshot(
             captureOpusSha256 = "1".repeat(64),
             decodedPcmSha256 = "2".repeat(64),
             words = listOf(HandsetQualificationAudit.ComparableWord("hello", 100L, 450L, "diar_0")),
-            turnCount = 12,
+            turns = baselineTurns,
+            turnCount = baselineTurns.size,
             speakerCount = 3,
             speakerLabels = mapOf("diar_0" to "Voice_A", "diar_1" to "Voice_B", "diar_2" to "Voice_C"),
             matchedVoices = listOf("diar_0:Voice_A:AUTO", "diar_1:Voice_B:AUTO", "diar_2:Voice_C:SUGGESTED"),
         )
+    }
+
+    @Test
+    fun laneEquivalenceValidatorRequiresNonEmptyBaselineVoicesAndExactHashesAndSpeakerMetadata() {
+        val enrolled = listOf("Voice_A", "Voice_B", "Voice_C")
+        val baseline = sampleBaselineEquivalence()
 
         HandsetQualificationAudit.verifyLaneEquivalence("PARAKEET thermal", baseline, baseline.copy(), enrolled)
 
