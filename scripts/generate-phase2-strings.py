@@ -102,6 +102,9 @@ LABELS = {
     'about_tagline': ('about.tagline.phone', None),
     'about_help': ('about.help', None),
     'about_help_subtitle': ('about.help.subtitle', None),
+    # D110 (L-65, D107 §2): the Report a problem row after Help.
+    'about_report_problem': ('about.reportProblem', None),
+    'about_report_problem_subtitle': ('about.reportProblem.subtitle', None),
     'about_privacy': ('about.privacy', None),
     'about_privacy_subtitle': ('about.privacy.subtitle.phone', None),
     'about_licences': ('about.licencesNotices', None),

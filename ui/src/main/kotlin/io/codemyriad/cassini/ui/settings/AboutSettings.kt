@@ -43,6 +43,9 @@ internal fun AboutSettings(state: SettingsUiState, onEvent: (SettingsEvent) -> U
         AboutLink(R.string.ui_about_help, stringResource(R.string.ui_about_help_subtitle)) {
             onEvent(SettingsEvent.OpenHelp)
         }
+        AboutLink(R.string.ui_about_report_problem, stringResource(R.string.ui_about_report_problem_subtitle)) {
+            onEvent(SettingsEvent.OpenReportProblem)
+        }
         AboutLink(R.string.ui_about_privacy, stringResource(R.string.ui_about_privacy_subtitle)) {
             onEvent(SettingsEvent.OpenPrivacy)
         }

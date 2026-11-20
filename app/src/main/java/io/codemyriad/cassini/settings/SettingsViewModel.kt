@@ -181,7 +181,8 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             }
             SettingsEvent.OpenPrivacy -> emit(SettingsEffect.Open(LicenseDetailKey(LicenseEntry.PRIVACY.name)))
             SettingsEvent.OpenSources -> emit(SettingsEffect.Open(LicenseDetailKey(LicenseEntry.MODEL_SOURCES.name)))
-            SettingsEvent.OpenHelp -> emit(SettingsEffect.OpenUrl("https://cassini.talk/help"))
+            SettingsEvent.OpenHelp -> emit(SettingsEffect.OpenUrl(HELP_URL))
+            SettingsEvent.OpenReportProblem -> emit(SettingsEffect.OpenUrl(REPORT_PROBLEM_URL))
             SettingsEvent.OpenSourceCode -> emit(SettingsEffect.OpenUrl(SOURCE_CODE_URL))
             SettingsEvent.OpenVoices -> emit(SettingsEffect.Open(SavedVoicesKey))
             SettingsEvent.OpenTrash -> emit(SettingsEffect.Open(TrashKey))
@@ -319,6 +320,12 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     companion object {
         private const val TAG = "CassiniSettings"
         private const val STOP_TIMEOUT_MS = 5_000L
+
+        /** About › Help (D103 §6). Opened in the browser only when tapped; the app sends nothing itself. */
+        internal const val HELP_URL = "https://cassini.talk/help"
+
+        /** About › Report a problem (D110). Opened like Help; nothing is attached (HARMONY §12). */
+        internal const val REPORT_PROBLEM_URL = "https://cassini.talk/report"
 
         /** The On-device models rows in [ModelPart] order; a part whose status is not known yet is left out. */
         fun rows(models: Map<ModelPart, ModelStatus>) = ModelPart.entries.mapNotNull { part ->

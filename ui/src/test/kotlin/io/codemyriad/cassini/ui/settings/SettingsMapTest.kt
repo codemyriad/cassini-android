@@ -66,20 +66,21 @@ class SettingsMapTest {
         rule.onNodeWithText("3 meetings, 1 hour of audio.").assertExists()
     }
 
-    @Test fun aboutHasFourDistinctDestinations() {
+    @Test fun aboutHasFiveDistinctDestinations() {
         val events = mutableListOf<SettingsEvent>()
         rule.setContent {
             CassiniTheme {
                 SettingsScreen(BoardFixtures.settings, events::add, initialPage = SettingsPage.ABOUT)
             }
         }
-        for (label in listOf("Help", "Privacy", "Licences and notices", "Source code")) {
+        for (label in listOf("Help", "Report a problem", "Privacy", "Licences and notices", "Source code")) {
             rule.onNodeWithText(label).performScrollTo().performClick()
         }
         rule.runOnIdle {
             assertEquals(
                 listOf(
                     SettingsEvent.OpenHelp,
+                    SettingsEvent.OpenReportProblem,
                     SettingsEvent.OpenPrivacy,
                     SettingsEvent.OpenLicenses,
                     SettingsEvent.OpenSourceCode,
