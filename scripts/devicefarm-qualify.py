@@ -176,12 +176,15 @@ def check_budget(
     now: dt.datetime | None = None,
     ceiling_usd: float = MONTHLY_DENY_USD,
     default_project_arn: str = PROJECT_ARN,
+    projected_new_run_usd: float = 0.0,
 ) -> float:
-    """Sums metered minutes across all projects and all ListRuns pages for the current UTC calendar month."""
+    """Sums metered minutes + projected outstanding/new run exposure across all projects for the current UTC month."""
     if not math.isfinite(ceiling_usd) or ceiling_usd <= 0 or ceiling_usd > MONTHLY_DENY_USD:
         raise SystemExit(
             f"Invalid ceiling {ceiling_usd!r}; must be a finite value in (0, ${MONTHLY_DENY_USD:.2f}].",
         )
+    if not math.isfinite(projected_new_run_usd) or projected_new_run_usd < 0:
+        raise SystemExit(f"Invalid projected_new_run_usd {projected_new_run_usd!r}; must be finite and >= 0.")
     now_utc = _to_utc(now) if now is not None else dt.datetime.now(dt.timezone.utc)
 
     project_arns: list[str] = []
@@ -192,22 +195,39 @@ def check_budget(
         project_arns.append(default_project_arn)
 
     metered_minutes = 0.0
+    outstanding_projected_minutes = 0.0
     for project_arn in project_arns:
         runs = paginate(df.list_runs, "runs", arn=project_arn)
         for run in runs:
             created = _to_utc(run["created"])
             if created.year == now_utc.year and created.month == now_utc.month:
-                metered_minutes += float(run.get("deviceMinutes", {}).get("metered", 0.0) or 0.0)
+                run_metered = float(run.get("deviceMinutes", {}).get("metered", 0.0) or 0.0)
+                metered_minutes += run_metered
+                status = str(run.get("status", "COMPLETED") or "COMPLETED").upper()
+                if status != "COMPLETED":
+                    total_jobs = int(run.get("totalJobs") or 1)
+                    run_timeout = float(run.get("jobTimeoutMinutes") or MAX_DEVICE_FARM_TIMEOUT_MINUTES)
+                    outstanding_projected_minutes += max(0.0, total_jobs * run_timeout - run_metered)
 
     spent_usd = metered_minutes * RATE_PER_MINUTE
+    outstanding_usd = outstanding_projected_minutes * RATE_PER_MINUTE
+    total_projected_usd = spent_usd + outstanding_usd + projected_new_run_usd
     print(
         f"Device Farm month-to-date ({now_utc:%Y-%m}): {metered_minutes:.2f} metered min "
-        f"(~${spent_usd:.2f} / ${ceiling_usd:.2f} scheduling deny threshold; ${MONTHLY_BUDGET_USD:.2f} monthly budget)",
+        f"(~${spent_usd:.2f} / ${ceiling_usd:.2f} scheduling deny threshold; "
+        f"outstanding=~${outstanding_usd:.2f}, new=~${projected_new_run_usd:.2f}, "
+        f"projected=~${total_projected_usd:.2f} / ${MONTHLY_BUDGET_USD:.2f} monthly budget)",
         flush=True,
     )
     if spent_usd >= ceiling_usd:
         raise SystemExit(
             f"Budget guard (D89/D-1126): ${spent_usd:.2f} >= ${ceiling_usd:.2f} monthly scheduling deny threshold.",
+        )
+    if projected_new_run_usd > 0.0 and total_projected_usd > MONTHLY_BUDGET_USD:
+        raise SystemExit(
+            f"Budget guard (D89/D-1126): projected monthly total ${total_projected_usd:.2f} "
+            f"(metered=${spent_usd:.2f} + outstanding=${outstanding_usd:.2f} + new=${projected_new_run_usd:.2f}) "
+            f"> ${MONTHLY_BUDGET_USD:.2f} monthly budget.",
         )
     return spent_usd
 
@@ -476,17 +496,28 @@ def resolve_test_class(test_class: str | None, long_engine: str) -> str:
     return ",".join(f"{DEFAULT_TEST_CLASS}#{method}" for method in methods)
 
 
-def resolve_timeout_minutes(timeout_minutes: int | None, test_class: str | None, long_engine: str) -> int:
-    """Derives AWS Device Farm jobTimeoutMinutes from selected lanes (capped at Device Farm's 150-minute max)."""
+def resolve_timeout_minutes(timeout_minutes: int | None, resolved_test_class: str, long_engine: str) -> int:
+    """Derives AWS Device Farm jobTimeoutMinutes from resolved lanes (capped at Device Farm's 150-minute max)."""
     if timeout_minutes is not None:
         if timeout_minutes <= 0 or timeout_minutes > MAX_DEVICE_FARM_TIMEOUT_MINUTES:
             raise SystemExit(
                 f"Invalid --timeout-minutes {timeout_minutes}; must be in [1, {MAX_DEVICE_FARM_TIMEOUT_MINUTES}].",
             )
         return timeout_minutes
-    if long_engine != "none" and not test_class:
+    selectors = [part.strip() for part in resolved_test_class.split(",") if part.strip()]
+    selects_whole_class = any("#" not in sel for sel in selectors)
+    includes_long = any(sel.endswith(f"#{LONG_METHOD}") for sel in selectors)
+    includes_core = any(
+        any(sel.endswith(f"#{core}") for core in DEFAULT_CORE_METHODS)
+        for sel in selectors
+    )
+    if long_engine != "none" and (selects_whole_class or (includes_long and includes_core)):
         return DEFAULT_COMBINED_LONG_TIMEOUT_MINUTES
     return DEFAULT_CORE_TIMEOUT_MINUTES
+
+
+def project_run_cost_usd(device_count: int, timeout_minutes: int) -> float:
+    return device_count * timeout_minutes * RATE_PER_MINUTE
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -566,12 +597,17 @@ def main(argv: list[str] | None = None) -> None:
             print(f"Extracted {len(reports)} qualification report(s) -> {out_dir / 'reports.json'}", flush=True)
         return
 
-    check_budget(df, ceiling_usd=args.ceiling_usd)
     if args.check_budget_only:
+        check_budget(df, ceiling_usd=args.ceiling_usd)
         return
 
     if not args.device_arn or not args.pool_name or not args.name:
         raise SystemExit("--device-arn, --pool-name, and --name are required to schedule a run.")
+
+    selected_test_class = resolve_test_class(args.test_class, args.long_engine)
+    job_timeout_minutes = resolve_timeout_minutes(args.timeout_minutes, selected_test_class, args.long_engine)
+    projected_new_run_usd = project_run_cost_usd(len(args.device_arn), job_timeout_minutes)
+    check_budget(df, ceiling_usd=args.ceiling_usd, projected_new_run_usd=projected_new_run_usd)
 
     out_dir = args.out_dir or (ROOT / ".tools/devicefarm-out" / args.name)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -593,7 +629,6 @@ def main(argv: list[str] | None = None) -> None:
         key, val = item.split("=", 1)
         extra_args[key] = val
 
-    selected_test_class = resolve_test_class(args.test_class, args.long_engine)
     spec_path = out_dir / f"{args.name}-testspec.yml"
     spec_path.write_text(build_test_spec(selected_test_class, extra_args), encoding="utf-8")
 
@@ -602,10 +637,9 @@ def main(argv: list[str] | None = None) -> None:
     spec_arn = upload_file(df, spec_path, "INSTRUMENTATION_TEST_SPEC")
     pool_arn = ensure_device_pool(df, args.pool_name, args.device_arn)
 
-    # Re-verify budget immediately prior to scheduling in case parallel runs finished during upload.
-    check_budget(df, ceiling_usd=args.ceiling_usd)
+    # Re-verify budget immediately prior to scheduling in case parallel runs started or finished during upload.
+    check_budget(df, ceiling_usd=args.ceiling_usd, projected_new_run_usd=projected_new_run_usd)
 
-    job_timeout_minutes = resolve_timeout_minutes(args.timeout_minutes, args.test_class, args.long_engine)
     scheduled = df.schedule_run(
         projectArn=PROJECT_ARN,
         appArn=app_arn,

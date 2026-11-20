@@ -203,9 +203,13 @@ class HandsetQualificationDeviceTest {
 
     private suspend fun runLiveOpusLifecycleAndInterruptions(): JSONObject {
         var screen: ActivityScenario<MainActivity>? = ActivityScenario.launch(MainActivity::class.java)
-        val monitor = HandsetTelemetryMonitor.start(context)
-        TestHooks.onWhistleFinish = { monitor.recordWhistleWorkerCpuMs(it.getLong("workerCpuMs")) }
         val whistleEligible = WhistleDeviceCapability.current() == WhistleCapability.ELIGIBLE
+        val monitor = HandsetTelemetryMonitor.start(context, isolatedWorkerCpuUnavailable = whistleEligible)
+        val sawWhistleFinish = AtomicBoolean(false)
+        TestHooks.onWhistleFinish = {
+            sawWhistleFinish.set(true)
+            monitor.recordWhistleWorkerCpuMs(it.getLong("workerCpuMs"))
+        }
         val precomputeWatch = LifecyclePrecomputeWatch().apply { install() }
         var decoder: CommittedOggOpusDecoder? = null
         val livePcmFile = File(context.cacheDir, "qual-live-pcm.f32")
@@ -240,6 +244,7 @@ class HandsetQualificationDeviceTest {
                 bgEvidence,
             )
             val snap = monitor.finish().also { Background.reset() }
+            assertLifecycleCpuScope(whistleEligible, sawWhistleFinish.get(), snap)
             return buildOpusLifecycleJson(
                 committed1.first,
                 committed2.first,
@@ -255,6 +260,18 @@ class HandsetQualificationDeviceTest {
             runCatching { decoder?.close() }
             runCatching { livePcmFile.delete() }
             runCatching { screen?.close() }
+        }
+    }
+
+    private fun assertLifecycleCpuScope(
+        whistleEligible: Boolean,
+        sawWhistleFinish: Boolean,
+        snap: HandsetTelemetryMonitor.Snapshot,
+    ) {
+        if (whistleEligible && !sawWhistleFinish) {
+            assertEquals(null, snap.whistleWorkerCpuSeconds)
+            assertEquals(null, snap.totalCpuSeconds)
+            assertEquals("app_process_only_isolated_worker_unavailable", snap.cpuScope)
         }
     }
 
