@@ -491,6 +491,54 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             MODULE.build_test_spec("io.codemyriad.Test", {"badKey": "$(whoami)"})
 
+    @staticmethod
+    def _extract_testspec_check_script(spec_yaml: str) -> str:
+        marker = "      - |-\n"
+        start = spec_yaml.index(marker) + len(marker)
+        lines: list[str] = []
+        for line in spec_yaml[start:].splitlines():
+            if line and not line.startswith("        "):
+                break
+            lines.append(line[8:] if line.startswith("        ") else "")
+        return "\n".join(lines) + "\n"
+
+    def _run_testspec_check(self, selector: str, log_text: str) -> int:
+        import os
+        import subprocess
+        import tempfile
+
+        spec = MODULE.build_test_spec(selector, {"cassiniHandsetQual": "true"})
+        script = self._extract_testspec_check_script(spec)
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "instrument.log").write_text(log_text, encoding="utf-8")
+            env = dict(os.environ, DEVICEFARM_LOG_DIR=tmp)
+            proc = subprocess.run(
+                ["bash", "-euo", "pipefail", "-c", script],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        return proc.returncode
+
+    @staticmethod
+    def _instrument_log(passed: list[tuple[str, str]]) -> str:
+        lines: list[str] = []
+        for cls, method in passed:
+            lines.extend(
+                [
+                    f"INSTRUMENTATION_STATUS: class={cls}",
+                    f"INSTRUMENTATION_STATUS: test={method}",
+                    "INSTRUMENTATION_STATUS_CODE: 1",
+                    f"INSTRUMENTATION_STATUS: class={cls}",
+                    f"INSTRUMENTATION_STATUS: test={method}",
+                    "INSTRUMENTATION_STATUS_CODE: 0",
+                ],
+            )
+        suffix = "test" if len(passed) == 1 else "tests"
+        lines.append(f"OK ({len(passed)} {suffix})")
+        return "\n".join(lines) + "\n"
+
     def test_expected_method_verification_rejects_smoke_only_log_for_three_method_request(self) -> None:
         default_selector = MODULE.resolve_test_class(None, "none")
         spec = MODULE.build_test_spec(default_selector, {"cassiniHandsetQual": "true"})
@@ -499,33 +547,45 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         self.assertIn("test01HardwareCaptureLifecycleInterruptionsAndAacControl", spec)
         self.assertIn("test02PairedFiveMinuteEquivalenceAndPressure", spec)
 
-        smoke_only_log = (
-            "INSTRUMENTATION_STATUS: test=qualificationHarnessTelemetryAndPrefixContractSmoke\n"
-            "INSTRUMENTATION_STATUS_CODE: 1\n"
-            "INSTRUMENTATION_STATUS: test=qualificationHarnessTelemetryAndPrefixContractSmoke\n"
-            "INSTRUMENTATION_STATUS_CODE: 0\n"
-            "OK (1 test)\n"
-        )
+        qual_cls = MODULE.DEFAULT_TEST_CLASS
+        smoke_only_log = self._instrument_log([(qual_cls, "qualificationHarnessTelemetryAndPrefixContractSmoke")])
         with self.assertRaises(SystemExit) as err:
             MODULE.verify_expected_methods_in_log(smoke_only_log, default_selector)
         self.assertIn("expected 3", str(err.exception))
+        self.assertNotEqual(0, self._run_testspec_check(default_selector, smoke_only_log))
 
-        full_three_method_log = (
-            "INSTRUMENTATION_STATUS: test=qualificationHarnessTelemetryAndPrefixContractSmoke\n"
-            "INSTRUMENTATION_STATUS_CODE: 1\n"
-            "INSTRUMENTATION_STATUS: test=qualificationHarnessTelemetryAndPrefixContractSmoke\n"
-            "INSTRUMENTATION_STATUS_CODE: 0\n"
-            "INSTRUMENTATION_STATUS: test=test01HardwareCaptureLifecycleInterruptionsAndAacControl\n"
-            "INSTRUMENTATION_STATUS_CODE: 1\n"
-            "INSTRUMENTATION_STATUS: test=test01HardwareCaptureLifecycleInterruptionsAndAacControl\n"
-            "INSTRUMENTATION_STATUS_CODE: 0\n"
-            "INSTRUMENTATION_STATUS: test=test02PairedFiveMinuteEquivalenceAndPressure\n"
-            "INSTRUMENTATION_STATUS_CODE: 1\n"
-            "INSTRUMENTATION_STATUS: test=test02PairedFiveMinuteEquivalenceAndPressure\n"
-            "INSTRUMENTATION_STATUS_CODE: 0\n"
-            "OK (3 tests)\n"
+        full_three_method_log = self._instrument_log(
+            [
+                (qual_cls, "qualificationHarnessTelemetryAndPrefixContractSmoke"),
+                (qual_cls, "test01HardwareCaptureLifecycleInterruptionsAndAacControl"),
+                (qual_cls, "test02PairedFiveMinuteEquivalenceAndPressure"),
+            ],
         )
         MODULE.verify_expected_methods_in_log(full_three_method_log, default_selector)
+        self.assertEqual(0, self._run_testspec_check(default_selector, full_three_method_log))
+
+    def test_expected_method_verification_enforces_class_names_and_mixed_whole_class_selectors(self) -> None:
+        same_method_selector = "pkg.A#check,pkg.B#check"
+        wrong_class_log = self._instrument_log([("pkg.A", "check"), ("pkg.C", "different")])
+        with self.assertRaises(SystemExit) as err:
+            MODULE.verify_expected_methods_in_log(wrong_class_log, same_method_selector)
+        self.assertIn("pkg.B#check", str(err.exception))
+        self.assertNotEqual(0, self._run_testspec_check(same_method_selector, wrong_class_log))
+
+        both_classes_log = self._instrument_log([("pkg.A", "check"), ("pkg.B", "check")])
+        MODULE.verify_expected_methods_in_log(both_classes_log, same_method_selector)
+        self.assertEqual(0, self._run_testspec_check(same_method_selector, both_classes_log))
+
+        mixed_selector = "pkg.A,pkg.B#required"
+        smoke_only_mixed_log = self._instrument_log([("pkg.A", "smoke")])
+        with self.assertRaises(SystemExit) as mixed_err:
+            MODULE.verify_expected_methods_in_log(smoke_only_mixed_log, mixed_selector)
+        self.assertIn("pkg.B#required", str(mixed_err.exception))
+        self.assertNotEqual(0, self._run_testspec_check(mixed_selector, smoke_only_mixed_log))
+
+        passing_mixed_log = self._instrument_log([("pkg.A", "smoke"), ("pkg.B", "required")])
+        MODULE.verify_expected_methods_in_log(passing_mixed_log, mixed_selector)
+        self.assertEqual(0, self._run_testspec_check(mixed_selector, passing_mixed_log))
 
     def test_extract_reports_from_text_parses_multiple_framed_blocks(self) -> None:
         log = (

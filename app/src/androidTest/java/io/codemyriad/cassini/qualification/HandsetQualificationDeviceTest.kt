@@ -331,19 +331,24 @@ class HandsetQualificationDeviceTest {
         captureFile: File,
         previousBytes: Long,
     ): Pair<Long, String> {
-        val postResumeOffsetBytes = maxOf(previousBytes, captureFile.length())
+        val snapshot = OggOpusPrefixScanner(captureFile, trailingPagesMargin = 0)
+        snapshot.poll(maxPages = Int.MAX_VALUE, maxBytes = Long.MAX_VALUE) {}
+        val postResumeOffsetBytes = maxOf(previousBytes, captureFile.length(), snapshot.committedBytes)
+        val targetSamples16k = maxOf(
+            liveSamplesCount[0],
+            HandsetQualificationAudit.granule48kToSamples16k(snapshot.committedGranule, snapshot.preSkip),
+        )
         var seenTick = TestHooks.policyTicks.value
         val drained = withTimeout(EVENT_TIMEOUT_MS) {
             HandsetQualificationAudit.drainUntilPastOffset(
                 targetOffsetBytes = postResumeOffsetBytes,
+                targetSamplePosition16k = targetSamples16k,
                 pollOnce = {
-                    var decoded = 0L
                     decoder.poll { samples, count ->
                         for (i in 0 until count) livePcmOut.writeFloat(samples[i])
                         liveSamplesCount[0] += count
-                        decoded += count
                     }
-                    decoder.committedBytes to decoded
+                    decoder.committedBytes to liveSamplesCount[0]
                 },
                 awaitMoreData = {
                     seenTick = TestHooks.policyTicks.first { it > seenTick }

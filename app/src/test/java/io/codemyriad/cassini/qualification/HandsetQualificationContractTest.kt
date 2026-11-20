@@ -548,25 +548,29 @@ class HandsetQualificationContractTest {
     @Test
     fun drainUntilPastOffsetDrainsMultiPollBacklogBeforeSucceeding() = runBlocking {
         val postResumeOffset = 800_000L
+        val targetSamples16k = HandsetQualificationAudit.granule48kToSamples16k(600_312L, 312)
+        assertEquals(200_000L, targetSamples16k)
         val scriptedPolls = ArrayDeque(
             listOf(
                 256_000L to 64_000L, // Poll 1: backlog from 5-min backgrounding (must NOT stop here)
-                512_000L to 64_000L, // Poll 2: still backlog
-                768_000L to 64_000L, // Poll 3: still backlog
-                800_000L to 8_000L, // Poll 4: caught up to postResumeOffset, not yet past it
-                800_000L to 0L, // Poll 5: stalled waiting for post-resume flush -> triggers awaitMoreData
-                840_000L to 1_600L, // Poll 6: strictly past postResumeOffset with post-resume samples!
+                512_000L to 128_000L, // Poll 2: still backlog
+                768_000L to 192_000L, // Poll 3: still backlog
+                800_000L to 198_000L, // Poll 4: caught up to postResumeOffset, not yet past either target
+                800_000L to 198_000L, // Poll 5: stalled waiting for post-resume flush -> triggers awaitMoreData
+                820_000L to 200_000L, // Poll 6: crosses byte offset while emitting only pre-resume PCM -> must continue
+                840_000L to 201_600L, // Poll 7: strictly past both byte offset AND 16 kHz sample boundary!
             ),
         )
         var awaits = 0
         val result = HandsetQualificationAudit.drainUntilPastOffset(
             targetOffsetBytes = postResumeOffset,
+            targetSamplePosition16k = targetSamples16k,
             pollOnce = { scriptedPolls.removeFirst() },
             awaitMoreData = { awaits++ },
         )
         assertEquals(840_000L, result.committedBytes)
-        assertEquals(1_600L, result.samplesDecodedBeyondOffset)
-        assertEquals(6, result.pollCount)
+        assertEquals(201_600L, result.totalEmittedSamples16k)
+        assertEquals(7, result.pollCount)
         assertEquals(1, awaits)
     }
 

@@ -24,6 +24,7 @@ object HandsetQualificationAudit {
     private const val STOP_REASON_OOM = "OUT_OF_MEMORY"
     private const val HEX_RADIX = 16
     private const val JSON_INDENT = 2
+    private const val OPUS_TO_16K_RATIO = 3L
 
     /**
      * Manages `handset-qual-reports.json` across instrumentation invocations: [initialize] resets the file to `[]`
@@ -56,35 +57,41 @@ object HandsetQualificationAudit {
 
     data class DrainResult(
         val committedBytes: Long,
-        val samplesDecodedBeyondOffset: Long,
+        val totalEmittedSamples16k: Long,
         val pollCount: Int,
     )
 
+    /** Converts a 48 kHz Ogg Opus granule (minus pre-skip) to its 16 kHz sample boundary (rounded up). */
+    fun granule48kToSamples16k(committedGranule48k: Long, preSkip48k: Int): Long {
+        val audio48k = (committedGranule48k - preSkip48k.toLong()).coerceAtLeast(0L)
+        return (audio48k + OPUS_TO_16K_RATIO - 1L) / OPUS_TO_16K_RATIO
+    }
+
     /**
-     * Repeatedly invokes [pollOnce] (returning `(committedBytes, newlyDecodedSamples)`) until `committedBytes`
-     * advances strictly past [targetOffsetBytes] AND at least one PCM sample has been decoded beyond that offset.
+     * Repeatedly invokes [pollOnce] (returning `(committedBytes, totalEmittedSamples16k)`) until `committedBytes`
+     * advances strictly past [targetOffsetBytes] AND `totalEmittedSamples16k` advances strictly past
+     * [targetSamplePosition16k], ensuring a crossing poll that emits only older queued PCM does not satisfy the drain.
      */
     suspend fun drainUntilPastOffset(
         targetOffsetBytes: Long,
+        targetSamplePosition16k: Long,
         pollOnce: () -> Pair<Long, Long>,
         awaitMoreData: suspend () -> Unit,
     ): DrainResult {
         var polls = 0
         var lastCommitted = -1L
-        var samplesPastOffset = 0L
+        var lastEmitted = -1L
         while (true) {
-            val (committed, decodedThisPoll) = pollOnce()
+            val (committed, totalEmitted) = pollOnce()
             polls++
-            if (committed > targetOffsetBytes) {
-                samplesPastOffset += decodedThisPoll
-                if (samplesPastOffset > 0L) {
-                    return DrainResult(committed, samplesPastOffset, polls)
-                }
+            if (committed > targetOffsetBytes && totalEmitted > targetSamplePosition16k) {
+                return DrainResult(committed, totalEmitted, polls)
             }
-            if (committed <= lastCommitted) {
+            if (committed <= lastCommitted && totalEmitted <= lastEmitted) {
                 awaitMoreData()
             }
             lastCommitted = committed
+            lastEmitted = totalEmitted
         }
     }
 
