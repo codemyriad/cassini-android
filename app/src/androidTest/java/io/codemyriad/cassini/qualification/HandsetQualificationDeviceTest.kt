@@ -65,6 +65,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
@@ -177,6 +181,10 @@ class HandsetQualificationDeviceTest {
         emitReport("test01-lifecycle-aac", report)
     }
 
+    private data class BackgroundEvidence(val beforeBgMs: Long, val afterBgMs: Long)
+
+    private data class SealedOpusCheck(val maxPcmDiff: Float, val sealedDurationMs: Long)
+
     private suspend fun runLiveOpusLifecycleAndInterruptions(): JSONObject {
         var screen: ActivityScenario<MainActivity>? = ActivityScenario.launch(MainActivity::class.java)
         val monitor = HandsetTelemetryMonitor.start(context)
@@ -185,6 +193,8 @@ class HandsetQualificationDeviceTest {
         val precomputeStops = Channel<PrecomputeStopReason>(Channel.UNLIMITED)
         TestHooks.onPrecomputeStopped = { _, reason -> precomputeStops.trySend(reason) }
         var decoder: CommittedOggOpusDecoder? = null
+        val livePcmFile = File(context.cacheDir, "qual-live-pcm.f32")
+        var livePcmOut: DataOutputStream? = null
         try {
             awaitVisible(true)
             configureOpusLifecycleMode(whistleEligible)
@@ -193,35 +203,42 @@ class HandsetQualificationDeviceTest {
             assertEquals(CaptureFormat.OPUS, active.format)
             val captureFile = File(graph.paths.note(active.noteId), "capture.opus")
 
-            val liveSamples = ArrayList<Float>(64_000)
+            livePcmOut = DataOutputStream(BufferedOutputStream(FileOutputStream(livePcmFile), 64 * 1024))
+            val liveSamplesCount = longArrayOf(0L)
             decoder = CommittedOggOpusDecoder(captureFile, included = whistleEligible)
-            val committed1 = pollInitialPrefix(decoder, liveSamples)
-            screen = exercisePauseResumeAndBackground(screen!!, whistleEligible, precomputeStops)
+            val committed1 = pollInitialPrefix(decoder, livePcmOut, liveSamplesCount)
+            val (next, bgEvidence) = exercisePauseResumeAndBackground(screen!!, whistleEligible, precomputeStops)
+            screen = next
             val focusObserved = exerciseInterruptionsAndRouteLoss()
-            val committed2 = pollPostInterruptionPrefix(decoder, liveSamples, committed1.first)
-            val liveSampleCount = liveSamples.size
+            val committed2 = pollPostInterruptionPrefix(decoder, livePcmOut, liveSamplesCount, committed1.first)
             decoder.close()
+            livePcmOut.close()
+            livePcmOut = null
 
-            val maxDiff = stopAndVerifyOpusPrefixAndPcm(
+            val sealed = stopAndVerifyOpusPrefixAndPcm(
                 captureFile,
                 whistleEligible,
                 committed1,
                 committed2,
-                liveSamples,
+                livePcmFile,
+                liveSamplesCount[0],
+                bgEvidence,
             )
-            val snap = monitor.finish()
-            Background.reset()
+            val snap = monitor.finish().also { Background.reset() }
             return buildOpusLifecycleJson(
                 committed1.first,
                 committed2.first,
                 captureFile,
-                liveSampleCount,
-                maxDiff,
+                liveSamplesCount[0],
+                sealed,
+                bgEvidence,
                 focusObserved,
                 snap,
             )
         } finally {
+            runCatching { livePcmOut?.close() }
             runCatching { decoder?.close() }
+            runCatching { livePcmFile.delete() }
             runCatching { screen?.close() }
         }
     }
@@ -231,8 +248,9 @@ class HandsetQualificationDeviceTest {
         committedBytes1: Long,
         committedBytes2: Long,
         captureFile: File,
-        liveSampleCount: Int,
-        maxPcmDiff: Float,
+        liveSampleCount: Long,
+        sealed: SealedOpusCheck,
+        bgEvidence: BackgroundEvidence,
         focusObserved: List<String>,
         snap: HandsetTelemetryMonitor.Snapshot,
     ): JSONObject = JSONObject()
@@ -240,8 +258,10 @@ class HandsetQualificationDeviceTest {
         .put("committedBytes1", committedBytes1)
         .put("committedBytes2", committedBytes2)
         .put("finalFileBytes", captureFile.length())
+        .put("backgroundAdvanceMs", bgEvidence.afterBgMs - bgEvidence.beforeBgMs)
+        .put("sealedDurationMs", sealed.sealedDurationMs)
         .put("liveDecodedSamples16k", liveSampleCount)
-        .put("maxDecodedPcmAbsDiff", maxPcmDiff.toDouble())
+        .put("maxDecodedPcmAbsDiff", sealed.maxPcmDiff.toDouble())
         .put("audioFocusEvents", JSONArray(focusObserved))
         .put("telemetry", snap.toJson())
 
@@ -256,25 +276,33 @@ class HandsetQualificationDeviceTest {
 
     private suspend fun pollInitialPrefix(
         decoder: CommittedOggOpusDecoder,
-        liveSamples: MutableList<Float>,
+        livePcmOut: DataOutputStream,
+        liveSamplesCount: LongArray,
     ): Pair<Long, String> {
         var committed = 0L
         awaitPolicyTicksUntil("Initial committed Ogg Opus pages") {
-            decoder.poll { samples, count -> for (i in 0 until count) liveSamples.add(samples[i]) }
+            decoder.poll { samples, count ->
+                for (i in 0 until count) livePcmOut.writeFloat(samples[i])
+                liveSamplesCount[0] += count
+            }
             committed = decoder.committedBytes
-            committed > 0L && liveSamples.size >= 16_000
+            committed > 0L && liveSamplesCount[0] >= 16_000L
         }
         return committed to decoder.committedSha256()
     }
 
     private suspend fun pollPostInterruptionPrefix(
         decoder: CommittedOggOpusDecoder,
-        liveSamples: MutableList<Float>,
+        livePcmOut: DataOutputStream,
+        liveSamplesCount: LongArray,
         previousBytes: Long,
     ): Pair<Long, String> {
         var committed = previousBytes
         awaitPolicyTicksUntil("Post-interruption Ogg Opus pages committed") {
-            decoder.poll { samples, count -> for (i in 0 until count) liveSamples.add(samples[i]) }
+            decoder.poll { samples, count ->
+                for (i in 0 until count) livePcmOut.writeFloat(samples[i])
+                liveSamplesCount[0] += count
+            }
             committed = decoder.committedBytes
             committed > previousBytes
         }
@@ -285,7 +313,7 @@ class HandsetQualificationDeviceTest {
         initialScreen: ActivityScenario<MainActivity>,
         whistleEligible: Boolean,
         precomputeStops: Channel<PrecomputeStopReason>,
-    ): ActivityScenario<MainActivity> {
+    ): Pair<ActivityScenario<MainActivity>, BackgroundEvidence> {
         val recording = graph.recording
         recording.pause()
         awaitRecordingState("Paused by user") { (it as? RecordingState.Active)?.pause == RecordingPause.USER }
@@ -299,19 +327,33 @@ class HandsetQualificationDeviceTest {
         }
 
         val beforeBgMs = recording.elapsedNowMs
+        val targetBgMs = beforeBgMs + BACKGROUND_DURATION_MS
         Background.shell("input keyevent KEYCODE_HOME")
         awaitVisible(false)
         if (whistleEligible) {
             withTimeout(EVENT_TIMEOUT_MS) { precomputeStops.receive() }
         }
-        awaitNPicks(2)
+        val bgState = withTimeout(BACKGROUND_TIMEOUT_MS) {
+            recording.state.first { state ->
+                when (state) {
+                    is RecordingState.Active -> state.elapsedMs >= targetBgMs || state.pause != null
+                    else -> true
+                }
+            }
+        }
         assertTrue(
-            "RecordingService keeps OpusCapture active in background",
-            recording.state.value is RecordingState.Active,
+            "RecordingService must keep OpusCapture active for full 5-min background interval ($bgState)",
+            bgState is RecordingState.Active && bgState.pause == null,
         )
-        assertTrue("OpusCapture advances in background", recording.elapsedNowMs > beforeBgMs + 800L)
+        assertFalse("Activity must remain backgrounded during 5-min interval", graph.visibility.visible.value)
+        val afterBgMs = recording.elapsedNowMs
+        assertTrue(
+            "OpusCapture must advance >= $BACKGROUND_DURATION_MS ms in background (actual=${afterBgMs - beforeBgMs} ms)",
+            afterBgMs >= targetBgMs,
+        )
         runCatching { initialScreen.close() }
-        return ActivityScenario.launch(MainActivity::class.java).also { awaitVisible(true) }
+        val reopened = ActivityScenario.launch(MainActivity::class.java).also { awaitVisible(true) }
+        return reopened to BackgroundEvidence(beforeBgMs, afterBgMs)
     }
 
     private suspend fun exerciseInterruptionsAndRouteLoss(): List<String> {
@@ -332,13 +374,16 @@ class HandsetQualificationDeviceTest {
         return focusObserved
     }
 
+    @Suppress("LongParameterList")
     private suspend fun stopAndVerifyOpusPrefixAndPcm(
         captureFile: File,
         included: Boolean,
         committed1: Pair<Long, String>,
         committed2: Pair<Long, String>,
-        liveSamples: List<Float>,
-    ): Float {
+        livePcmFile: File,
+        liveSampleCount: Long,
+        bgEvidence: BackgroundEvidence,
+    ): SealedOpusCheck {
         val recording = graph.recording
         graph.settings.setTranscriptionMode(TranscriptionMode.RECORD_ONLY)
         recording.finish()
@@ -357,29 +402,34 @@ class HandsetQualificationDeviceTest {
             OggOpusPrefixScanner.sha256Prefix(captureFile, committed2.first),
         )
 
-        val liveCount = liveSamples.size
-        val batchSamples = FloatArray(liveCount)
-        var copied = 0
-        openDecoder(context, included).stream(
-            Uri.fromFile(captureFile),
-            { block, count ->
-                val take = minOf(count, liveCount - copied)
-                if (take > 0) {
-                    block.copyInto(batchSamples, copied, 0, take)
-                    copied += take
-                }
-            },
-        )
-        assertEquals("Finalized .opus must contain all live-decoded samples", liveCount, copied)
+        var compared = 0L
+        var finalizedSamples = 0L
         var maxPcmDiff = 0f
-        for (i in 0 until liveCount) {
-            maxPcmDiff = maxOf(maxPcmDiff, abs(liveSamples[i] - batchSamples[i]))
+        DataInputStream(BufferedInputStream(livePcmFile.inputStream(), 64 * 1024)).use { liveIn ->
+            openDecoder(context, included).stream(
+                Uri.fromFile(captureFile),
+                { block, count ->
+                    finalizedSamples += count
+                    val take = minOf(count.toLong(), liveSampleCount - compared).toInt()
+                    for (i in 0 until take) {
+                        maxPcmDiff = maxOf(maxPcmDiff, abs(liveIn.readFloat() - block[i]))
+                    }
+                    compared += take
+                },
+            )
         }
+        assertEquals("Finalized .opus must contain all live-decoded samples", liveSampleCount, compared)
         assertTrue(
             "CommittedOggOpusDecoder PCM must match finalized AudioDecoder ($maxPcmDiff)",
             maxPcmDiff <= 1e-4f,
         )
-        return maxPcmDiff
+        val sealedDurationMs = finalizedSamples * 1_000L / 16_000L
+        assertTrue(
+            "Sealed .opus ($sealedDurationMs ms) must cover the 5-min background interval " +
+                "(afterBg=${bgEvidence.afterBgMs} ms, min=$BACKGROUND_DURATION_MS ms)",
+            sealedDurationMs >= BACKGROUND_DURATION_MS && sealedDurationMs >= bgEvidence.afterBgMs - 2_000L,
+        )
+        return SealedOpusCheck(maxPcmDiff = maxPcmDiff, sealedDurationMs = sealedDurationMs)
     }
 
     private suspend fun runAacFallbackControl(): JSONObject {
@@ -393,12 +443,17 @@ class HandsetQualificationDeviceTest {
 
         val precomputeCheckpoints = AtomicInteger(0)
         TestHooks.onPrecomputeCheckpointed = { _, _ -> precomputeCheckpoints.incrementAndGet() }
-        TestHooks.captureSource = ExplicitAacCaptureSource(context)
+        // Leave captureSource unset on API 26-28 so production format selection (CaptureFactory -> AacCapture) runs
+        // naturally; keep ExplicitAacCaptureSource as the forced control on Opus-capable API 29+ devices.
+        val naturalAacFallback = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+        TestHooks.captureSource = if (naturalAacFallback) null else ExplicitAacCaptureSource(context)
+        TestHooks.lastStartedCaptureClass = null
 
         val recording = graph.recording
         assertTrue("AacCapture starts", recording.start("D1126 AAC Fallback"))
         val active = awaitRecordingState("Active AacCapture") { it is RecordingState.Active } as RecordingState.Active
         assertEquals(CaptureFormat.M4A, active.format)
+        assertEquals("AacCapture", TestHooks.lastStartedCaptureClass)
         awaitRecordingState("AAC records >= 2.5s") { it is RecordingState.Active && it.elapsedMs >= 2_500L }
 
         val api26FocusPaused = exerciseApi26FocusPauseIfApplicable()
@@ -417,11 +472,13 @@ class HandsetQualificationDeviceTest {
         assertEquals("AAC precompute checkpoints must remain 0", 0, precomputeCheckpoints.get())
 
         val snap = monitor.finish()
+        val captureClass = TestHooks.lastStartedCaptureClass
         TestHooks.captureSource = null
         Background.reset()
         return JSONObject()
             .put("passed", true)
-            .put("naturalApi26To28", Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+            .put("naturalApi26To28", naturalAacFallback)
+            .put("captureClass", captureClass)
             .put("api26FocusPauseVerified", api26FocusPaused)
             .put("precomputeCheckpoints", precomputeCheckpoints.get())
             .put("stopToPublishedSeconds", stopToPublishedSec)
@@ -432,10 +489,13 @@ class HandsetQualificationDeviceTest {
     private suspend fun exerciseApi26FocusPauseIfApplicable(): Boolean {
         val competing = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) requestTransientFocus() else null
         if (competing == null) return false
-        awaitRecordingState("API 26-28 focus loss pauses AAC") {
-            (it as? RecordingState.Active)?.pause == RecordingPause.OTHER_APP
+        try {
+            awaitRecordingState("API 26-28 focus loss pauses AAC") {
+                (it as? RecordingState.Active)?.pause == RecordingPause.OTHER_APP
+            }
+        } finally {
+            abandonTransientFocus(competing)
         }
-        abandonTransientFocus(competing)
         graph.recording.resume()
         awaitRecordingState("API 26-28 AAC resumed") { it is RecordingState.Active && it.pause == null }
         return true
@@ -551,19 +611,21 @@ class HandsetQualificationDeviceTest {
         baseline: LaneResult,
         recovered: LaneResult,
     ) {
-        assertEquals("${model.name} $label recovery words & timings", baseline.words, recovered.words)
-        assertEquals("${model.name} $label recovery turnCount", baseline.turnCount, recovered.turnCount)
-        assertEquals("${model.name} $label recovery CAM++ matches", baseline.matchedVoices, recovered.matchedVoices)
+        HandsetQualificationAudit.verifyLaneEquivalence(
+            label = "${model.name} $label recovery",
+            baseline = baseline.toEquivalenceSnapshot(),
+            candidate = recovered.toEquivalenceSnapshot(),
+            expectedEnrolledVoices = MultiSpeakerSpeechTrack.SYNTHETIC_VOICE_LABELS,
+        )
     }
 
     private fun assertPairEquivalence(model: SpeechModel, baseline: LaneResult, headStart: LaneResult) {
-        assertEquals("${model.name} capture.opus SHA-256", baseline.captureOpusSha256, headStart.captureOpusSha256)
-        assertEquals("${model.name} decoded .opus PCM SHA-256", baseline.decodedPcmSha256, headStart.decodedPcmSha256)
-        assertEquals("${model.name} published words & timings", baseline.words, headStart.words)
-        assertEquals("${model.name} diarization turnCount", baseline.turnCount, headStart.turnCount)
-        assertEquals("${model.name} diarization speakerCount", baseline.speakerCount, headStart.speakerCount)
-        assertEquals("${model.name} speaker labels", baseline.speakerLabels, headStart.speakerLabels)
-        assertEquals("${model.name} CAM++ saved-voice matches", baseline.matchedVoices, headStart.matchedVoices)
+        HandsetQualificationAudit.verifyLaneEquivalence(
+            label = model.name,
+            baseline = baseline.toEquivalenceSnapshot(),
+            candidate = headStart.toEquivalenceSnapshot(),
+            expectedEnrolledVoices = MultiSpeakerSpeechTrack.SYNTHETIC_VOICE_LABELS,
+        )
         assertTrue("${model.name} must save precompute checkpoints", headStart.precomputeCheckpoints > 0)
         assertTrue("${model.name} x-resumedFromMs > 0", headStart.resumedFromMs > 0L)
         assertTrue(
@@ -631,8 +693,6 @@ class HandsetQualificationDeviceTest {
             .put("lowMemoryPostStopTelemetry", lowMemory.lane.postStopTelemetry.toJson())
     }
 
-    private data class ComparableWord(val text: String, val startMs: Long, val endMs: Long, val speaker: String)
-
     private data class LaneMetrics(
         val preCheckpoints: Int,
         val postUnits: Int,
@@ -649,7 +709,7 @@ class HandsetQualificationDeviceTest {
     private data class LaneResult(
         val captureOpusSha256: String,
         val decodedPcmSha256: String,
-        val words: List<ComparableWord>,
+        val words: List<HandsetQualificationAudit.ComparableWord>,
         val turnCount: Int,
         val speakerCount: Int,
         val speakerLabels: Map<String, String>,
@@ -665,7 +725,17 @@ class HandsetQualificationDeviceTest {
         val stopToPublishedSec: Double,
         val precomputeTelemetry: HandsetTelemetryMonitor.Snapshot?,
         val postStopTelemetry: HandsetTelemetryMonitor.Snapshot,
-    )
+    ) {
+        fun toEquivalenceSnapshot() = HandsetQualificationAudit.EquivalenceSnapshot(
+            captureOpusSha256 = captureOpusSha256,
+            decodedPcmSha256 = decodedPcmSha256,
+            words = words,
+            turnCount = turnCount,
+            speakerCount = speakerCount,
+            speakerLabels = speakerLabels,
+            matchedVoices = matchedVoices,
+        )
+    }
 
     private class LaneCounters {
         val preChunks = AtomicInteger(0)
@@ -995,7 +1065,7 @@ class HandsetQualificationDeviceTest {
             assertLongCaptureInvulnerability(health, doc.audioDurationMs, cfg.longSeconds)
             val metrics = counters.toMetrics(stopToPubSec, recSnap, postSnap)
             val lane = inspectPublishedLane(active.noteId, model, doc, metrics)
-            verifyLongLaneOutput(model, lane)
+            verifyLongLaneOutput(model, lane, cfg.longSeconds * 1_000L)
             val report = buildThirtyMinuteReport(
                 engineArg,
                 cfg.longSeconds,
@@ -1011,8 +1081,16 @@ class HandsetQualificationDeviceTest {
         }
     }
 
-    private fun verifyLongLaneOutput(model: SpeechModel, lane: LaneResult) {
-        assertTrue("30-min transcript must contain words", lane.words.isNotEmpty())
+    private fun verifyLongLaneOutput(model: SpeechModel, lane: LaneResult, expectedDurationMs: Long) {
+        HandsetQualificationAudit.verifyLongLaneProgress(
+            HandsetQualificationAudit.LongLaneProgress(
+                expectedDurationMs = expectedDurationMs,
+                precomputeCheckpoints = lane.precomputeCheckpoints,
+                resumedFromMs = lane.resumedFromMs,
+                wordCount = lane.words.size,
+                lastWordEndMs = lane.words.maxOfOrNull { it.endMs } ?: 0L,
+            ),
+        )
         if (model == SpeechModel.INCLUDED) {
             WhistlePrefixAudit.verifyNoNeuralPrefixRedecode(
                 precomputedPrefixSpans = lane.whistlePrecomputedSpans,
@@ -1043,10 +1121,10 @@ class HandsetQualificationDeviceTest {
         publishedDurationMs: Long,
         expectedSeconds: Int,
     ) {
-        assertEquals("Zero dropped AudioRecord buffers", 0, health.droppedBuffers)
-        assertTrue(
-            "Max OpusCapture frame interval (${health.maxFrameIntervalMs} ms) < ring (${health.ringBufferMs} ms)",
-            health.maxFrameIntervalMs < health.ringBufferMs,
+        HandsetQualificationAudit.verifyCaptureHealth(
+            summary = health.halSummary,
+            maxFrameIntervalMs = health.maxFrameIntervalMs,
+            ringBufferMs = health.ringBufferMs,
         )
         assertTrue(
             "Published duration ($publishedDurationMs ms) within 2s of ${expectedSeconds * 1000L} ms",
@@ -1089,7 +1167,12 @@ class HandsetQualificationDeviceTest {
                 .put("captureClass", "OpusCapture")
                 .put("capturedSamples", health.capturedSamples)
                 .put("capturedSeconds", health.capturedSeconds)
-                .put("droppedBuffers", health.droppedBuffers)
+                .put("droppedBuffers", health.halSummary.droppedBuffers ?: JSONObject.NULL)
+                .put("halTimestampAvailable", health.halSummary.halTimestampAvailable)
+                .put("halTimestampSamples", health.halSummary.halTimestampSamples)
+                .put("halDropEvents", health.halSummary.halDropEvents)
+                .put("maxHalFrameDeficit", health.halSummary.maxHalFrameDeficit)
+                .put("timingDropEvents", health.halSummary.timingDropEvents)
                 .put("maxFrameIntervalMs", health.maxFrameIntervalMs)
                 .put("ringBufferMs", health.ringBufferMs)
                 .put("micPeakAmplitude", health.micPeakAmplitude),
@@ -1215,7 +1298,9 @@ class HandsetQualificationDeviceTest {
         LaneResult(
             captureOpusSha256 = captureSha,
             decodedPcmSha256 = pcmSha,
-            words = selected.words.map { ComparableWord(it.text, it.startMs, it.endMs, it.speaker) },
+            words = selected.words.map {
+                HandsetQualificationAudit.ComparableWord(it.text, it.startMs, it.endMs, it.speaker)
+            },
             turnCount = diar?.optInt("turnCount", 0) ?: 0,
             speakerCount = diar?.optInt("speakerCount", 0) ?: 0,
             speakerLabels = speakerLabels,
@@ -1246,30 +1331,44 @@ class HandsetQualificationDeviceTest {
 
     private suspend fun exerciseAudioFocusTransientLossAndGain(): List<String> {
         val observed = ArrayList<String>()
-        val lostDeferred = CompletableDeferred<Unit>()
-        val gainedDeferred = CompletableDeferred<Unit>()
+        val transientLostDeferred = CompletableDeferred<Unit>()
+        val gainedAfterLossDeferred = CompletableDeferred<Unit>()
+        val sawTransientLoss = AtomicBoolean(false)
         val platform = AndroidPlaybackPlatform(context)
-        var requested = false
+        var primaryGranted = false
         instrumentation.runOnMainSync {
-            requested = platform.requestFocus { change ->
+            primaryGranted = platform.requestFocus { change ->
                 synchronized(observed) { observed.add(change.name) }
-                if (change == FocusChange.LOST_FOR_NOW || change == FocusChange.LOST) lostDeferred.complete(Unit)
-                if (change == FocusChange.GAINED) gainedDeferred.complete(Unit)
-            }
-        }
-        try {
-            if (requested) {
-                val competing = requestTransientFocus()
-                if (competing != null) {
-                    withTimeout(EVENT_TIMEOUT_MS) { lostDeferred.await() }
-                    abandonTransientFocus(competing)
-                    withTimeout(EVENT_TIMEOUT_MS) { gainedDeferred.await() }
+                if (change == FocusChange.LOST_FOR_NOW) {
+                    sawTransientLoss.set(true)
+                    transientLostDeferred.complete(Unit)
+                } else if (change == FocusChange.GAINED && sawTransientLoss.get()) {
+                    gainedAfterLossDeferred.complete(Unit)
                 }
             }
+        }
+        var competing: AudioFocusRequest? = null
+        var competingGranted = false
+        try {
+            assertTrue("Primary audio-focus request must be granted", primaryGranted)
+            competing = requestTransientFocus()
+            competingGranted = competing != null
+            assertNotNull("Competing transient audio-focus request must be granted", competing)
+            withTimeout(EVENT_TIMEOUT_MS) { transientLostDeferred.await() }
+            abandonTransientFocus(competing!!)
+            competing = null
+            withTimeout(EVENT_TIMEOUT_MS) { gainedAfterLossDeferred.await() }
         } finally {
+            competing?.let { runCatching { abandonTransientFocus(it) } }
             instrumentation.runOnMainSync { platform.abandonFocus() }
         }
-        return synchronized(observed) { observed.toList() }
+        val snapshot = synchronized(observed) { observed.toList() }
+        HandsetQualificationAudit.verifyTransientAudioFocusTransition(
+            primaryGranted = primaryGranted,
+            competingGranted = competingGranted,
+            observedEvents = snapshot,
+        )
+        return snapshot
     }
 
     private fun requestTransientFocus(): AudioFocusRequest? {
@@ -1418,6 +1517,8 @@ class HandsetQualificationDeviceTest {
     private companion object {
         const val TAG = "CassiniHandsetQual"
         const val EVENT_TIMEOUT_MS = 30_000L
+        const val BACKGROUND_DURATION_MS = 300_000L
+        const val BACKGROUND_TIMEOUT_MS = BACKGROUND_DURATION_MS + 60_000L
         const val ENCODE_TIMEOUT_MS = 120_000L
         const val PRECOMPUTE_TIMEOUT_MS = 1_200_000L
         const val PUBLISH_TIMEOUT_MS = 1_800_000L

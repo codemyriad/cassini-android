@@ -416,11 +416,10 @@ internal class ProductionOpusEnduranceObserver(
     val targetReached = CompletableDeferred<CaptureHealth>()
     private val speechFrame = ShortArray(FRAME)
     private val timestamp = AudioTimestamp()
-    private val droppedBuffersCount = AtomicInteger(0)
+    private val halTracker = HandsetQualificationAudit.HalTimestampDropTracker()
+    private val timingDroppedCount = AtomicInteger(0)
     private val maxFrameIntervalMsValue = AtomicLong(0L)
     private val micPeakValue = AtomicInteger(0)
-
-    @Volatile private var baseHalFrame: Long? = null
 
     @Volatile private var lastFrameAtMs: Long = 0L
 
@@ -429,7 +428,7 @@ internal class ProductionOpusEnduranceObserver(
     data class CaptureHealth(
         val capturedSamples: Long,
         val capturedSeconds: Double,
-        val droppedBuffers: Int,
+        val halSummary: HandsetQualificationAudit.HalDropSummary,
         val maxFrameIntervalMs: Long,
         val ringBufferMs: Long,
         val micPeakAmplitude: Int,
@@ -448,7 +447,7 @@ internal class ProductionOpusEnduranceObserver(
         if (prevAt > 0L) {
             val intervalMs = (now - prevAt).coerceAtLeast(0L)
             maxFrameIntervalMsValue.accumulateAndGet(intervalMs, ::maxOf)
-            if (intervalMs > ringMs) droppedBuffersCount.incrementAndGet()
+            if (intervalMs > ringMs) timingDroppedCount.incrementAndGet()
         }
         lastFrameAtMs = now
 
@@ -478,10 +477,7 @@ internal class ProductionOpusEnduranceObserver(
         ) {
             return
         }
-        val base = baseHalFrame ?: timestamp.framePosition.also { baseHalFrame = it }
-        if (timestamp.framePosition - base - nextSamples > ringSamples) {
-            droppedBuffersCount.incrementAndGet()
-        }
+        halTracker.record(timestamp.framePosition, nextSamples, ringSamples)
     }
 
     private fun reportProgressAndTarget(ringMs: Long, nextSamples: Long) {
@@ -495,7 +491,7 @@ internal class ProductionOpusEnduranceObserver(
                 CaptureHealth(
                     capturedSamples = nextSamples,
                     capturedSeconds = nextSamples.toDouble() / RATE,
-                    droppedBuffers = droppedBuffersCount.get(),
+                    halSummary = halTracker.snapshot(timingDroppedCount.get()),
                     maxFrameIntervalMs = maxFrameIntervalMsValue.get(),
                     ringBufferMs = ringMs,
                     micPeakAmplitude = micPeakValue.get(),

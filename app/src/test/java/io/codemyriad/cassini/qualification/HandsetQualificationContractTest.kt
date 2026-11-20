@@ -200,6 +200,197 @@ class HandsetQualificationContractTest {
         }
     }
 
+    @Test
+    fun halTimestampDropTrackerDetectsFrameDeficitAndRejectsUnavailableTimestamps() {
+        val ringSamples = 48_000
+
+        // 1. Clean continuity: HAL delta equals app delta across samples.
+        val clean = HandsetQualificationAudit.HalTimestampDropTracker()
+        assertFalse(clean.record(halFramePosition = 48_000L, appSamples = 48_000L, ringSamples = ringSamples))
+        assertFalse(clean.record(halFramePosition = 96_000L, appSamples = 96_000L, ringSamples = ringSamples))
+        val cleanSummary = clean.snapshot(timingDropEvents = 0)
+        assertTrue(cleanSummary.halTimestampAvailable)
+        assertEquals(0, cleanSummary.droppedBuffers)
+        assertEquals(0L, cleanSummary.maxHalFrameDeficit)
+        HandsetQualificationAudit.verifyCaptureHealth(cleanSummary, maxFrameIntervalMs = 48L, ringBufferMs = 1_000L)
+
+        // 2. Known frame deficit (50,000 frames > 48,000 ring) starting after initial 48,000-sample baseline.
+        //    Comparing deltas (98,000 - 48,000 = 50,000) catches the overrun that subtracting total appSamples hid.
+        val deficit = HandsetQualificationAudit.HalTimestampDropTracker()
+        assertFalse(deficit.record(halFramePosition = 48_000L, appSamples = 48_000L, ringSamples = ringSamples))
+        assertTrue(deficit.record(halFramePosition = 146_000L, appSamples = 96_000L, ringSamples = ringSamples))
+        val deficitSummary = deficit.snapshot(timingDropEvents = 0)
+        assertTrue(deficitSummary.halTimestampAvailable)
+        assertEquals(1, deficitSummary.halDropEvents)
+        assertEquals(1, deficitSummary.droppedBuffers)
+        assertEquals(50_000L, deficitSummary.maxHalFrameDeficit)
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyCaptureHealth(
+                deficitSummary,
+                maxFrameIntervalMs = 48L,
+                ringBufferMs = 1_000L,
+            )
+        }
+
+        // 3. Unavailable HAL timestamps (0 samples, or only 1 sample with no delta) must NOT report 0 drops.
+        val noneSummary = HandsetQualificationAudit.HalTimestampDropTracker().snapshot(timingDropEvents = 0)
+        assertFalse(noneSummary.halTimestampAvailable)
+        assertEquals(null, noneSummary.droppedBuffers)
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyCaptureHealth(
+                noneSummary,
+                maxFrameIntervalMs = 48L,
+                ringBufferMs = 1_000L,
+            )
+        }
+
+        val single = HandsetQualificationAudit.HalTimestampDropTracker()
+        single.record(halFramePosition = 48_000L, appSamples = 48_000L, ringSamples = ringSamples)
+        val singleSummary = single.snapshot(timingDropEvents = 0)
+        assertFalse(singleSummary.halTimestampAvailable)
+        assertEquals(null, singleSummary.droppedBuffers)
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyCaptureHealth(
+                singleSummary,
+                maxFrameIntervalMs = 48L,
+                ringBufferMs = 1_000L,
+            )
+        }
+    }
+
+    @Test
+    fun longLaneProgressValidatorRejectsZeroCheckpointZeroResumeAndMissingTail() {
+        val valid = HandsetQualificationAudit.LongLaneProgress(
+            expectedDurationMs = 1_800_000L,
+            precomputeCheckpoints = 68,
+            resumedFromMs = 1_770_000L,
+            wordCount = 3_115,
+            lastWordEndMs = 1_795_000L,
+        )
+        HandsetQualificationAudit.verifyLongLaneProgress(valid)
+
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLongLaneProgress(valid.copy(precomputeCheckpoints = 0))
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLongLaneProgress(valid.copy(resumedFromMs = 0L))
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLongLaneProgress(valid.copy(resumedFromMs = 60_000L))
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLongLaneProgress(valid.copy(lastWordEndMs = 900_000L))
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLongLaneProgress(valid.copy(wordCount = 0))
+        }
+    }
+
+    @Test
+    fun laneEquivalenceValidatorRequiresNonEmptyBaselineVoicesAndExactHashesAndSpeakerMetadata() {
+        val enrolled = listOf("Voice_A", "Voice_B", "Voice_C")
+        val baseline = HandsetQualificationAudit.EquivalenceSnapshot(
+            captureOpusSha256 = "1".repeat(64),
+            decodedPcmSha256 = "2".repeat(64),
+            words = listOf(HandsetQualificationAudit.ComparableWord("hello", 100L, 450L, "diar_0")),
+            turnCount = 12,
+            speakerCount = 3,
+            speakerLabels = mapOf("diar_0" to "Voice_A", "diar_1" to "Voice_B", "diar_2" to "Voice_C"),
+            matchedVoices = listOf("diar_0:Voice_A:AUTO", "diar_1:Voice_B:AUTO", "diar_2:Voice_C:SUGGESTED"),
+        )
+
+        HandsetQualificationAudit.verifyLaneEquivalence("PARAKEET thermal", baseline, baseline.copy(), enrolled)
+
+        // Empty baseline words or missing enrolled voices must fail even when candidate matches identically.
+        val emptyWords = baseline.copy(words = emptyList())
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLaneEquivalence("PARAKEET", emptyWords, emptyWords, enrolled)
+        }
+        val missingVoiceC = baseline.copy(matchedVoices = listOf("diar_0:Voice_A:AUTO", "diar_1:Voice_B:AUTO"))
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLaneEquivalence("PARAKEET", missingVoiceC, missingVoiceC, enrolled)
+        }
+
+        // Hash or speaker metadata mismatch must fail.
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLaneEquivalence(
+                "PARAKEET thermal",
+                baseline,
+                baseline.copy(captureOpusSha256 = "f".repeat(64)),
+                enrolled,
+            )
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLaneEquivalence(
+                "PARAKEET thermal",
+                baseline,
+                baseline.copy(decodedPcmSha256 = "e".repeat(64)),
+                enrolled,
+            )
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLaneEquivalence(
+                "PARAKEET thermal",
+                baseline,
+                baseline.copy(speakerCount = 2),
+                enrolled,
+            )
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyLaneEquivalence(
+                "PARAKEET thermal",
+                baseline,
+                baseline.copy(speakerLabels = mapOf("diar_0" to "Speaker 1")),
+                enrolled,
+            )
+        }
+    }
+
+    @Test
+    fun transientAudioFocusValidatorRequiresBothGrantsAndOrderedTransientLossToGain() {
+        HandsetQualificationAudit.verifyTransientAudioFocusTransition(
+            primaryGranted = true,
+            competingGranted = true,
+            observedEvents = listOf("LOST_FOR_NOW", "GAINED"),
+        )
+
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyTransientAudioFocusTransition(
+                primaryGranted = false,
+                competingGranted = true,
+                observedEvents = listOf("LOST_FOR_NOW", "GAINED"),
+            )
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyTransientAudioFocusTransition(
+                primaryGranted = true,
+                competingGranted = false,
+                observedEvents = listOf("LOST_FOR_NOW", "GAINED"),
+            )
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyTransientAudioFocusTransition(
+                primaryGranted = true,
+                competingGranted = true,
+                observedEvents = emptyList(),
+            )
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyTransientAudioFocusTransition(
+                primaryGranted = true,
+                competingGranted = true,
+                observedEvents = listOf("LOST", "GAINED"),
+            )
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyTransientAudioFocusTransition(
+                primaryGranted = true,
+                competingGranted = true,
+                observedEvents = listOf("GAINED", "LOST_FOR_NOW"),
+            )
+        }
+    }
+
     private data class FakeSeg(val start: Long, val end: Long, val sha256: String, val json: String)
 
     private class FakeWhistleTransport(private val segments: List<FakeSeg>) : WhistleTransport {

@@ -1,4 +1,4 @@
-"""Unit tests for scripts/devicefarm-qualify.py: paginated $200 D89 budget guard, TestSpec, and report parsing."""
+"""Unit tests for scripts/devicefarm-qualify.py: paginated $160 D-1126/$200 D89 budget guard, TestSpec, and report parsing."""
 
 from __future__ import annotations
 
@@ -41,12 +41,12 @@ class FakeDeviceFarmClient:
 
 
 class DeviceFarmQualifyTest(unittest.TestCase):
-    def test_budget_guard_paginates_all_list_runs_and_projects_and_denies_at_200_usd(self) -> None:
+    def test_budget_guard_paginates_all_list_runs_and_projects_and_denies_at_160_usd(self) -> None:
         p1 = "arn:aws:devicefarm:us-west-2:111111111111:project:one"
         p2 = MODULE.PROJECT_ARN
         now = dt.datetime(2026, 11, 20, 14, 0, tzinfo=dt.timezone.utc)
 
-        # Page 1 of p1 has only 100 min ($17.00); later pages across p1 + p2 push total to 1,200 min ($204.00 >= $200).
+        # Page 1 of p1 has only 100 min ($17.00); later pages across p1 + p2 push total to 1,000 min ($170.00 >= $160).
         fake = FakeDeviceFarmClient(
             project_pages=[
                 {"projects": [{"arn": p1}], "nextToken": "proj-page-1"},
@@ -55,8 +55,8 @@ class DeviceFarmQualifyTest(unittest.TestCase):
             run_pages_by_project={
                 p1: [
                     {"runs": [_run(2026, 11, 2, 10, 100.0), _run(2026, 10, 31, 23, 999.0)], "nextToken": "run-page-1"},
-                    {"runs": [_run(2026, 11, 10, 8, 500.0)], "nextToken": "run-page-2"},
-                    {"runs": [_run(2026, 11, 18, 12, 400.0)]},
+                    {"runs": [_run(2026, 11, 10, 8, 400.0)], "nextToken": "run-page-2"},
+                    {"runs": [_run(2026, 11, 18, 12, 300.0)]},
                 ],
                 p2: [
                     {"runs": [_run(2026, 11, 20, 1, 200.0)]},
@@ -66,14 +66,38 @@ class DeviceFarmQualifyTest(unittest.TestCase):
 
         with self.assertRaises(SystemExit) as ctx:
             MODULE.check_budget(fake, now=now)
-        self.assertIn("$204.00 >= $200.00", str(ctx.exception))
+        self.assertIn("$170.00 >= $160.00", str(ctx.exception))
         self.assertEqual([None, "proj-page-1"], fake.project_calls)
         self.assertEqual(
             [(p1, None), (p1, "run-page-1"), (p1, "run-page-2"), (p2, None)],
             fake.run_calls,
         )
 
-    def test_budget_guard_allows_multi_page_spend_below_200_and_normalizes_timezones(self) -> None:
+    def test_budget_guard_admits_immediately_below_160_and_denies_at_exact_160(self) -> None:
+        p1 = MODULE.PROJECT_ARN
+        now = dt.datetime(2026, 11, 20, 14, 0, tzinfo=dt.timezone.utc)
+
+        # Immediately below $160.00 ($159.9989) must be admitted.
+        below_minutes = 941.17
+        admit_client = FakeDeviceFarmClient(
+            project_pages=[{"projects": [{"arn": p1}]}],
+            run_pages_by_project={p1: [{"runs": [_run(2026, 11, 15, 10, below_minutes)]}]},
+        )
+        spent = MODULE.check_budget(admit_client, now=now)
+        self.assertLess(spent, 160.0)
+        self.assertAlmostEqual(below_minutes * 0.17, spent, places=4)
+
+        # Exactly $160.00 must be denied.
+        at_threshold_minutes = 160.0 / MODULE.RATE_PER_MINUTE
+        deny_client = FakeDeviceFarmClient(
+            project_pages=[{"projects": [{"arn": p1}]}],
+            run_pages_by_project={p1: [{"runs": [_run(2026, 11, 15, 10, at_threshold_minutes)]}]},
+        )
+        with self.assertRaises(SystemExit) as ctx:
+            MODULE.check_budget(deny_client, now=now)
+        self.assertIn("$160.00 >= $160.00", str(ctx.exception))
+
+    def test_budget_guard_allows_multi_page_spend_below_160_and_normalizes_timezones(self) -> None:
         p1 = MODULE.PROJECT_ARN
         now = dt.datetime(2026, 11, 20, 14, 0, tzinfo=dt.timezone.utc)
         plus_two = dt.timezone(dt.timedelta(hours=2))
@@ -100,7 +124,7 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         spent = MODULE.check_budget(fake, now=now)
         self.assertAlmostEqual(500.0 * 0.17, spent, places=4)
 
-    def test_budget_guard_refuses_cyclic_next_token_and_ceiling_override_above_200(self) -> None:
+    def test_budget_guard_refuses_cyclic_next_token_and_ceiling_override_above_160(self) -> None:
         p1 = MODULE.PROJECT_ARN
         cyclic = FakeDeviceFarmClient(
             project_pages=[{"projects": [{"arn": p1}]}],
@@ -114,7 +138,9 @@ class DeviceFarmQualifyTest(unittest.TestCase):
 
         valid = FakeDeviceFarmClient(project_pages=[{"projects": []}], run_pages_by_project={})
         with self.assertRaises(SystemExit):
-            MODULE.check_budget(valid, ceiling_usd=201.0)
+            MODULE.check_budget(valid, ceiling_usd=160.01)
+        with self.assertRaises(SystemExit):
+            MODULE.check_budget(valid, ceiling_usd=200.0)
 
     def test_test_spec_validates_arguments_and_rejects_shell_metacharacters(self) -> None:
         spec = MODULE.build_test_spec(

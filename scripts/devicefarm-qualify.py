@@ -10,8 +10,8 @@ When AWS credentials live on a separate control host (such as drmeyers) with tig
 `--control-ssh drmeyers`: control-plane API calls run over SSH while APK uploads and log downloads stream
 directly between this host and S3 without storing artifacts on the SSH host or logging presigned URLs.
 
-Enforces the D89 $200.00/month deny ceiling across all projects and all paginated ListRuns pages before
-scheduling any run.
+Enforces the D89/D-1126 $160.00/month scheduling denial threshold (within the $200.00/month budget) across
+all projects and all paginated ListRuns pages before scheduling any run.
 """
 
 from __future__ import annotations
@@ -32,7 +32,8 @@ ROOT = Path(__file__).resolve().parents[1]
 REGION = "us-west-2"
 PROJECT_ARN = "arn:aws:devicefarm:us-west-2:613912634239:project:6c67e094-43ab-4c2a-af51-f93bd2b1bfac"
 RATE_PER_MINUTE = 0.17
-MONTHLY_DENY_USD = 200.0
+MONTHLY_BUDGET_USD = 200.0
+MONTHLY_DENY_USD = 160.0
 DEFAULT_TEST_CLASS = "io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest"
 APP_PACKAGE = "io.codemyriad.cassini.talk.debug"
 
@@ -189,11 +190,13 @@ def check_budget(
     spent_usd = metered_minutes * RATE_PER_MINUTE
     print(
         f"Device Farm month-to-date ({now_utc:%Y-%m}): {metered_minutes:.2f} metered min "
-        f"(~${spent_usd:.2f} / ${ceiling_usd:.2f} deny cap)",
+        f"(~${spent_usd:.2f} / ${ceiling_usd:.2f} scheduling deny threshold; ${MONTHLY_BUDGET_USD:.2f} monthly budget)",
         flush=True,
     )
     if spent_usd >= ceiling_usd:
-        raise SystemExit(f"Budget guard (D89): ${spent_usd:.2f} >= ${ceiling_usd:.2f} monthly deny ceiling.")
+        raise SystemExit(
+            f"Budget guard (D89/D-1126): ${spent_usd:.2f} >= ${ceiling_usd:.2f} monthly scheduling deny threshold.",
+        )
     return spent_usd
 
 
