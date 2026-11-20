@@ -827,6 +827,61 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         self.assertTrue(any("pkg.A#alpha" in s and "pkg.B#beta" not in s for s in scheduled_specs))
         self.assertTrue(any("pkg.B#beta" in s and "pkg.A#alpha" not in s for s in scheduled_specs))
 
+    def test_collect_run_arn_isolates_two_runs_in_distinct_directories(self) -> None:
+        import json
+        import tempfile
+        from unittest import mock
+
+        arn1 = "arn:aws:devicefarm:us-west-2:123:run:proj/run-1"
+        arn2 = "arn:aws:devicefarm:us-west-2:123:run:proj/run-2"
+        runs = {
+            arn1: {
+                "arn": arn1,
+                "name": "d1126-pixel8",
+                "status": "COMPLETED",
+                "result": "PASSED",
+                "counters": {"passed": 3},
+                "deviceMinutes": {"metered": 12.0},
+            },
+            arn2: {
+                "arn": arn2,
+                "name": "d1126-pixel8",
+                "status": "COMPLETED",
+                "result": "PASSED",
+                "counters": {"passed": 3},
+                "deviceMinutes": {"metered": 14.0},
+            },
+        }
+        reports_by_arn = {
+            arn1: [{"test": "run1-report"}],
+            arn2: [{"test": "run2-report"}],
+        }
+
+        class FakeCollectClient:
+            def get_run(self, arn: str) -> dict:
+                return {"run": runs[arn]}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base_dir = Path(tmp) / "collected"
+            with (
+                mock.patch.object(MODULE, "open_client", return_value=FakeCollectClient()),
+                mock.patch.object(MODULE, "extract_reports", side_effect=lambda _df, arn, _dir: reports_by_arn[arn]),
+            ):
+                MODULE.main(["--collect-run-arn", arn1, "--out-dir", str(base_dir)])
+                MODULE.main(["--collect-run-arn", arn2, "--out-dir", str(base_dir)])
+
+            run_dirs = sorted(p for p in base_dir.iterdir() if p.is_dir())
+            self.assertEqual(2, len(run_dirs))
+            collected_by_arn = {}
+            for run_dir in run_dirs:
+                run_meta = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+                report_data = json.loads((run_dir / "reports.json").read_text(encoding="utf-8"))
+                collected_by_arn[run_meta["arn"]] = (run_dir, run_meta, report_data)
+
+            self.assertEqual({arn1, arn2}, set(collected_by_arn.keys()))
+            self.assertEqual([{"test": "run1-report"}], collected_by_arn[arn1][2])
+            self.assertEqual([{"test": "run2-report"}], collected_by_arn[arn2][2])
+
 
 if __name__ == "__main__":
     unittest.main()

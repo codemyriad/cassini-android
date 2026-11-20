@@ -799,20 +799,31 @@ def create_run_out_dir(name: str, base_out_dir: Path | None = None) -> Path:
     return Path(tempfile.mkdtemp(prefix=f"{name}-", dir=parent))
 
 
+def _safe_collect_prefix(name: str | None, run_info: dict[str, Any], run_arn: str) -> str:
+    if name:
+        return name
+    raw = str(run_info.get("name") or run_arn.rsplit("/", 1)[-1].rsplit(":", 1)[-1] or "collected")
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "-", raw).strip(".-")
+    while ".." in cleaned:
+        cleaned = cleaned.replace("..", "-")
+    return cleaned if cleaned and SAFE_NAME_RE.fullmatch(cleaned) else "collected"
+
+
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     df = open_client(args.control_ssh, args.aws_profile)
 
     if args.collect_run_arn:
-        out_dir = args.out_dir or (ROOT / ".tools/devicefarm-out/collected")
         run_info = df.get_run(arn=args.collect_run_arn)["run"]
         print(
             f"[{run_info['status']}] result={run_info.get('result')} minutes={run_info.get('deviceMinutes')}",
             flush=True,
         )
         if run_info["status"] == "COMPLETED":
+            collect_prefix = _safe_collect_prefix(args.name, run_info, args.collect_run_arn)
+            base_dir = args.out_dir or (ROOT / ".tools/devicefarm-out/collected")
+            out_dir = create_run_out_dir(collect_prefix, base_dir)
             reports = extract_reports(df, args.collect_run_arn, out_dir / "artifacts")
-            out_dir.mkdir(parents=True, exist_ok=True)
             (out_dir / "reports.json").write_text(json.dumps(reports, indent=2) + "\n", encoding="utf-8")
             (out_dir / "run.json").write_text(
                 json.dumps(
@@ -829,6 +840,7 @@ def main(argv: list[str] | None = None) -> None:
                 + "\n",
                 encoding="utf-8",
             )
+            print(f"Collected run output -> {out_dir}", flush=True)
             print(f"Extracted {len(reports)} qualification report(s) -> {out_dir / 'reports.json'}", flush=True)
         return
 
