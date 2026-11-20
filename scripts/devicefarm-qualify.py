@@ -28,6 +28,7 @@ import os
 import re
 import shlex
 import subprocess
+import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -55,6 +56,7 @@ APP_PACKAGE = "io.codemyriad.cassini.talk.debug"
 SAFE_CLASS_RE = re.compile(r"^[A-Za-z0-9_.$#,-]+$")
 SAFE_KEY_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 SAFE_VAL_RE = re.compile(r"^[A-Za-z0-9_.,:/@#=-]+$")
+SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 SSH_CONTROL_SCRIPT = """
 import boto3, datetime as dt, json, sys
@@ -788,6 +790,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def create_run_out_dir(name: str, base_out_dir: Path | None = None) -> Path:
+    """Validates run name as a safe path component and creates a unique per-invocation directory."""
+    if not SAFE_NAME_RE.fullmatch(name) or ".." in name:
+        raise SystemExit(f"Unsafe run name (must be a single safe path component): {name!r}")
+    parent = base_out_dir or (ROOT / ".tools/devicefarm-out")
+    parent.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=f"{name}-", dir=parent))
+
+
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     df = open_client(args.control_ssh, args.aws_profile)
@@ -833,8 +844,7 @@ def main(argv: list[str] | None = None) -> None:
     projected_new_run_usd = project_run_cost_usd(len(args.device_arn), job_timeout_minutes)
     check_budget(df, ceiling_usd=args.ceiling_usd, projected_new_run_usd=projected_new_run_usd)
 
-    out_dir = args.out_dir or (ROOT / ".tools/devicefarm-out" / args.name)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = create_run_out_dir(args.name, args.out_dir)
 
     app_apk, test_apk = resolve_apks(ROOT) if args.skip_build else build_apks(ROOT)
 

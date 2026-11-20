@@ -714,6 +714,119 @@ class DeviceFarmQualifyTest(unittest.TestCase):
             extracted = MODULE.extract_reports(FakeArtifactClient(), "run:1", Path(tmp))
         self.assertEqual([{"test": "test01", "passed": True}], extracted)
 
+    def test_concurrent_same_name_submissions_isolate_testspecs(self) -> None:
+        import tempfile
+        import threading
+        from unittest import mock
+
+        for bad_name in ("../escape", "a/b", ".hidden", "-dash", "bad..name"):
+            with self.assertRaises(SystemExit):
+                MODULE.create_run_out_dir(bad_name)
+
+        first_in_apk_upload = threading.Event()
+        second_spec_uploaded = threading.Event()
+        spec_lock = threading.Lock()
+        uploaded_specs: dict[str, tuple[Path, str]] = {}
+        scheduled_specs: list[str] = []
+        errors: list[BaseException] = []
+
+        class FakeClient:
+            def list_projects(self, nextToken: str | None = None) -> dict:
+                return {"projects": [{"arn": MODULE.PROJECT_ARN}]}
+
+            def list_runs(self, arn: str, nextToken: str | None = None) -> dict:
+                return {"runs": []}
+
+            def list_device_pools(self, arn: str, type: str = "PRIVATE") -> dict:
+                return {"devicePools": [{"name": "pool", "arn": "arn:pool:1"}]}
+
+            def update_device_pool(self, **kwargs) -> dict:
+                return {"devicePool": {"arn": "arn:pool:1"}}
+
+            def create_device_pool(self, **kwargs) -> dict:
+                return {"devicePool": {"arn": "arn:pool:1"}}
+
+            def schedule_run(self, **kwargs) -> dict:
+                spec_arn = kwargs["test"]["testSpecArn"]
+                with spec_lock:
+                    scheduled_specs.append(uploaded_specs[spec_arn][1])
+                    idx = len(scheduled_specs)
+                return {"run": {"arn": f"arn:run:{idx}"}}
+
+        def fake_upload(df, path: Path, upload_type: str) -> str:
+            thread_name = threading.current_thread().name
+            if upload_type == "ANDROID_APP" and thread_name == "alpha":
+                first_in_apk_upload.set()
+                assert second_spec_uploaded.wait(timeout=5.0), "beta did not upload its testspec in time"
+            if upload_type == "INSTRUMENTATION_TEST_SPEC":
+                content = path.read_text(encoding="utf-8")
+                arn = f"arn:spec:{thread_name}"
+                with spec_lock:
+                    uploaded_specs[arn] = (path, content)
+                if thread_name == "beta":
+                    second_spec_uploaded.set()
+                return arn
+            return f"arn:{upload_type}:{thread_name}"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_root = Path(tmp)
+            app_apk = tmp_root / "app.apk"
+            test_apk = tmp_root / "test.apk"
+            app_apk.write_bytes(b"apk")
+            test_apk.write_bytes(b"test")
+            out_base = tmp_root / "out"
+            lock_file = tmp_root / "schedule.lock"
+
+            def run_submission(selector: str, wait_for_alpha: bool) -> None:
+                try:
+                    if wait_for_alpha:
+                        assert first_in_apk_upload.wait(timeout=5.0), "alpha did not reach APK upload"
+                    MODULE.main(
+                        [
+                            "--device-arn",
+                            "arn:device:1",
+                            "--pool-name",
+                            "pool",
+                            "--name",
+                            "shared-run",
+                            "--test-class",
+                            selector,
+                            "--out-dir",
+                            str(out_base),
+                            "--lock-file",
+                            str(lock_file),
+                            "--skip-build",
+                            "--no-wait",
+                        ],
+                    )
+                except BaseException as exc:  # pragma: no cover - surfaced below
+                    errors.append(exc)
+
+            with (
+                mock.patch.object(MODULE, "open_client", return_value=FakeClient()),
+                mock.patch.object(MODULE, "resolve_apks", return_value=(app_apk, test_apk)),
+                mock.patch.object(MODULE, "upload_file", side_effect=fake_upload),
+            ):
+                t_alpha = threading.Thread(name="alpha", target=run_submission, args=("pkg.A#alpha", False))
+                t_beta = threading.Thread(name="beta", target=run_submission, args=("pkg.B#beta", True))
+                t_alpha.start()
+                t_beta.start()
+                t_alpha.join(timeout=10.0)
+                t_beta.join(timeout=10.0)
+
+        self.assertEqual([], errors)
+        self.assertEqual(2, len(uploaded_specs))
+        alpha_path, alpha_spec = uploaded_specs["arn:spec:alpha"]
+        beta_path, beta_spec = uploaded_specs["arn:spec:beta"]
+        self.assertNotEqual(alpha_path.parent, beta_path.parent)
+        self.assertIn("pkg.A#alpha", alpha_spec)
+        self.assertNotIn("pkg.B#beta", alpha_spec)
+        self.assertIn("pkg.B#beta", beta_spec)
+        self.assertNotIn("pkg.A#alpha", beta_spec)
+        self.assertEqual(2, len(scheduled_specs))
+        self.assertTrue(any("pkg.A#alpha" in s and "pkg.B#beta" not in s for s in scheduled_specs))
+        self.assertTrue(any("pkg.B#beta" in s and "pkg.A#alpha" not in s for s in scheduled_specs))
+
 
 if __name__ == "__main__":
     unittest.main()
