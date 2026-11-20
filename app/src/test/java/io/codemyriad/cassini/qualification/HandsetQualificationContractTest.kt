@@ -474,6 +474,52 @@ class HandsetQualificationContractTest {
         }
     }
 
+    @Test
+    fun resolvePairedEnginesRejectsWhistleOnlyOnIneligibleHandset() {
+        assertEquals(
+            HandsetQualificationAudit.PairedEnginePlan(runParakeet = true, runWhistle = false),
+            HandsetQualificationAudit.resolvePairedEngines(
+                runParakeet = true,
+                runWhistle = true,
+                whistleEligible = false,
+            ),
+        )
+        assertEquals(
+            HandsetQualificationAudit.PairedEnginePlan(runParakeet = false, runWhistle = true),
+            HandsetQualificationAudit.resolvePairedEngines(
+                runParakeet = false,
+                runWhistle = true,
+                whistleEligible = true,
+            ),
+        )
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.resolvePairedEngines(
+                runParakeet = false,
+                runWhistle = true,
+                whistleEligible = false,
+            )
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.resolvePairedEngines(
+                runParakeet = false,
+                runWhistle = false,
+                whistleEligible = true,
+            )
+        }
+    }
+
+    @Test
+    fun bitExactFloatPcmPrefixRejectsSingleSampleOneLsbDifference() {
+        val live = floatArrayOf(0.0f, 0.25f, -0.5f, 0.125f)
+        val exact = floatArrayOf(0.0f, 0.25f, -0.5f, 0.125f, 0.75f)
+        HandsetQualificationAudit.verifyBitExactFloatPcmPrefix(live, exact)
+
+        val drifted = exact.copyOf().apply { this[2] += 1e-5f }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.verifyBitExactFloatPcmPrefix(live, drifted)
+        }
+    }
+
     private data class FakeSeg(val start: Long, val end: Long, val sha256: String, val json: String)
 
     private class FakeWhistleTransport(private val segments: List<FakeSeg>) : WhistleTransport {

@@ -17,6 +17,46 @@ object HandsetQualificationAudit {
     private const val FOCUS_GAINED = "GAINED"
     private const val STOP_REASON_YIELDED = "YIELDED"
     private const val STOP_REASON_OOM = "OUT_OF_MEMORY"
+    private const val HEX_RADIX = 16
+
+    data class PairedEnginePlan(
+        val runParakeet: Boolean,
+        val runWhistle: Boolean,
+    )
+
+    fun resolvePairedEngines(
+        runParakeet: Boolean,
+        runWhistle: Boolean,
+        whistleEligible: Boolean,
+    ): PairedEnginePlan {
+        val effectiveWhistle = runWhistle && whistleEligible
+        if (!runParakeet && !effectiveWhistle) {
+            throw AssertionError(
+                "No requested paired engine can execute on this handset " +
+                    "(runParakeet=$runParakeet, runWhistle=$runWhistle, whistleEligible=$whistleEligible)",
+            )
+        }
+        return PairedEnginePlan(runParakeet = runParakeet, runWhistle = effectiveWhistle)
+    }
+
+    fun verifyBitExactFloatPcmSample(index: Long, live: Float, finalized: Float) {
+        if (live.toRawBits() != finalized.toRawBits()) {
+            throw AssertionError(
+                "Live vs finalized float32 PCM diverged at sample $index " +
+                    "(live=$live [0x${live.toRawBits().toString(HEX_RADIX)}], " +
+                    "finalized=$finalized [0x${finalized.toRawBits().toString(HEX_RADIX)}])",
+            )
+        }
+    }
+
+    fun verifyBitExactFloatPcmPrefix(live: FloatArray, finalized: FloatArray) {
+        if (finalized.size < live.size) {
+            throw AssertionError("Finalized PCM (${finalized.size}) shorter than live prefix (${live.size})")
+        }
+        for (i in live.indices) {
+            verifyBitExactFloatPcmSample(i.toLong(), live[i], finalized[i])
+        }
+    }
 
     /**
      * Tracks a fresh precompute worker start after user Resume, verifies that the worker is still active when

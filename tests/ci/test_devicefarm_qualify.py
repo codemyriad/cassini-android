@@ -298,20 +298,23 @@ class DeviceFarmQualifyTest(unittest.TestCase):
         p1 = MODULE.PROJECT_ARN
         now = dt.datetime(2026, 11, 1, 0, 5, tzinfo=dt.timezone.utc)
 
-        # 1. Outstanding run with missing totalJobs must fail closed (cannot assume 1 device).
-        unknown_jobs_run = {
-            "arn": "arn:aws:devicefarm:us-west-2:1:run:pending-unknown",
-            "created": now,
-            "status": "SCHEDULING",
-            "deviceMinutes": {"metered": 0.0},
-        }
-        unknown_client = FakeDeviceFarmClient(
-            project_pages=[{"projects": [{"arn": p1}]}],
-            run_pages_by_project={p1: [{"runs": [unknown_jobs_run]}]},
-        )
-        with self.assertRaises(SystemExit) as unknown_err:
-            MODULE.check_budget(unknown_client, now=now, projected_new_run_usd=17.0)
-        self.assertIn("unknown device count", str(unknown_err.exception))
+        # 1. Outstanding run with missing, zero, or negative totalJobs must fail closed (cannot assume 1 device).
+        for bad_total_jobs in (None, 0, -1):
+            unknown_jobs_run: dict = {
+                "arn": "arn:aws:devicefarm:us-west-2:1:run:pending-unknown",
+                "created": now,
+                "status": "SCHEDULING",
+                "deviceMinutes": {"metered": 0.0},
+            }
+            if bad_total_jobs is not None:
+                unknown_jobs_run["totalJobs"] = bad_total_jobs
+            unknown_client = FakeDeviceFarmClient(
+                project_pages=[{"projects": [{"arn": p1}]}],
+                run_pages_by_project={p1: [{"runs": [unknown_jobs_run]}]},
+            )
+            with self.assertRaises(SystemExit) as unknown_err:
+                MODULE.check_budget(unknown_client, now=now, projected_new_run_usd=17.0)
+            self.assertIn("unknown device count", str(unknown_err.exception))
 
         # 2. Active prior-month-timestamped run with 100 metered min NOT counted in Nov's metered_minutes:
         #    must keep its full 150-min ($25.50) reservation rather than subtracting 100 min ($8.50).

@@ -454,17 +454,15 @@ class HandsetQualificationDeviceTest {
                     finalizedSamples += count
                     val take = minOf(count.toLong(), liveSampleCount - compared).toInt()
                     for (i in 0 until take) {
-                        maxPcmDiff = maxOf(maxPcmDiff, abs(liveIn.readFloat() - block[i]))
+                        val liveSample = liveIn.readFloat()
+                        HandsetQualificationAudit.verifyBitExactFloatPcmSample(compared + i, liveSample, block[i])
+                        maxPcmDiff = maxOf(maxPcmDiff, abs(liveSample - block[i]))
                     }
                     compared += take
                 },
             )
         }
         assertEquals("Finalized .opus must contain all live-decoded samples", liveSampleCount, compared)
-        assertTrue(
-            "CommittedOggOpusDecoder PCM must match finalized AudioDecoder ($maxPcmDiff)",
-            maxPcmDiff <= 1e-4f,
-        )
         val sealedDurationMs = finalizedSamples * 1_000L / 16_000L
         assertTrue(
             "Sealed .opus ($sealedDurationMs ms) must cover the 5-min background interval " +
@@ -548,10 +546,13 @@ class HandsetQualificationDeviceTest {
     @Test
     fun test02PairedFiveMinuteEquivalenceAndPressure() = runBlocking {
         val cfg = requireQualConfig()
+        val whistleEligible = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            WhistleDeviceCapability.current() == WhistleCapability.ELIGIBLE
+        val plan = HandsetQualificationAudit.resolvePairedEngines(cfg.runParakeet, cfg.runWhistle, whistleEligible)
         grantRecordAudio()
 
         val neededParts = mutableSetOf(ModelPart.SPEAKERS, ModelPart.VOICES)
-        if (cfg.runParakeet) neededParts += ModelPart.SPEECH
+        if (plan.runParakeet) neededParts += ModelPart.SPEECH
         ensureModelsInstalled(neededParts)
 
         val track = withContext(Dispatchers.IO) {
@@ -566,17 +567,15 @@ class HandsetQualificationDeviceTest {
             .put("audioSeconds", cfg.shortSeconds)
             .put("enrolledVoices", JSONArray(enrolled.names))
             .put("maxPairwiseVoiceCosine", enrolled.maxPairwiseCosine.toDouble())
+            .put("whistleEligible", whistleEligible)
 
         ActivityScenario.launch(MainActivity::class.java).use {
             awaitVisible(true)
             report.put("recordOnly", runRecordOnlyControl(track, cfg.shortSeconds))
-            if (cfg.runParakeet) {
+            if (plan.runParakeet) {
                 report.put("parakeet", runEngineEquivalenceSuite(SpeechModel.PARAKEET, track, cfg.shortSeconds))
             }
-            val whistleEligible = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                WhistleDeviceCapability.current() == WhistleCapability.ELIGIBLE
-            report.put("whistleEligible", whistleEligible)
-            if (cfg.runWhistle && whistleEligible) {
+            if (plan.runWhistle) {
                 report.put("whistle", runEngineEquivalenceSuite(SpeechModel.INCLUDED, track, cfg.shortSeconds))
             }
         }
@@ -1569,15 +1568,20 @@ class HandsetQualificationDeviceTest {
 
     private fun emitReport(name: String, report: JSONObject) {
         val reportsFile = File(context.filesDir, "handset-qual-reports.json")
-        val existing = runCatching {
-            if (reportsFile.isFile) JSONArray(reportsFile.readText(Charsets.UTF_8)) else JSONArray()
-        }.getOrElse { JSONArray() }
+        val existing = if (reportInitializedInProcess.compareAndSet(false, true)) {
+            JSONArray()
+        } else {
+            runCatching {
+                if (reportsFile.isFile) JSONArray(reportsFile.readText(Charsets.UTF_8)) else JSONArray()
+            }.getOrElse { JSONArray() }
+        }
         existing.put(report)
         reportsFile.writeText(existing.toString(2) + "\n", Charsets.UTF_8)
         sendStream("\nCASSINI_HANDSET_QUAL_BEGIN:$name\n$report\nCASSINI_HANDSET_QUAL_END:$name\n")
     }
 
     private companion object {
+        val reportInitializedInProcess = AtomicBoolean(false)
         const val TAG = "CassiniHandsetQual"
         const val EVENT_TIMEOUT_MS = 30_000L
         const val BACKGROUND_DURATION_MS = 300_000L
