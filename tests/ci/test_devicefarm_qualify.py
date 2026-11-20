@@ -168,6 +168,38 @@ class DeviceFarmQualifyTest(unittest.TestCase):
             MODULE.resolve_test_class(explicit_args.test_class, explicit_args.long_engine),
         )
 
+    def test_timeout_minutes_scales_for_combined_long_lanes_and_validates_explicit_bounds(self) -> None:
+        core_args = MODULE.build_parser().parse_args([])
+        self.assertEqual(
+            75,
+            MODULE.resolve_timeout_minutes(core_args.timeout_minutes, core_args.test_class, core_args.long_engine),
+        )
+
+        combined_whistle = MODULE.build_parser().parse_args(["--long-engine", "whistle"])
+        self.assertEqual(
+            150,
+            MODULE.resolve_timeout_minutes(
+                combined_whistle.timeout_minutes,
+                combined_whistle.test_class,
+                combined_whistle.long_engine,
+            ),
+        )
+
+        explicit_args = MODULE.build_parser().parse_args(["--long-engine", "whistle", "--timeout-minutes", "85"])
+        self.assertEqual(
+            85,
+            MODULE.resolve_timeout_minutes(
+                explicit_args.timeout_minutes,
+                explicit_args.test_class,
+                explicit_args.long_engine,
+            ),
+        )
+
+        with self.assertRaises(SystemExit):
+            MODULE.resolve_timeout_minutes(151, None, "whistle")
+        with self.assertRaises(SystemExit):
+            MODULE.resolve_timeout_minutes(0, None, "none")
+
     def test_test_spec_validates_arguments_and_rejects_shell_metacharacters(self) -> None:
         spec = MODULE.build_test_spec(
             "io.codemyriad.cassini.qualification.HandsetQualificationDeviceTest#test02Paired",

@@ -349,6 +349,7 @@ class HandsetQualificationDeviceTest {
 
         val beforeBgMs = recording.elapsedNowMs
         val targetBgMs = beforeBgMs + BACKGROUND_DURATION_MS
+        precomputeWatch.tracker.markHomeIssued()
         Background.shell("input keyevent KEYCODE_HOME")
         awaitVisible(false)
         if (whistleEligible) {
@@ -624,7 +625,11 @@ class HandsetQualificationDeviceTest {
         val lowMemory = runLowMemorySuppressionLane(model, track, totalSeconds)
         assertRecoveryMatchesBaseline(model, "lowMemory", baseline, lowMemory.lane)
 
-        val oomPassed = if (model == SpeechModel.PARAKEET) runOomSuppressionCheck(track) else true
+        val oomPassed = if (model == SpeechModel.PARAKEET) {
+            runOomSuppressionCheck(track)
+        } else {
+            HandsetQualificationAudit.evaluateOomSuppression(exercised = false, observedStopReason = null)
+        }
         return buildEquivalenceReport(model, baseline, headStart, thermal, lowMemory, oomPassed)
     }
 
@@ -674,7 +679,7 @@ class HandsetQualificationDeviceTest {
         headStart: LaneResult,
         thermal: PressureOutcome,
         lowMemory: PressureOutcome,
-        oomPassed: Boolean,
+        oomPassed: Boolean?,
     ): JSONObject {
         val speedup = if (headStart.stopToPublishedSec > 0.0) {
             baseline.stopToPublishedSec / headStart.stopToPublishedSec
@@ -692,7 +697,7 @@ class HandsetQualificationDeviceTest {
             .put("lowMemoryStopReason", lowMemory.stopReason.name)
             .put("lowMemoryPrecomputeCheckpoints", lowMemory.lane.precomputeCheckpoints)
             .put("lowMemoryPostStopUnits", lowMemory.lane.postStopUnits)
-            .put("oomSuppressionPassed", oomPassed)
+            .put("oomSuppressionPassed", oomPassed ?: JSONObject.NULL)
             .put("wordCount", baseline.words.size)
             .put("turnCount", baseline.turnCount)
             .put("speakerCount", baseline.speakerCount)
@@ -855,7 +860,10 @@ class HandsetQualificationDeviceTest {
         graph.settings.setTranscriptionMode(mode)
 
         val preMon = if (splitAfterSeconds != null) {
-            HandsetTelemetryMonitor.start(context).also(counters.activeMonitor::set)
+            HandsetTelemetryMonitor.start(
+                context,
+                isolatedWorkerCpuUnavailable = model == SpeechModel.INCLUDED,
+            ).also(counters.activeMonitor::set)
         } else {
             null
         }
@@ -1036,7 +1044,10 @@ class HandsetQualificationDeviceTest {
         val active = awaitRecordingState("OOM control active") { it is RecordingState.Active } as RecordingState.Active
         withTimeout(ENCODE_TIMEOUT_MS) { source.prefixCommitted.await() }
         val reason = withTimeout(EVENT_TIMEOUT_MS) { oomReasons.receive() }
-        assertEquals(PrecomputeStopReason.OUT_OF_MEMORY, reason)
+        val evaluated = HandsetQualificationAudit.evaluateOomSuppression(
+            exercised = true,
+            observedStopReason = reason.name,
+        ) == true
         assertTrue(
             "Capture continues uninterrupted after precompute OOM",
             graph.recording.state.value is RecordingState.Active,
@@ -1048,7 +1059,7 @@ class HandsetQualificationDeviceTest {
         graph.recording.dismissEnded()
         cleanupNote(active.noteId)
         TestHooks.reset()
-        return true
+        return evaluated
     }
 
     @Manual
@@ -1076,7 +1087,10 @@ class HandsetQualificationDeviceTest {
                 sendStream("[30min-$engineArg] ${sec}s/${cfg.longSeconds}s cp=${counters.preCheckpoints.get()}\n")
             }
             TestHooks.opusReadHook = observer
-            val recMonitor = HandsetTelemetryMonitor.start(context).also(counters.activeMonitor::set)
+            val recMonitor = HandsetTelemetryMonitor.start(
+                context,
+                isolatedWorkerCpuUnavailable = model == SpeechModel.INCLUDED,
+            ).also(counters.activeMonitor::set)
             assertTrue(graph.recording.start("D1126 30min $engineArg"))
             val active = awaitRecordingState("30-min active") { it is RecordingState.Active } as RecordingState.Active
             assertEquals("OpusCapture", TestHooks.lastStartedCaptureClass)

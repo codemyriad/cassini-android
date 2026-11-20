@@ -392,29 +392,59 @@ class HandsetQualificationContractTest {
     }
 
     @Test
-    fun precomputeBackgroundYieldTrackerIgnoresStalePauseStopAndRequiresPostResumeYield() {
+    fun precomputeBackgroundYieldTrackerIgnoresStalePauseStopAndRejectsPreHomeYield() {
         val tracker = HandsetQualificationAudit.PrecomputeBackgroundYieldTracker()
 
-        // Pre-resume worker starts and stops with YIELDED due to user Pause: must NOT satisfy Home yield.
+        // 1. Pre-resume worker starts and stops with YIELDED due to user Pause: must NOT satisfy Home yield.
         assertFalse(tracker.onWorkerStarted())
         assertFalse(tracker.onWorkerStopped("YIELDED"))
 
-        // Even a delayed stale stop arriving right after markResumed (before fresh post-Resume worker starts) is ignored.
+        // 2. Even a delayed stale stop arriving right after markResumed (before fresh post-Resume worker starts) is ignored.
         tracker.markResumed()
         assertFalse(tracker.onWorkerStopped("YIELDED"))
         assertThrows(AssertionError::class.java) { tracker.verifyYieldedAfterBackground() }
 
-        // Fresh post-Resume worker starts, then stops with CANCELLED (not YIELDED): must fail.
+        // 3. Post-Resume worker starts and yields BEFORE KEYCODE_HOME is issued: must NOT pass.
+        val preHomeYield = HandsetQualificationAudit.PrecomputeBackgroundYieldTracker()
+        preHomeYield.markResumed()
+        assertTrue(preHomeYield.onWorkerStarted())
+        assertFalse(preHomeYield.onWorkerStopped("YIELDED"))
+        preHomeYield.markHomeIssued()
+        assertThrows(AssertionError::class.java) { preHomeYield.verifyYieldedAfterBackground() }
+
+        // 4. Fresh post-Resume worker active at Home, then stops with CANCELLED (not YIELDED): must fail.
         val wrongReason = HandsetQualificationAudit.PrecomputeBackgroundYieldTracker()
         wrongReason.markResumed()
         assertTrue(wrongReason.onWorkerStarted())
+        wrongReason.markHomeIssued()
         assertTrue(wrongReason.onWorkerStopped("CANCELLED"))
         assertThrows(AssertionError::class.java) { wrongReason.verifyYieldedAfterBackground() }
 
-        // Fresh post-Resume worker starts and yields on KEYCODE_HOME with YIELDED: passes.
+        // 5. Fresh post-Resume worker active at Home, then yields with YIELDED after Home: passes.
         assertTrue(tracker.onWorkerStarted())
+        tracker.markHomeIssued()
         assertTrue(tracker.onWorkerStopped("YIELDED"))
         tracker.verifyYieldedAfterBackground()
+    }
+
+    @Test
+    fun oomSuppressionEvaluatorReturnsNullWhenUntestedAndRequiresOutOfMemoryReason() {
+        val untested = HandsetQualificationAudit.evaluateOomSuppression(
+            exercised = false,
+            observedStopReason = null,
+        )
+        assertEquals(null, untested)
+        val observed = HandsetQualificationAudit.evaluateOomSuppression(
+            exercised = true,
+            observedStopReason = "OUT_OF_MEMORY",
+        )
+        assertEquals(true, observed)
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.evaluateOomSuppression(exercised = true, observedStopReason = "YIELDED")
+        }
+        assertThrows(AssertionError::class.java) {
+            HandsetQualificationAudit.evaluateOomSuppression(exercised = true, observedStopReason = null)
+        }
     }
 
     private data class FakeSeg(val start: Long, val end: Long, val sha256: String, val json: String)

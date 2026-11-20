@@ -21,6 +21,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -34,6 +35,7 @@ import java.util.concurrent.atomic.AtomicLong
 @Suppress("TooManyFunctions") // Focused telemetry collector with one helper per OS subsystem.
 internal class HandsetTelemetryMonitor private constructor(
     private val app: Application,
+    private val isolatedWorkerCpuUnavailable: Boolean,
 ) {
     data class Snapshot(
         val manufacturer: String,
@@ -48,15 +50,18 @@ internal class HandsetTelemetryMonitor private constructor(
         val opusDecoderName: String,
         val wallSeconds: Double,
         val appCpuSeconds: Double,
-        val whistleWorkerCpuSeconds: Double,
-        val totalCpuSeconds: Double,
+        val whistleWorkerCpuSeconds: Double?,
+        val totalCpuSeconds: Double?,
+        val cpuScope: String,
         val baselineRssMiB: Double,
         val peakRssMiB: Double,
         val vmHwmMiB: Double,
         val peakJvmHeapMiB: Double,
         val peakNativeHeapMiB: Double,
         val minAvailRamMiB: Double,
-        val lowMemoryEvents: Int,
+        val trimMemoryPressureEvents: Int,
+        val uiHiddenEvents: Int,
+        val sampledLowMemoryTicks: Int,
         val maxTrimLevel: Int,
         val peakThermalStatus: String,
         val peakThermalCode: Int,
@@ -92,15 +97,19 @@ internal class HandsetTelemetryMonitor private constructor(
                 .put("opusDecoderName", opusDecoderName)
                 .put("wallSeconds", round3(wallSeconds))
                 .put("appCpuSeconds", round3(appCpuSeconds))
-                .put("whistleWorkerCpuSeconds", round3(whistleWorkerCpuSeconds))
-                .put("totalCpuSeconds", round3(totalCpuSeconds))
+                .put("whistleWorkerCpuSeconds", whistleWorkerCpuSeconds?.let(::round3) ?: JSONObject.NULL)
+                .put("totalCpuSeconds", totalCpuSeconds?.let(::round3) ?: JSONObject.NULL)
+                .put("cpuScope", cpuScope)
                 .put("baselineRssMiB", round2(baselineRssMiB))
                 .put("peakRssMiB", round2(peakRssMiB))
                 .put("vmHwmMiB", round2(vmHwmMiB))
                 .put("peakJvmHeapMiB", round2(peakJvmHeapMiB))
                 .put("peakNativeHeapMiB", round2(peakNativeHeapMiB))
                 .put("minAvailRamMiB", round2(minAvailRamMiB))
-                .put("lowMemoryEvents", lowMemoryEvents)
+                .put("lowMemoryEvents", trimMemoryPressureEvents)
+                .put("trimMemoryPressureEvents", trimMemoryPressureEvents)
+                .put("uiHiddenEvents", uiHiddenEvents)
+                .put("sampledLowMemoryTicks", sampledLowMemoryTicks)
                 .put("maxTrimLevel", maxTrimLevel)
                 .put("peakThermalStatus", peakThermalStatus)
                 .put("peakThermalCode", peakThermalCode)
@@ -124,6 +133,7 @@ internal class HandsetTelemetryMonitor private constructor(
     private val startedWallNs = SystemClock.elapsedRealtimeNanos()
     private val startedCpuMs = Process.getElapsedCpuTime()
     private val whistleCpuMs = AtomicLong(0L)
+    private val whistleCpuRecorded = AtomicBoolean(false)
     private val startBattery = readBattery(app)
 
     private var baselineRssKiB = 0L
@@ -132,7 +142,9 @@ internal class HandsetTelemetryMonitor private constructor(
     private var peakJvmBytes = 0L
     private var peakNativeBytes = 0L
     private var minAvailBytes = Long.MAX_VALUE
-    private var lowMemEvents = 0
+    private var trimPressureEvents = 0
+    private var uiHiddenEvents = 0
+    private var sampledLowMemTicks = 0
     private var maxTrim = 0
     private var peakThermal = -1
     private val thermalSamples = ArrayList<String>()
@@ -148,13 +160,19 @@ internal class HandsetTelemetryMonitor private constructor(
 
         @Deprecated("Deprecated in Java")
         override fun onLowMemory() {
-            synchronized(lock) { lowMemEvents++ }
+            synchronized(lock) { trimPressureEvents++ }
         }
 
         override fun onTrimMemory(level: Int) {
             synchronized(lock) {
+                if (level == ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+                    uiHiddenEvents++
+                    return
+                }
                 if (level > maxTrim) maxTrim = level
-                if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) lowMemEvents++
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+                    trimPressureEvents++
+                }
             }
         }
     }
@@ -178,6 +196,7 @@ internal class HandsetTelemetryMonitor private constructor(
     }
 
     fun recordWhistleWorkerCpuMs(cpuMs: Long) {
+        whistleCpuRecorded.set(true)
         if (cpuMs > 0L) whistleCpuMs.addAndGet(cpuMs)
     }
 
@@ -198,49 +217,72 @@ internal class HandsetTelemetryMonitor private constructor(
         val activityMgr = app.getSystemService(ActivityManager::class.java)
         val memInfo = ActivityManager.MemoryInfo().also { activityMgr?.getMemoryInfo(it) }
         val appCpuSec = (endCpuMs - startedCpuMs).coerceAtLeast(0L) / 1000.0
-        val workerCpuSec = whistleCpuMs.get().coerceAtLeast(0L) / 1000.0
-
+        val workerCpuSec: Double? = if (isolatedWorkerCpuUnavailable && !whistleCpuRecorded.get()) {
+            null
+        } else {
+            whistleCpuMs.get().coerceAtLeast(0L) / 1000.0
+        }
         return synchronized(lock) {
-            Snapshot(
-                manufacturer = Build.MANUFACTURER.orEmpty(),
-                model = Build.MODEL.orEmpty(),
-                device = Build.DEVICE.orEmpty(),
-                hardware = Build.HARDWARE.orEmpty(),
-                release = Build.VERSION.RELEASE.orEmpty(),
-                sdkInt = Build.VERSION.SDK_INT,
-                totalRamMiB = memInfo.totalMem / MIB,
-                isLowRamDevice = activityMgr?.isLowRamDevice == true,
-                opusEncoderName = CODEC_NAMES.first,
-                opusDecoderName = CODEC_NAMES.second,
-                wallSeconds = (endWallNs - startedWallNs).coerceAtLeast(0L) / 1_000_000_000.0,
-                appCpuSeconds = appCpuSec,
-                whistleWorkerCpuSeconds = workerCpuSec,
-                totalCpuSeconds = appCpuSec + workerCpuSec,
-                baselineRssMiB = baselineRssKiB / 1024.0,
-                peakRssMiB = peakRssKiB / 1024.0,
-                vmHwmMiB = vmHwmKiB / 1024.0,
-                peakJvmHeapMiB = peakJvmBytes / MIB,
-                peakNativeHeapMiB = peakNativeBytes / MIB,
-                minAvailRamMiB = if (minAvailBytes == Long.MAX_VALUE) 0.0 else minAvailBytes / MIB,
-                lowMemoryEvents = lowMemEvents,
-                maxTrimLevel = maxTrim,
-                peakThermalStatus = thermalName(peakThermal),
-                peakThermalCode = peakThermal,
-                thermalTimeline = thermalSamples.toList(),
-                batteryStartPercent = startBattery.percent,
-                batteryEndPercent = endBattery.percent,
-                pluggedSource = endBattery.plugged,
-                chargeStartUah = startBattery.chargeUah,
-                chargeEndUah = endBattery.chargeUah,
-                energyStartNwh = startBattery.energyNwh,
-                energyEndNwh = endBattery.energyNwh,
-                minCurrentNowUa = minCurrentUa,
-                maxCurrentNowUa = maxCurrentUa,
-                avgCurrentNowUa = if (currentSamples > 0L) currentSumUa / currentSamples else null,
-                sampleCount = ticks,
+            buildSnapshot(
+                memInfo = memInfo,
+                lowRam = activityMgr?.isLowRamDevice == true,
+                wallSec = (endWallNs - startedWallNs).coerceAtLeast(0L) / 1_000_000_000.0,
+                appCpuSec = appCpuSec,
+                workerCpuSec = workerCpuSec,
+                endBattery = endBattery,
             )
         }
     }
+
+    @Suppress("LongParameterList")
+    private fun buildSnapshot(
+        memInfo: ActivityManager.MemoryInfo,
+        lowRam: Boolean,
+        wallSec: Double,
+        appCpuSec: Double,
+        workerCpuSec: Double?,
+        endBattery: BatterySample,
+    ): Snapshot = Snapshot(
+        manufacturer = Build.MANUFACTURER.orEmpty(),
+        model = Build.MODEL.orEmpty(),
+        device = Build.DEVICE.orEmpty(),
+        hardware = Build.HARDWARE.orEmpty(),
+        release = Build.VERSION.RELEASE.orEmpty(),
+        sdkInt = Build.VERSION.SDK_INT,
+        totalRamMiB = memInfo.totalMem / MIB,
+        isLowRamDevice = lowRam,
+        opusEncoderName = CODEC_NAMES.first,
+        opusDecoderName = CODEC_NAMES.second,
+        wallSeconds = wallSec,
+        appCpuSeconds = appCpuSec,
+        whistleWorkerCpuSeconds = workerCpuSec,
+        totalCpuSeconds = workerCpuSec?.let { appCpuSec + it },
+        cpuScope = if (workerCpuSec == null) "app_process_only_isolated_worker_unavailable" else "app_and_worker",
+        baselineRssMiB = baselineRssKiB / 1024.0,
+        peakRssMiB = peakRssKiB / 1024.0,
+        vmHwmMiB = vmHwmKiB / 1024.0,
+        peakJvmHeapMiB = peakJvmBytes / MIB,
+        peakNativeHeapMiB = peakNativeBytes / MIB,
+        minAvailRamMiB = if (minAvailBytes == Long.MAX_VALUE) 0.0 else minAvailBytes / MIB,
+        trimMemoryPressureEvents = trimPressureEvents,
+        uiHiddenEvents = uiHiddenEvents,
+        sampledLowMemoryTicks = sampledLowMemTicks,
+        maxTrimLevel = maxTrim,
+        peakThermalStatus = thermalName(peakThermal),
+        peakThermalCode = peakThermal,
+        thermalTimeline = thermalSamples.toList(),
+        batteryStartPercent = startBattery.percent,
+        batteryEndPercent = endBattery.percent,
+        pluggedSource = endBattery.plugged,
+        chargeStartUah = startBattery.chargeUah,
+        chargeEndUah = endBattery.chargeUah,
+        energyStartNwh = startBattery.energyNwh,
+        energyEndNwh = endBattery.energyNwh,
+        minCurrentNowUa = minCurrentUa,
+        maxCurrentNowUa = maxCurrentUa,
+        avgCurrentNowUa = if (currentSamples > 0L) currentSumUa / currentSamples else null,
+        sampleCount = ticks,
+    )
 
     private fun sampleOnce(isInitial: Boolean, forceThermal: Boolean = false) {
         val rt = Runtime.getRuntime()
@@ -275,7 +317,7 @@ internal class HandsetTelemetryMonitor private constructor(
         peakNativeBytes = maxOf(peakNativeBytes, nativeUsed)
         if (memInfo != null) {
             minAvailBytes = minOf(minAvailBytes, memInfo.availMem)
-            if (memInfo.lowMemory) lowMemEvents++
+            if (memInfo.lowMemory) sampledLowMemTicks++
         }
     }
 
@@ -311,8 +353,11 @@ internal class HandsetTelemetryMonitor private constructor(
 
         private val CODEC_NAMES: Pair<String, String> by lazy { probeOpusCodecNames() }
 
-        fun start(context: Context): HandsetTelemetryMonitor =
-            HandsetTelemetryMonitor(context.applicationContext as Application)
+        fun start(
+            context: Context,
+            isolatedWorkerCpuUnavailable: Boolean = false,
+        ): HandsetTelemetryMonitor =
+            HandsetTelemetryMonitor(context.applicationContext as Application, isolatedWorkerCpuUnavailable)
 
         private fun probeOpusCodecNames(): Pair<String, String> {
             val enc = runCatching {

@@ -42,6 +42,9 @@ DEFAULT_CORE_METHODS = (
     "test02PairedFiveMinuteEquivalenceAndPressure",
 )
 LONG_METHOD = "test03ThirtyMinuteContinuousQualification"
+DEFAULT_CORE_TIMEOUT_MINUTES = 75
+DEFAULT_COMBINED_LONG_TIMEOUT_MINUTES = 150
+MAX_DEVICE_FARM_TIMEOUT_MINUTES = 150
 APP_PACKAGE = "io.codemyriad.cassini.talk.debug"
 
 SAFE_CLASS_RE = re.compile(r"^[A-Za-z0-9_.$#,-]+$")
@@ -473,6 +476,19 @@ def resolve_test_class(test_class: str | None, long_engine: str) -> str:
     return ",".join(f"{DEFAULT_TEST_CLASS}#{method}" for method in methods)
 
 
+def resolve_timeout_minutes(timeout_minutes: int | None, test_class: str | None, long_engine: str) -> int:
+    """Derives AWS Device Farm jobTimeoutMinutes from selected lanes (capped at Device Farm's 150-minute max)."""
+    if timeout_minutes is not None:
+        if timeout_minutes <= 0 or timeout_minutes > MAX_DEVICE_FARM_TIMEOUT_MINUTES:
+            raise SystemExit(
+                f"Invalid --timeout-minutes {timeout_minutes}; must be in [1, {MAX_DEVICE_FARM_TIMEOUT_MINUTES}].",
+            )
+        return timeout_minutes
+    if long_engine != "none" and not test_class:
+        return DEFAULT_COMBINED_LONG_TIMEOUT_MINUTES
+    return DEFAULT_CORE_TIMEOUT_MINUTES
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -494,7 +510,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-whistle", action="store_true")
     parser.add_argument("--long-engine", choices=("parakeet", "whistle", "none"), default="none")
     parser.add_argument("--arg", action="append", default=[], help="Extra instrumentation KEY=VALUE argument.")
-    parser.add_argument("--timeout-minutes", type=int, default=75)
+    parser.add_argument(
+        "--timeout-minutes",
+        type=int,
+        default=None,
+        help="Device Farm job timeout in minutes (defaults to 75 for core lanes, 150 when combined with --long-engine).",
+    )
     parser.add_argument("--ceiling-usd", type=float, default=MONTHLY_DENY_USD)
     parser.add_argument("--out-dir", type=Path, help="Output directory for logs and extracted reports.")
     parser.add_argument("--control-ssh", help="Optional SSH host holding AWS credentials (control-plane only).")
@@ -584,6 +605,7 @@ def main(argv: list[str] | None = None) -> None:
     # Re-verify budget immediately prior to scheduling in case parallel runs finished during upload.
     check_budget(df, ceiling_usd=args.ceiling_usd)
 
+    job_timeout_minutes = resolve_timeout_minutes(args.timeout_minutes, args.test_class, args.long_engine)
     scheduled = df.schedule_run(
         projectArn=PROJECT_ARN,
         appArn=app_arn,
@@ -594,7 +616,7 @@ def main(argv: list[str] | None = None) -> None:
             "testPackageArn": test_arn,
             "testSpecArn": spec_arn,
         },
-        executionConfiguration={"jobTimeoutMinutes": args.timeout_minutes},
+        executionConfiguration={"jobTimeoutMinutes": job_timeout_minutes},
     )["run"]
     run_arn = scheduled["arn"]
     (out_dir / "scheduled.json").write_text(

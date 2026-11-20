@@ -16,36 +16,61 @@ object HandsetQualificationAudit {
     private const val FOCUS_LOST_TRANSIENT = "LOST_FOR_NOW"
     private const val FOCUS_GAINED = "GAINED"
     private const val STOP_REASON_YIELDED = "YIELDED"
+    private const val STOP_REASON_OOM = "OUT_OF_MEMORY"
 
     /**
-     * Tracks a fresh precompute worker start after user Resume and verifies that subsequent Home backgrounding
-     * yields that post-Resume worker with `YIELDED` (ignoring any stale stop events queued by the prior Pause).
+     * Tracks a fresh precompute worker start after user Resume, verifies that the worker is still active when
+     * `KEYCODE_HOME` is issued, and requires a subsequent `YIELDED` stop after Home (ignoring stale Pause stops and
+     * rejecting pre-Home yields).
      */
     class PrecomputeBackgroundYieldTracker {
         private var awaitingPostResumeStart = false
         private var postResumeWorkerStarted = false
-        private val postResumeStops = ArrayList<String>()
+        private var postResumeWorkerActive = false
+        private var homeIssued = false
+        private var stoppedBeforeHome = false
+        private val postHomeStops = ArrayList<String>()
 
         @Synchronized
         fun markResumed() {
             awaitingPostResumeStart = true
             postResumeWorkerStarted = false
-            postResumeStops.clear()
+            postResumeWorkerActive = false
+            homeIssued = false
+            stoppedBeforeHome = false
+            postHomeStops.clear()
         }
 
         @Synchronized
         fun onWorkerStarted(): Boolean {
             if (awaitingPostResumeStart) {
                 postResumeWorkerStarted = true
+                postResumeWorkerActive = true
             }
             return postResumeWorkerStarted
         }
 
         @Synchronized
-        fun onWorkerStopped(reason: String): Boolean {
-            if (!postResumeWorkerStarted) return false
-            postResumeStops.add(reason)
-            return true
+        fun markHomeIssued() {
+            homeIssued = true
+            if (postResumeWorkerStarted && !postResumeWorkerActive) {
+                stoppedBeforeHome = true
+            }
+        }
+
+        @Synchronized
+        fun onWorkerStopped(reason: String): Boolean = when {
+            !postResumeWorkerStarted -> false
+            !homeIssued -> {
+                postResumeWorkerActive = false
+                stoppedBeforeHome = true
+                false
+            }
+            else -> {
+                postResumeWorkerActive = false
+                postHomeStops.add(reason)
+                true
+            }
         }
 
         @Synchronized
@@ -53,14 +78,30 @@ object HandsetQualificationAudit {
             val failure = when {
                 !postResumeWorkerStarted ->
                     "Precompute worker did not start fresh after Resume before Home backgrounding"
-                postResumeStops.isEmpty() ->
-                    "Expected $STOP_REASON_YIELDED after KEYCODE_HOME, got no post-Resume stop event"
-                postResumeStops.first() != STOP_REASON_YIELDED ->
-                    "Expected $STOP_REASON_YIELDED after KEYCODE_HOME, got ${postResumeStops.first()}"
+                stoppedBeforeHome ->
+                    "Post-Resume precompute worker stopped before KEYCODE_HOME was issued"
+                !homeIssued ->
+                    "KEYCODE_HOME was not marked before verifying background yield"
+                postHomeStops.isEmpty() ->
+                    "Expected $STOP_REASON_YIELDED after KEYCODE_HOME, got no post-Home stop event"
+                postHomeStops.first() != STOP_REASON_YIELDED ->
+                    "Expected $STOP_REASON_YIELDED after KEYCODE_HOME, got ${postHomeStops.first()}"
                 else -> null
             }
             if (failure != null) throw AssertionError(failure)
         }
+    }
+
+    /**
+     * Evaluates the OOM suppression check outcome: returns `null` when OOM was not exercised for an engine, returns
+     * `true` only when `OUT_OF_MEMORY` was actually observed, and throws [AssertionError] otherwise.
+     */
+    fun evaluateOomSuppression(exercised: Boolean, observedStopReason: String?): Boolean? {
+        if (!exercised) return null
+        if (observedStopReason != STOP_REASON_OOM) {
+            throw AssertionError("Expected PrecomputeStopReason.$STOP_REASON_OOM, got $observedStopReason")
+        }
+        return true
     }
 
     data class HalDropSummary(
