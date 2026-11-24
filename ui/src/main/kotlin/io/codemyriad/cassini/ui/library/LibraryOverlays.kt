@@ -7,10 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.ConfirmDialog
-import io.codemyriad.cassini.ui.components.ConfirmDialogContent
 import io.codemyriad.cassini.ui.components.ConfirmSpec
 import io.codemyriad.cassini.ui.components.RenameDialog
-import io.codemyriad.cassini.ui.components.RenameDialogContent
 import io.codemyriad.cassini.ui.note.DocumentInfoDialog
 import io.codemyriad.cassini.ui.note.NoteActionsSheet
 import io.codemyriad.cassini.ui.note.startOverSpec
@@ -45,29 +43,6 @@ internal fun LibraryDialogWindow(dialog: LibraryDialog, onEvent: (LibraryEvent) 
             spec = libraryConfirmSpec(dialog),
             onConfirm = { onEvent(LibraryEvent.ConfirmDialog) },
             onDismiss = dismiss,
-        )
-    }
-}
-
-/**
- * A Library dialog drawn inline, for screenshots (`DialogBoardFrame`): the Rename dialog with its title unchanged,
- * or the confirmation of [dialog].
- */
-@Composable
-fun LibraryDialogContent(dialog: LibraryDialog, onEvent: (LibraryEvent) -> Unit) {
-    if (dialog is LibraryDialog.Rename) {
-        RenameDialogContent(
-            title = dialog.title,
-            value = dialog.title,
-            onValueChange = {},
-            onConfirm = { onEvent(LibraryEvent.RenameConfirmed(dialog.id, it)) },
-            onDismiss = { onEvent(LibraryEvent.DismissDialog) },
-        )
-    } else {
-        ConfirmDialogContent(
-            spec = libraryConfirmSpec(dialog),
-            onConfirm = { onEvent(LibraryEvent.ConfirmDialog) },
-            onDismiss = { onEvent(LibraryEvent.DismissDialog) },
         )
     }
 }

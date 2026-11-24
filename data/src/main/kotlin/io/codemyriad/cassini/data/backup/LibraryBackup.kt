@@ -2,6 +2,7 @@ package io.codemyriad.cassini.data.backup
 
 import android.content.Context
 import android.util.AtomicFile
+import android.util.Log
 import io.codemyriad.cassini.core.backup.BackupManifest
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.Threads
@@ -151,7 +152,7 @@ class LibraryBackup(context: Context, private val paths: AppPaths, private val s
             null
         } catch (error: CorruptRestoreException) {
             transaction.rejectReceived(stage)
-            android.util.Log.w("LibraryRestore", "Rejected transfer; the existing library is kept", error)
+            Log.w("LibraryRestore", "Rejected transfer; the existing library is kept", error)
             error.toString()
         }
         if (rejection == null) {

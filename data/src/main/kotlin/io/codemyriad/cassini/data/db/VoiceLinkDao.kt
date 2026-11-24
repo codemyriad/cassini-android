@@ -39,10 +39,6 @@ abstract class VoiceLinkDao {
     // Blocking twins for VoiceRepository, which writes a voice file and its links under the file's lock.
 
     @WorkerThread
-    @Query("SELECT * FROM note_voice_links WHERE note_id = :noteId ORDER BY variant_id, speaker_id")
-    abstract fun linksBlocking(noteId: String): List<NoteVoiceLinkEntity>
-
-    @WorkerThread
     @Insert
     protected abstract fun insertBlocking(links: List<NoteVoiceLinkEntity>)
 

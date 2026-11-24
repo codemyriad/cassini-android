@@ -193,9 +193,6 @@ abstract class NoteDao {
         return true
     }
 
-    @Query("UPDATE notes SET title_dirty = :dirty, updated_at = :now WHERE id = :id")
-    abstract suspend fun setTitleDirty(id: String, dirty: Boolean, now: Long)
-
     @Query("UPDATE notes SET position_ms = :positionMs WHERE id = :id")
     abstract suspend fun setPosition(id: String, positionMs: Long)
 

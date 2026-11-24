@@ -277,7 +277,7 @@ The "Save a copy" rows are:
 
 The input is `ExportTranscript(title, durationMs, words, labels)`. It has the words of the selected variant in canonical order (the writers never sort them again) and the display label of each speaker ID. Named labels are verbatim, and placeholders are the localized "Speaker N". If a label is missing, the writer uses the ID. The output is UTF-8 without BOM, with `\n` line ends and exactly one `\n` at the end. One space separates the words.
 
-- Turns (`TranscriptTurns.of`): the longest runs of consecutive words with the same speaker. The start is the start of the first word, and the end is the end of the last word. The UI and `SpeakerStats` also use this function.
+- Turns (`ReadingTurns.wholeRuns`): the longest runs of consecutive words with the same speaker, with the reading model's grouping and timing repair (`docs/transcript-rendering.md`). `SpeakerStats` also uses this function.
 - Clock (`ExportClock`): `mm:ss` for a duration of less than 1 h, else `h:mm:ss`. The seconds are rounded down. SRT uses `HH:MM:SS,mmm`, and VTT uses `HH:MM:SS.mmm`.
 - TXT (`TextExport.write(t, subtitle, emptyText)`): a title line, a subtitle line ("8 Oct 2026, 15:10 · 23:50 · 3 speakers") and a blank line. Then, for each turn, `[<clock>] <label>` and the paragraph. One blank line separates the turns. With only one speaker, the writer does not write the label. With 0 words, the file has the title, the subtitle, a blank line and `emptyText`.
 - Cues (`SubtitleCues.build`): the writer reads the words in canonical order. The list "Cue breaks" after this list gives the conditions for a new cue.
