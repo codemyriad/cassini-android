@@ -116,7 +116,7 @@ The P1 move kept the bodies of the files, except for the listed edits. `scripts/
 | `models` | `ModelCatalog`, `ArtifactFetcher` | `ArtifactFetcher` continues `.part` files with HTTP Range (section 5.6). P3 added `ModelPart`, `ModelPlan`, a progress callback for the digest, `VOICEPRINT_DIM = 512` and the redirect allow-list. D53 added `DistManifest` and the pins of the model host (one seekable Zstandard file for each model file). |
 | `checkpoint` | `CheckpointData`, `CheckpointState` | The codec of `checkpoint.json`. It reads and writes version 2 (section 3.5); a version 1 file does not resume (D51). `WordLog` is the codec of `words.log`. P3 added two optional members to `names.json` (section 3.6). |
 | `library` | `NoteRules` (P10 removed it) | P3 added the shared enums (`Origin`, `AudioKind`, `JobState`, `JobKind`, `PauseReason`, `VariantKind`), `NoteStatus`, `DayGroups`, `SearchQuery`, `TrashPolicy` and `PreviewText`. Two rules refine features.md section 1. Their KDoc gives the details. `PreviewText` stops at the first turn end after it holds 40 characters (a shorter turn continues, and board 00 stops before Speaker 3). It uses the transcript start at or after the end of the last word. `SearchQuery.fts` changes each character that is not a letter, a digit or a mark into a space inside the phrase (`e-mail` → `"e mail*"`, `caf.` → `"caf*"`), as unicode61 makes tokens. It removes terms without a letter or a digit. |
-| `export` | New in P3 | `TranscriptTurns`, `ExportClock`, `TextExport`, `SubtitleCues`, `SrtWriter`, `VttWriter`, `ExportNames` (features.md section 9). |
+| `export` | New in P3 | `ReadingTurns`, `ExportClock`, `TextExport`, `SubtitleCues`, `SrtWriter`, `VttWriter`, `ExportNames` (features.md section 9). |
 | (root) | `Failure` | Failure codes without string resources. `FailureMessages` in `:app` is the only place where a failure gets a string. |
 
 ### 2.2 `:engine` (package `io.codemyriad.cassini.engine`, and `io.codemyriad.cassini.NativeOpus`)
@@ -551,7 +551,6 @@ An import can operate while a job runs.
 - `loadDraft(noteId)` gives the words of the saved chunks with the names applied, for a paused note.
 - `load(noteId)` and `identity(noteId)`. The identity comes from the note row.
 - `sealedMarker(noteId)` is true when `work/sealed` exists.
-- `hasWork(noteId)`.
 - `release(noteId)` removes the draft names from memory. It takes the note lock on IO.
 
 ### 4.5 `VoiceRepository`
@@ -597,7 +596,7 @@ A voice file whose `version` is newer than the codec stays in place, read-only, 
 - `queue()`.
 - `enqueue(noteId, kind)`. If the row is QUEUED or RUNNING, nothing occurs. A PAUSED, FAILED or NEEDS_CONSENT row goes again to the end of the queue, with no failure, no pause reason and 0 attempts. If the note has no job row but has a `work/sealed` marker, an adopt did not finish. Then `enqueue` first runs `SealedAdopter`. If the marker stays, `enqueue` refuses with `ADOPT_PENDING`.
 - `claimNext()`: one transaction. It fails if a RUNNING row exists.
-- `markRunning`, `markPaused(reason, done, total, words)`, `markFailed`, `markNeedsConsent` and `remove`.
+- `markPaused(reason, done, total, words)`, `markFailed`, `markNeedsConsent` and `remove`.
 - `reconcileOnStart(activeNoteId)` (section 5.3). It is the only function that increases `attempts`.
 
 `SettingsRepository` has typed accessors for the keys of section 3.4.

@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.data.checkpoint
 
+import android.util.Log
 import androidx.annotation.WorkerThread
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.checkpoint.CheckpointOrigin
@@ -103,7 +104,7 @@ class CheckpointRepository(
         val saved = try {
             if (WorkFiles.exists(file)) JSONObject(WorkFiles.read(file)).optString("model") else null
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            android.util.Log.w("CassiniCheckpoint", "Cannot read saved model identity", error)
+            Log.w("CassiniCheckpoint", "Cannot read saved model identity", error)
             null // The full checkpoint validator reports corruption; it never opens an engine.
         }
         return if (saved == included) included else ModelCatalog.PARAKEET_REVISION
@@ -196,9 +197,6 @@ class CheckpointRepository(
     /** Whether `work/sealed` marks a finished `sealed.opus` that waits for adopt. */
     suspend fun sealedMarker(noteId: String): Boolean =
         withContext(dispatchers.io) { File(work(noteId), WorkFiles.SEALED_MARKER).isFile }
-
-    /** Whether `work/` exists. */
-    suspend fun hasWork(noteId: String): Boolean = withContext(dispatchers.io) { work(noteId).isDirectory }
 
     /** What the work directory of [noteId] holds: a sealed output, a resumable checkpoint, a mismatch, or nothing. */
     suspend fun status(noteId: String): CheckpointStatus {

@@ -123,14 +123,6 @@ class JobRepository(
         }
     }
 
-    /** Marks the job of [noteId] RUNNING unless another job runs. Returns whether it is RUNNING now. */
-    suspend fun markRunning(noteId: String): Boolean = database.withTransaction {
-        val job = jobs.job(noteId)
-        val other = jobs.all().any { it.state == JobState.RUNNING && it.noteId != noteId }
-        if (job != null && !other) jobs.update(job.copy(state = JobState.RUNNING, updatedAt = clock()))
-        job != null && !other
-    }
-
     /** The job stopped with its checkpoint saved at [doneMs] of [totalMs] with [words] words. */
     suspend fun markPaused(noteId: String, reason: PauseReason, doneMs: Long, totalMs: Long, words: Int): Boolean =
         change(noteId) {
@@ -153,10 +145,6 @@ class JobRepository(
     /** The job needs the model download consent first ("Ready to transcribe"). */
     suspend fun markNeedsConsent(noteId: String): Boolean =
         change(noteId) { it.copy(state = JobState.NEEDS_CONSENT, pauseReason = null, failure = null) }
-
-    /** The numbers of the last checkpoint, for the Library and the queue. */
-    suspend fun recordProgress(noteId: String, doneMs: Long, totalMs: Long, words: Int): Boolean =
-        change(noteId) { it.copy(doneMs = doneMs, totalMs = totalMs, words = words) }
 
     /** Removes the job of [noteId] (it ended, or the user removed it from the queue). */
     suspend fun remove(noteId: String) = jobs.delete(noteId)

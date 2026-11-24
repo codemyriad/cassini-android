@@ -2,6 +2,7 @@ package io.codemyriad.cassini.transfer
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.data.notes.ArchiveRejected
 import io.codemyriad.cassini.data.notes.ImportSource
@@ -24,7 +25,7 @@ internal class ArchiveImports(context: Context, private val graph: AppGraph) {
         source.describe(uri).displayName
     } catch (@Suppress("TooGenericExceptionCaught") error: RuntimeException) {
         // Third-party content providers can throw runtime exceptions; the card then gets the fallback title.
-        android.util.Log.w("CassiniImport", "Cannot name a selected file", error)
+        Log.w("CassiniImport", "Cannot name a selected file", error)
         null
     }
 
@@ -56,7 +57,7 @@ internal class ArchiveImports(context: Context, private val graph: AppGraph) {
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             currentCoroutineContext().ensureActive()
             // Third-party content providers can throw runtime exceptions as well as IO failures.
-            android.util.Log.w("CassiniImport", "Cannot import a selected file", error)
+            Log.w("CassiniImport", "Cannot import a selected file", error)
             progress + ImportSummary(failed = 1)
         }
     }

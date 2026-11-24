@@ -178,7 +178,6 @@ class JobRepositoryTest {
 
         assertEquals(ids[2], (jobs.claimNext() as ClaimOutcome.Claimed).job.noteId)
         assertEquals(ClaimOutcome.Busy(ids[2]), jobs.claimNext())
-        assertFalse(jobs.markRunning(ids[0]))
 
         jobs.remove(ids[2])
         assertEquals(ids[1], (jobs.claimNext() as ClaimOutcome.Claimed).job.noteId)
@@ -216,8 +215,6 @@ class JobRepositoryTest {
         val (a) = notes(1)
         jobs.enqueue(a, JobKind.TRANSCRIBE)
         jobs.claimNext()
-        assertTrue(jobs.recordProgress(a, 28_000, 90_000, 35))
-        assertEquals(28_000L to 35, job(a).doneMs to job(a).words)
 
         assertTrue(jobs.markPaused(a, PauseReason.SYSTEM, 56_000, 90_000, 70))
         job(a).let {
@@ -226,7 +223,6 @@ class JobRepositoryTest {
             assertEquals(56_000L, it.doneMs)
             assertEquals(70, it.words)
         }
-        assertTrue(jobs.markRunning(a))
         assertTrue(jobs.markFailed(a, JobRepository.CHECKPOINT_MISMATCH))
         assertEquals(JobRepository.CHECKPOINT_MISMATCH, job(a).failure)
         assertNull(job(a).pauseReason)
