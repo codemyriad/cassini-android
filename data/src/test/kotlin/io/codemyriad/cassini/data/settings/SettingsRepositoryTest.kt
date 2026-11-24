@@ -97,21 +97,26 @@ class SettingsRepositoryTest {
         }
     }
 
-    @Test fun transcriptionModeDefaultsToAfterStopRoundTripsAndFallsBackOnInvalidTokens() = runTest {
+    @Test fun transcriptionModeDefaultsToTranscribeWhileRecordingRoundTripsAndFallsBackOnInvalidTokens() = runTest {
         withStore { store ->
-            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
+            assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
             assertTrue(store.transcribeRightAway.first())
             store.setTranscriptionMode(TranscriptionMode.RECORD_ONLY)
             assertEquals(TranscriptionMode.RECORD_ONLY, store.transcriptionMode.first())
             assertFalse(store.transcribeRightAway.first())
-            store.setTranscriptionMode(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING)
+            store.setTranscribeRightAway(true)
             assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
             assertTrue(store.transcribeRightAway.first())
+            store.setTranscriptionMode(TranscriptionMode.AFTER_STOP)
+            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
+            assertTrue(store.transcribeRightAway.first())
+            store.setTranscribeRightAway(true)
+            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
         }
         withStore { store ->
-            assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
+            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
         }
-        // Invalid stored value deterministically resolves to AFTER_STOP (never enables precompute).
+        // Invalid stored value deterministically resolves to TRANSCRIBE_WHILE_RECORDING (D111 default).
         val job = Job()
         try {
             val raw = PreferenceDataStoreFactory.create(
@@ -123,7 +128,7 @@ class SettingsRepositoryTest {
             job.cancelAndJoin()
         }
         withStore { store ->
-            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
+            assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
             assertTrue(store.transcribeRightAway.first())
         }
     }

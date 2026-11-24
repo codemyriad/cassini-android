@@ -112,15 +112,16 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setAutoNameVoices(enabled: Boolean) = set(Keys.AUTO_NAME_VOICES, enabled)
 
     /**
-     * Non-UI transcription lifecycle mode (`contract/HEAD-START-TRANSCRIPTION.md`, D-1124).
-     * Defaults to [TranscriptionMode.AFTER_STOP]; invalid stored values fall back deterministically to `AFTER_STOP`.
+     * Non-UI transcription lifecycle mode (`contract/HEAD-START-TRANSCRIPTION.md`, D-1124 / D111).
+     * Defaults to [TranscriptionMode.TRANSCRIBE_WHILE_RECORDING]; invalid stored values fall back deterministically
+     * to [TranscriptionMode.DEFAULT].
      */
     val transcriptionMode: Flow<TranscriptionMode> = preferences.map { prefs ->
         val raw = prefs[Keys.TRANSCRIPTION_MODE]
         when {
             raw != null -> TranscriptionMode.parse(raw).mode
             prefs[Keys.TRANSCRIBE_RIGHT_AWAY] == false -> TranscriptionMode.RECORD_ONLY
-            else -> TranscriptionMode.AFTER_STOP
+            else -> TranscriptionMode.DEFAULT
         }
     }.distinctUntilChanged()
 
@@ -142,8 +143,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             val current = prefs[Keys.TRANSCRIPTION_MODE]?.let { TranscriptionMode.parse(it).mode }
             prefs[Keys.TRANSCRIPTION_MODE] = when {
                 !enabled -> TranscriptionMode.RECORD_ONLY.canonical
-                current == TranscriptionMode.TRANSCRIBE_WHILE_RECORDING -> current.canonical
-                else -> TranscriptionMode.AFTER_STOP.canonical
+                current == TranscriptionMode.AFTER_STOP -> current.canonical
+                else -> TranscriptionMode.DEFAULT.canonical
             }
         }
     }

@@ -1,9 +1,9 @@
 package io.codemyriad.cassini.core.asr
 
 /**
- * Non-UI transcription lifecycle policy (D-1117 / D109 `contract/HEAD-START-TRANSCRIPTION.md`).
+ * Non-UI transcription lifecycle policy (D-1117 / D109 / D111 `contract/HEAD-START-TRANSCRIPTION.md`).
  *
- * Defaults to [AFTER_STOP] across all platforms until device qualification passes.
+ * Defaults to [TRANSCRIBE_WHILE_RECORDING] across all platforms (D111).
  */
 enum class TranscriptionMode(val canonical: String) {
     /** Run zero native models during recording and leave stopped notes audio-only until manual Transcribe. */
@@ -35,7 +35,7 @@ enum class TranscriptionMode(val canonical: String) {
     )
 
     companion object {
-        val DEFAULT: TranscriptionMode = AFTER_STOP
+        val DEFAULT: TranscriptionMode = TRANSCRIBE_WHILE_RECORDING
 
         private const val STATE_QUEUED = "queued"
         private const val STATE_NONE = "none"
