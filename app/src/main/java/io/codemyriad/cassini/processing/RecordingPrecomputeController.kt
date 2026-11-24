@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.processing
 
 import io.codemyriad.cassini.core.asr.TranscriptionMode
+import io.codemyriad.cassini.core.models.ParakeetSuggestion
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.engine.job.PrecomputeStopReason
 import io.codemyriad.cassini.recording.CaptureFormat
@@ -23,6 +24,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Starts at most one background-priority precompute follower when:
  * - recording is [RecordingState.Active] with [CaptureFormat.OPUS] (never API 26-28 AAC) and unpaused,
  * - [TranscriptionMode] evaluates `spawnWorkerDuringRecording == true`,
+ * - when [SpeechModel.PARAKEET] is active via the default mode (`fellBackToDefault == true`), the device has at least
+ *   [ParakeetSuggestion.MIN_TOTAL_BYTES] (6 GB) total RAM (D-1126 qualification gate; explicit
+ *   `transcribeWhileRecording` overrides still run),
  * - the app is visible (per [ForegroundPolicy]),
  * - device thermal status is below `THERMAL_STATUS_SEVERE`,
  * - no foreground saved-audio job or manual preemption is active.
@@ -38,17 +42,18 @@ class RecordingPrecomputeController(
     class Parts(
         val scope: CoroutineScope,
         val recordingState: StateFlow<RecordingState>,
-        val transcriptionMode: Flow<TranscriptionMode>,
+        val transcriptionMode: Flow<TranscriptionMode.ParseResult>,
         val visible: StateFlow<Boolean>,
         val throttled: StateFlow<Boolean>,
         val foregroundBusy: StateFlow<Boolean>,
         val speechModel: Flow<SpeechModel?>,
+        val deviceTotalRamBytes: () -> Long = { ParakeetSuggestion.MIN_TOTAL_BYTES },
         val runPrecompute: suspend (noteId: String, shouldContinue: () -> Boolean) -> PrecomputeStopReason,
     )
 
     private data class Snapshot(
         val recording: RecordingState,
-        val mode: TranscriptionMode,
+        val mode: TranscriptionMode.ParseResult,
         val visible: Boolean,
         val throttled: Boolean,
         val foregroundBusy: Boolean,
@@ -148,13 +153,18 @@ class RecordingPrecomputeController(
         val active = snap.recording as? RecordingState.Active
         if (active == null || !isEligible(snap, active)) return false
         val decision = TranscriptionMode.evaluate(
-            rawMode = snap.mode.canonical,
+            rawMode = if (snap.mode.fellBackToDefault) null else snap.mode.mode.canonical,
             hasForegroundSavedJob = snap.foregroundBusy,
             manualTranscribeRequested = false,
-            platformSupportsPrecompute = active.format == CaptureFormat.OPUS,
+            platformSupportsPrecompute = active.format == CaptureFormat.OPUS && deviceSupportsPrecompute(snap),
         )
         return decision.spawnWorkerDuringRecording
     }
+
+    private fun deviceSupportsPrecompute(snap: Snapshot): Boolean =
+        snap.speechModel != SpeechModel.PARAKEET ||
+            !snap.mode.fellBackToDefault ||
+            parts.deviceTotalRamBytes() >= ParakeetSuggestion.MIN_TOTAL_BYTES
 
     private fun isEligible(snap: Snapshot, active: RecordingState.Active): Boolean =
         active.pause == null &&

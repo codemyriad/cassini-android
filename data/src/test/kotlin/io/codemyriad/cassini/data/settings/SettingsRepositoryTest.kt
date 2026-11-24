@@ -99,16 +99,34 @@ class SettingsRepositoryTest {
 
     @Test fun transcriptionModeDefaultsToTranscribeWhileRecordingRoundTripsAndFallsBackOnInvalidTokens() = runTest {
         withStore { store ->
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, fellBackToDefault = true),
+                store.transcriptionModeResolution.first(),
+            )
             assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
             assertTrue(store.transcribeRightAway.first())
             store.setTranscriptionMode(TranscriptionMode.RECORD_ONLY)
-            assertEquals(TranscriptionMode.RECORD_ONLY, store.transcriptionMode.first())
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.RECORD_ONLY, fellBackToDefault = false),
+                store.transcriptionModeResolution.first(),
+            )
             assertFalse(store.transcribeRightAway.first())
             store.setTranscribeRightAway(true)
-            assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, fellBackToDefault = true),
+                store.transcriptionModeResolution.first(),
+            )
             assertTrue(store.transcribeRightAway.first())
+            store.setTranscriptionMode(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING)
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, fellBackToDefault = false),
+                store.transcriptionModeResolution.first(),
+            )
             store.setTranscriptionMode(TranscriptionMode.AFTER_STOP)
-            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.AFTER_STOP, fellBackToDefault = false),
+                store.transcriptionModeResolution.first(),
+            )
             assertTrue(store.transcribeRightAway.first())
             store.setTranscribeRightAway(true)
             assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
@@ -128,6 +146,10 @@ class SettingsRepositoryTest {
             job.cancelAndJoin()
         }
         withStore { store ->
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, fellBackToDefault = true),
+                store.transcriptionModeResolution.first(),
+            )
             assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
             assertTrue(store.transcribeRightAway.first())
         }

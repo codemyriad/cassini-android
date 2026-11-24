@@ -3,6 +3,7 @@ package io.codemyriad.cassini.processing
 import android.os.PowerManager
 import io.codemyriad.cassini.core.asr.TranscriptionMode
 import io.codemyriad.cassini.core.audio.RecordingSpace
+import io.codemyriad.cassini.core.models.ParakeetSuggestion
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.engine.job.PrecomputeStopReason
 import io.codemyriad.cassini.recording.CaptureFormat
@@ -31,7 +32,11 @@ import java.util.concurrent.atomic.AtomicInteger
 class RecordingPrecomputeControllerTest {
     private class Harness(
         scope: CoroutineScope,
-        initialMode: TranscriptionMode = TranscriptionMode.TRANSCRIBE_WHILE_RECORDING,
+        initialMode: TranscriptionMode.ParseResult = TranscriptionMode.ParseResult(
+            TranscriptionMode.TRANSCRIBE_WHILE_RECORDING,
+            fellBackToDefault = false,
+        ),
+        deviceTotalRamBytes: Long = ParakeetSuggestion.MIN_TOTAL_BYTES,
         run: suspend (String, () -> Boolean) -> PrecomputeStopReason,
     ) {
         val recording = MutableStateFlow<RecordingState>(RecordingState.Idle)
@@ -49,6 +54,7 @@ class RecordingPrecomputeControllerTest {
                 throttled = throttled,
                 foregroundBusy = busy,
                 speechModel = speech,
+                deviceTotalRamBytes = { deviceTotalRamBytes },
                 runPrecompute = run,
             ),
         )
@@ -82,7 +88,10 @@ class RecordingPrecomputeControllerTest {
 
     @Test fun afterStopRecordOnlyAndAacNeverSpawnPrecompute() = runTest(UnconfinedTestDispatcher()) {
         val starts = AtomicInteger()
-        val h = Harness(backgroundScope, initialMode = TranscriptionMode.AFTER_STOP) { _, _ ->
+        val h = Harness(
+            backgroundScope,
+            initialMode = TranscriptionMode.ParseResult(TranscriptionMode.AFTER_STOP, fellBackToDefault = false),
+        ) { _, _ ->
             starts.incrementAndGet()
             PrecomputeStopReason.YIELDED
         }
@@ -91,17 +100,78 @@ class RecordingPrecomputeControllerTest {
         runCurrent()
         assertEquals("AFTER_STOP must not spawn precompute", 0, starts.get())
 
-        h.mode.value = TranscriptionMode.RECORD_ONLY
+        h.mode.value = TranscriptionMode.ParseResult(TranscriptionMode.RECORD_ONLY, fellBackToDefault = false)
         runCurrent()
         assertEquals("RECORD_ONLY must not spawn precompute", 0, starts.get())
 
         h.recording.value = active(format = CaptureFormat.M4A)
-        h.mode.value = TranscriptionMode.TRANSCRIBE_WHILE_RECORDING
+        h.mode.value = TranscriptionMode.ParseResult(
+            TranscriptionMode.TRANSCRIBE_WHILE_RECORDING,
+            fellBackToDefault = false,
+        )
         runCurrent()
         assertEquals("API 26-28 AAC capture must not spawn precompute", 0, starts.get())
 
         h.controller.close()
     }
+
+    @Test fun defaultParakeetPrecomputeRequiresSixGigabytesRamUnlessExplicitlyEnabled() =
+        runTest(UnconfinedTestDispatcher()) {
+            val lowRamStarts = AtomicInteger()
+            val lowRam = Harness(
+                backgroundScope,
+                initialMode = TranscriptionMode.ParseResult(
+                    TranscriptionMode.TRANSCRIBE_WHILE_RECORDING,
+                    fellBackToDefault = true,
+                ),
+                deviceTotalRamBytes = 4_000_000_000L,
+            ) { _, _ ->
+                lowRamStarts.incrementAndGet()
+                awaitCancellation()
+            }
+
+            lowRam.recording.value = active(format = CaptureFormat.OPUS)
+            runCurrent()
+            assertEquals("Default Parakeet precompute must not start below 6 GB RAM", 0, lowRamStarts.get())
+
+            // Whistle (INCLUDED) is not blocked by the Parakeet 6 GB gate.
+            lowRam.speech.value = SpeechModel.INCLUDED
+            runCurrent()
+            assertEquals("Default Whistle precompute may start below 6 GB RAM", 1, lowRamStarts.get())
+
+            // Returning to Parakeet with default mode yields again.
+            lowRam.speech.value = SpeechModel.PARAKEET
+            runCurrent()
+            assertEquals(1, lowRamStarts.get())
+
+            // Explicitly stored transcribeWhileRecording overrides the default RAM gate.
+            lowRam.mode.value = TranscriptionMode.ParseResult(
+                TranscriptionMode.TRANSCRIBE_WHILE_RECORDING,
+                fellBackToDefault = false,
+            )
+            runCurrent()
+            assertEquals("Explicit transcribeWhileRecording must override the default RAM gate", 2, lowRamStarts.get())
+            lowRam.controller.close()
+
+            // Devices with >= 6 GB RAM run default Parakeet precompute.
+            val sixGbStarts = AtomicInteger()
+            val sixGb = Harness(
+                backgroundScope,
+                initialMode = TranscriptionMode.ParseResult(
+                    TranscriptionMode.TRANSCRIBE_WHILE_RECORDING,
+                    fellBackToDefault = true,
+                ),
+                deviceTotalRamBytes = ParakeetSuggestion.MIN_TOTAL_BYTES,
+            ) { _, _ ->
+                sixGbStarts.incrementAndGet()
+                awaitCancellation()
+            }
+
+            sixGb.recording.value = active(format = CaptureFormat.OPUS)
+            runCurrent()
+            assertEquals("Default Parakeet precompute must start at >= 6 GB RAM", 1, sixGbStarts.get())
+            sixGb.controller.close()
+        }
 
     @Test fun yieldsImmediatelyOnPauseBackgroundThermalAndPreempt() = runTest(UnconfinedTestDispatcher()) {
         val starts = AtomicInteger()

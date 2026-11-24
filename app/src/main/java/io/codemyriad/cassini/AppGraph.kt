@@ -1,5 +1,6 @@
 package io.codemyriad.cassini
 
+import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
@@ -575,16 +576,22 @@ class AppGraph(context: Context, val config: Config) {
             RecordingPrecomputeController.Parts(
                 scope = appScope,
                 recordingState = controller.state,
-                transcriptionMode = settings.transcriptionMode,
+                transcriptionMode = settings.transcriptionModeResolution,
                 visible = visibility.visible,
                 throttled = thermalHolder.value.throttled,
                 foregroundBusy = foregroundBusy,
-                speechModel = settings.speechModel,
+                speechModel = speech.state.map { it.selected },
+                deviceTotalRamBytes = ::deviceTotalRamBytes,
                 runPrecompute = ::runRecordingPrecompute,
             ),
         )
         recordingPrecompute.set(precomputer)
         return controller
+    }
+
+    private fun deviceTotalRamBytes(): Long {
+        val manager = app.getSystemService(ActivityManager::class.java) ?: return 0L
+        return ActivityManager.MemoryInfo().also(manager::getMemoryInfo).totalMem
     }
 
     private fun preemptRecordingPrecompute() {
