@@ -25,7 +25,7 @@ The owner does these steps:
 3. At the start of the section of the new version, add a short paragraph about the installation. Give the name of the APK file (`cassini-android-VERSION.apk`) and the requirements (Android 8.0 or later, 64-bit Android). Tell the users to install the APK over the earlier version, so that the notes and the downloaded models stay. Tell them that the release has the native sources and the notices, and that the models download separately.
 4. Make sure that `python3 scripts/changelog-section.py v0.2.0` shows the notes of the new version.
 5. Set `versionName` and increase `versionCode` in `app/build.gradle.kts`.
-6. Make the Settings screenshot again, because it shows the version number. Use the steps in [`development.md`](development.md#acceptance-walksh) to make `docs/screenshots/light/05-settings.png`, `docs/screenshots/dark/05-settings.png` and `metadata/en-US/images/phoneScreenshots/5.png`.
+6. Make the Settings screenshot again, because it shows the version number. Use the steps in [`development.md`](development.md#acceptance-walksh) to make the store screenshot `metadata/en-US/images/phoneScreenshots/5.png` (and `5.png` of the other listings in `metadata/`). The README shows the `:ui` goldens, which do not change with the version.
 7. Commit the changes on `main` and push them.
 8. Wait until CI passes on that commit.
 9. Make an annotated tag on that commit with `git tag -a v0.2.0 -m "Cassini 0.2.0"`.

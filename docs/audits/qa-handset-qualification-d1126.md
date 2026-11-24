@@ -2,7 +2,7 @@
 
 Empirical physical-handset qualification of `transcribeWhileRecording` vs. `afterStop` / `recordOnly` on real Android handsets via AWS Device Farm (`us-west-2`, D89) for **Parakeet TDT (+ streaming Sortformer + CAM++ saved voices)**, **Whistle (`INCLUDED` + Sortformer + CAM++)**, and **API 26–28 `AacCapture` fallback**, prior to enabling recording-time precomputation by default on any Android device profile.
 
-- **Code baseline:** `093efc96` (`main`) + [HandsetQualificationDeviceTest.kt](../app/src/androidTest/java/io/codemyriad/cassini/qualification/HandsetQualificationDeviceTest.kt), [HandsetQualificationContractTest.kt](../app/src/test/java/io/codemyriad/cassini/qualification/HandsetQualificationContractTest.kt), [WhistlePrefixAudit.kt](../engine/src/main/kotlin/io/codemyriad/cassini/engine/whistle/WhistlePrefixAudit.kt), and [devicefarm-qualify.py](../scripts/devicefarm-qualify.py).
+- **Code baseline:** `093efc96` (`main`) + [HandsetQualificationDeviceTest.kt](../../app/src/androidTest/java/io/codemyriad/cassini/qualification/HandsetQualificationDeviceTest.kt), [HandsetQualificationContractTest.kt](../../app/src/test/java/io/codemyriad/cassini/qualification/HandsetQualificationContractTest.kt), [WhistlePrefixAudit.kt](../../engine/src/main/kotlin/io/codemyriad/cassini/engine/whistle/WhistlePrefixAudit.kt), and [devicefarm-qualify.py](../../scripts/devicefarm-qualify.py).
 - **Shared contracts:** `cassini-ux/contract/HEAD-START-TRANSCRIPTION.md` (`D109`), `cassini-ux/decisions/DECISIONS-UX.md` (`D89`).
 - **Shipped default:** remains `afterStop` (no UI or default-mode change in this PR).
 

@@ -6,7 +6,7 @@ Cassini records audio and makes the transcript on your phone. It labels the spea
 
 ## Privacy
 
-Cassini does all speech recognition and speaker analysis on the phone. It does not upload audio, transcripts or voiceprints. It has no accounts, no analytics and no advertising. The app uses the network only to download the models, and only after you agree. Voiceprints stay in the private storage of the app. On Android 9 or later, direct device-to-device transfer copies notes, the catalogue and saved voices when “Move to a new phone” is on (on by default). Cloud backup is not used; downloaded models and unfinished work are not copied. Cassini never writes a voiceprint into a document or an export. [`PRIVACY.md`](PRIVACY.md) gives the full privacy policy.
+Cassini does all speech recognition and speaker analysis on the phone. It does not upload audio, transcripts or voiceprints. It has no accounts, no analytics and no advertising. The app uses the network only to download the models, and only after you agree. Voiceprints stay in the private storage of the app. Android can copy notes, the catalogue and saved voices in two ways, which you can turn off in Settings: encrypted cloud backup (Google or Seedvault, on by default) and, on Android 9 or later, direct device-to-device transfer to a new phone (on by default). Cassini itself uploads nothing, and downloaded models and unfinished work are never copied. Cassini never writes a voiceprint into a document or an export. [`PRIVACY.md`](PRIVACY.md) gives the full privacy policy.
 
 ## Requirements
 
@@ -17,12 +17,12 @@ Cassini does all speech recognition and speaker analysis on the phone. It does n
 
 ## Screenshots
 
-These screenshots come from the Android emulator. The audio is a clip of the FLEURS data set (CC BY 4.0), and the names are test names.
+These screenshots are the phone goldens of the `:ui` screenshot tests ([`docs/development.md`](docs/development.md#screenshot-tests)). CI compares them with the current screens on every change, so they show the current design. They use test data and test names.
 
 | | Notes | Read and listen | Transcribing | Name a speaker | Settings |
 |---|---|---|---|---|---|
-| Light | <img src="docs/screenshots/light/01-library.png" width="150" alt="Notes, light theme"> | <img src="docs/screenshots/light/02-read-and-listen.png" width="150" alt="Read and listen, light theme"> | <img src="docs/screenshots/light/03-transcribing.png" width="150" alt="Transcribing, light theme"> | <img src="docs/screenshots/light/04-name-a-speaker.png" width="150" alt="Name a speaker, light theme"> | <img src="docs/screenshots/light/05-settings.png" width="150" alt="Settings, light theme"> |
-| Dark | <img src="docs/screenshots/dark/01-library.png" width="150" alt="Notes, dark theme"> | <img src="docs/screenshots/dark/02-read-and-listen.png" width="150" alt="Read and listen, dark theme"> | <img src="docs/screenshots/dark/03-transcribing.png" width="150" alt="Transcribing, dark theme"> | <img src="docs/screenshots/dark/04-name-a-speaker.png" width="150" alt="Name a speaker, dark theme"> | <img src="docs/screenshots/dark/05-settings.png" width="150" alt="Settings, dark theme"> |
+| Light | <img src="ui/src/test/screenshots/light/00-library.png" width="150" alt="Notes, light theme"> | <img src="ui/src/test/screenshots/light/03-read-and-listen.png" width="150" alt="Read and listen, light theme"> | <img src="ui/src/test/screenshots/light/02-transcribing.png" width="150" alt="Transcribing, light theme"> | <img src="ui/src/test/screenshots/light/04-name-a-speaker.png" width="150" alt="Name a speaker, light theme"> | <img src="ui/src/test/screenshots/light/08-settings.png" width="150" alt="Settings, light theme"> |
+| Dark | <img src="ui/src/test/screenshots/dark/00-library.png" width="150" alt="Notes, dark theme"> | <img src="ui/src/test/screenshots/dark/03-read-and-listen.png" width="150" alt="Read and listen, dark theme"> | <img src="ui/src/test/screenshots/dark/02-transcribing.png" width="150" alt="Transcribing, dark theme"> | <img src="ui/src/test/screenshots/dark/04-name-a-speaker.png" width="150" alt="Name a speaker, dark theme"> | <img src="ui/src/test/screenshots/dark/08-settings.png" width="150" alt="Settings, dark theme"> |
 
 ## Build
 
@@ -38,32 +38,38 @@ The build needs JDK 17 and the Android SDK. [`CONTRIBUTING.md`](CONTRIBUTING.md)
 ## Modules
 
 ```
-:core    Pure Kotlin/JVM. The verbatim engine plus pure app rules (statuses, search,
-         trash arithmetic, exports, speaker stats, model plan).
-:data    Android library. Room catalogue, DataStore settings, file repositories.
-:engine  Android library. Native wrappers (sherpa-onnx, libcassini_opus), MediaCodec
-         decoder, microphone capture, TranscriptionJob, ModelInstaller, ProgressTracker.
-:ui      Android library. Compose design system and stateless screens.
-:app     Android application. AppGraph, ViewModels, navigation, services, notifications.
-:bench   Experiments and calibration on a device (com.android.test).
-         Never in CI.
+:core       Pure Kotlin/JVM. The verbatim engine plus pure app rules (statuses, search,
+            trash arithmetic, exports, speaker stats, model plan).
+:app-logic  Pure Kotlin/JVM app policies (leaf state, import tracking, model-install
+            ownership and sequencing).
+:data       Android library. Room catalogue, DataStore settings, file repositories.
+:engine     Android library. Native wrappers (sherpa-onnx, Whistle, libcassini_opus),
+            MediaCodec decoder, microphone capture, TranscriptionJob, ProgressTracker.
+:ui         Android library. Compose design system and stateless screens.
+:app        Android application. AppGraph, ViewModels, navigation, services, notifications.
+:bench      Experiments and calibration on a device (com.android.test). Never in CI.
+:baselineprofile  Generates the Baseline Profile of :app on a device. Never in CI.
 
 app -> ui
+app -> app-logic -> core
+data, engine -> app-logic
 app -> data -> core
 app -> engine -> core
-bench -(instruments)-> app
+bench, baselineprofile -(instrument)-> app
 ```
+
+`whistle/` holds the build and verification tools of the included Whistle runtime ([`whistle/README.md`](whistle/README.md)). `tools/` holds host programs that Gradle does not build.
 
 ## Documentation
 
-- [`CONTRIBUTING.md`](CONTRIBUTING.md): build, tests, style and pull requests.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): build, tests, style and pull requests. Coding agents also read [`AGENTS.md`](AGENTS.md).
+- [`docs/README.md`](docs/README.md): the index of every document, with the guides, the reference, the design specifications and the dated records.
 - [`docs/development.md`](docs/development.md): worktrees, test tiers, device scripts and the pre-release gate.
 - [`docs/architecture.md`](docs/architecture.md): modules, storage, background work and the build.
 - [`docs/data-formats.md`](docs/data-formats.md): storage layout, the portable document, exports and the differences from gocassini.
 - [`docs/native-runtime.md`](docs/native-runtime.md): the sherpa-onnx AAR and libopus.
 - [`docs/release.md`](docs/release.md): tags, signing and the F-Droid draft.
-- [`docs/design/`](docs/design/): the features and the visual design.
-- [`docs/notes/`](docs/notes/): historical notes of the 0.1.0 prototype.
+- [`scripts/README.md`](scripts/README.md): the helper scripts, grouped by task.
 - [`SECURITY.md`](SECURITY.md), [`PRIVACY.md`](PRIVACY.md), [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) and [`CHANGELOG.md`](CHANGELOG.md).
 
 The [cassini-format](https://github.com/codemyriad/cassini-format) repository gives the specification of the portable format. The desktop pipeline and the web viewer are in [gocassini](https://github.com/codemyriad/gocassini).
