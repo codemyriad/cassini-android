@@ -39,7 +39,7 @@ def validate_manifest(rows, expected_files=None):
         dark = path.startswith("dark/") or path.split("/")[0].endswith("-dark") or path.endswith("-dark.png")
         assert row["scheme"] == ("dark" if dark else "light"), path
         groups.setdefault(shots.screen_id(row), []).append(row)
-        fixed = path in {f"{d}/01-recording.png" for d in ("light", "dark", "fr", "wide")} or path.startswith(
+        fixed = path.endswith("/01-recording.png") or path.startswith(
             ("variants/recording-", "adaptive/recording-", "adaptive-dark/recording-")
         )
         rendered = "dark" if fixed else row["scheme"]
@@ -207,12 +207,27 @@ class AndroidPublication(unittest.TestCase):
         self.assertIn("Library · light (fr)", full)
         tablet = copy.deepcopy(self.data)
         for row in tablet["rows"]:
-            if row["screen"] == "library" and row["lang"] == "en":
+            if row["screen"] == "library" and row["lang"] == "en" and row["device"] == "phone":
                 row["device"] = "tablet"
         qualified = shots.render_block(tablet, True, False, None)
         self.assertIn("Library · light (tablet)", qualified)
+        self.assertIn("Library · light (tablet-portrait)", full)
+        self.assertIn("Library · dark (tablet-landscape)", full)
+        self.assertIn("Settings · light (foldable-folded)", full)
+        self.assertIn("Read and listen · dark (foldable-unfolded)", full)
         dry = self.dry_run(self.data, "Authored description.\n" * 1500)
         self.assertEqual(rendered, dry.rstrip("\n") + "\n")
+
+    def test_form_factor_devices_cover_key_screens_in_light_and_dark(self):
+        expected_devices = ("tablet-portrait", "tablet-landscape", "foldable-folded", "foldable-unfolded")
+        expected_screens = {"library", "recording", "read-and-listen", "settings"}
+        for device in expected_devices:
+            by_scheme = {"light": set(), "dark": set()}
+            for row in self.data["rows"]:
+                if row["device"] == device and row["lang"] == "en":
+                    by_scheme[row["scheme"]].add(row["screen"])
+            self.assertEqual(expected_screens, by_scheme["light"], f"{device} light")
+            self.assertEqual(expected_screens, by_scheme["dark"], f"{device} dark")
 
     def test_added_real_screen_precedes_secondary_and_localized_screens(self):
         for row in self.data["rows"]:
