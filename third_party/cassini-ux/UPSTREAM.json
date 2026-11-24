@@ -83,8 +83,8 @@
     },
     "vectors/head-start/transcription-mode-vectors.json": {
       "source": "vectors/head-start/transcription-mode-vectors.json",
-      "commit": "8cbef9e1cf3365300c3d83535dbacde10c0411f4",
-      "sha256": "30b695bb7fa9e772e9f8013ee3b79d4889c99c3d005c4b7b7c362b1f7d72d166"
+      "commit": "ae9cbe138e741f8e730c24ee0bebce8308aaa40b",
+      "sha256": "7405309d1d73d596939997417104e8855f5154bdfaae3eab9b631d5eb1836aad"
     },
     "vectors/head-start/mobile-prefix-checkpoint-vectors.json": {
       "source": "vectors/head-start/mobile-prefix-checkpoint-vectors.json",

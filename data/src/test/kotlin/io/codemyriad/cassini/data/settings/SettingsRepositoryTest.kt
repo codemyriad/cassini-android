@@ -97,21 +97,44 @@ class SettingsRepositoryTest {
         }
     }
 
-    @Test fun transcriptionModeDefaultsToAfterStopRoundTripsAndFallsBackOnInvalidTokens() = runTest {
+    @Test fun transcriptionModeDefaultsToTranscribeWhileRecordingRoundTripsAndFallsBackOnInvalidTokens() = runTest {
         withStore { store ->
-            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, fellBackToDefault = true),
+                store.transcriptionModeResolution.first(),
+            )
+            assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
             assertTrue(store.transcribeRightAway.first())
             store.setTranscriptionMode(TranscriptionMode.RECORD_ONLY)
-            assertEquals(TranscriptionMode.RECORD_ONLY, store.transcriptionMode.first())
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.RECORD_ONLY, fellBackToDefault = false),
+                store.transcriptionModeResolution.first(),
+            )
             assertFalse(store.transcribeRightAway.first())
-            store.setTranscriptionMode(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING)
-            assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
+            store.setTranscribeRightAway(true)
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, fellBackToDefault = true),
+                store.transcriptionModeResolution.first(),
+            )
             assertTrue(store.transcribeRightAway.first())
+            store.setTranscriptionMode(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING)
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, fellBackToDefault = false),
+                store.transcriptionModeResolution.first(),
+            )
+            store.setTranscriptionMode(TranscriptionMode.AFTER_STOP)
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.AFTER_STOP, fellBackToDefault = false),
+                store.transcriptionModeResolution.first(),
+            )
+            assertTrue(store.transcribeRightAway.first())
+            store.setTranscribeRightAway(true)
+            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
         }
         withStore { store ->
-            assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
+            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
         }
-        // Invalid stored value deterministically resolves to AFTER_STOP (never enables precompute).
+        // Invalid stored value deterministically resolves to TRANSCRIBE_WHILE_RECORDING (D111 default).
         val job = Job()
         try {
             val raw = PreferenceDataStoreFactory.create(
@@ -123,7 +146,11 @@ class SettingsRepositoryTest {
             job.cancelAndJoin()
         }
         withStore { store ->
-            assertEquals(TranscriptionMode.AFTER_STOP, store.transcriptionMode.first())
+            assertEquals(
+                TranscriptionMode.ParseResult(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, fellBackToDefault = true),
+                store.transcriptionModeResolution.first(),
+            )
+            assertEquals(TranscriptionMode.TRANSCRIBE_WHILE_RECORDING, store.transcriptionMode.first())
             assertTrue(store.transcribeRightAway.first())
         }
     }

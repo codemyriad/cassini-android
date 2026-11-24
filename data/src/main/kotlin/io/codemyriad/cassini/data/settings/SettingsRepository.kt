@@ -112,16 +112,26 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setAutoNameVoices(enabled: Boolean) = set(Keys.AUTO_NAME_VOICES, enabled)
 
     /**
-     * Non-UI transcription lifecycle mode (`contract/HEAD-START-TRANSCRIPTION.md`, D-1124).
-     * Defaults to [TranscriptionMode.AFTER_STOP]; invalid stored values fall back deterministically to `AFTER_STOP`.
+     * Non-UI transcription lifecycle mode (`contract/HEAD-START-TRANSCRIPTION.md`, D-1124 / D111) together with
+     * whether the value came from the default rather than an explicit preference.
      */
-    val transcriptionMode: Flow<TranscriptionMode> = preferences.map { prefs ->
+    val transcriptionModeResolution: Flow<TranscriptionMode.ParseResult> = preferences.map { prefs ->
         val raw = prefs[Keys.TRANSCRIPTION_MODE]
         when {
-            raw != null -> TranscriptionMode.parse(raw).mode
-            prefs[Keys.TRANSCRIBE_RIGHT_AWAY] == false -> TranscriptionMode.RECORD_ONLY
-            else -> TranscriptionMode.AFTER_STOP
+            raw != null -> TranscriptionMode.parse(raw)
+            prefs[Keys.TRANSCRIBE_RIGHT_AWAY] == false ->
+                TranscriptionMode.ParseResult(TranscriptionMode.RECORD_ONLY, fellBackToDefault = false)
+            else -> TranscriptionMode.ParseResult(TranscriptionMode.DEFAULT, fellBackToDefault = true)
         }
+    }.distinctUntilChanged()
+
+    /**
+     * Non-UI transcription lifecycle mode (`contract/HEAD-START-TRANSCRIPTION.md`, D-1124 / D111).
+     * Defaults to [TranscriptionMode.TRANSCRIBE_WHILE_RECORDING]; invalid stored values fall back deterministically
+     * to [TranscriptionMode.DEFAULT].
+     */
+    val transcriptionMode: Flow<TranscriptionMode> = transcriptionModeResolution.map {
+        it.mode
     }.distinctUntilChanged()
 
     suspend fun setTranscriptionMode(mode: TranscriptionMode) {
@@ -140,10 +150,11 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         store.edit { prefs ->
             prefs[Keys.TRANSCRIBE_RIGHT_AWAY] = enabled
             val current = prefs[Keys.TRANSCRIPTION_MODE]?.let { TranscriptionMode.parse(it).mode }
-            prefs[Keys.TRANSCRIPTION_MODE] = when {
-                !enabled -> TranscriptionMode.RECORD_ONLY.canonical
-                current == TranscriptionMode.TRANSCRIBE_WHILE_RECORDING -> current.canonical
-                else -> TranscriptionMode.AFTER_STOP.canonical
+            when {
+                !enabled -> prefs[Keys.TRANSCRIPTION_MODE] = TranscriptionMode.RECORD_ONLY.canonical
+                current == TranscriptionMode.AFTER_STOP || current == TranscriptionMode.TRANSCRIBE_WHILE_RECORDING ->
+                    prefs[Keys.TRANSCRIPTION_MODE] = current.canonical
+                else -> prefs.remove(Keys.TRANSCRIPTION_MODE)
             }
         }
     }
