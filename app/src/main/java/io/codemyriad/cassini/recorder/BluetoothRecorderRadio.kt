@@ -136,10 +136,18 @@ class BluetoothRecorderRadio(context: Context, private val io: CoroutineDispatch
         adapter?.getRemoteDevice(address) ?: throw IOException("This phone has no Bluetooth")
 
     private class SocketLink(private val socket: BluetoothSocket) : RecorderLink {
-        override val input: XrecInput = StreamXrecInput(socket.inputStream, threadName = "recorder-link")
         override val output: OutputStream = socket.outputStream
+        private val stream = StreamXrecInput(socket.inputStream, threadName = "recorder-link")
+        override val input: XrecInput = stream
 
-        override fun close() = closeQuietly(socket)
+        override fun close() {
+            try {
+                stream.close()
+            } catch (_: IOException) {
+                // Already closed.
+            }
+            closeQuietly(socket)
+        }
     }
 
     private companion object {

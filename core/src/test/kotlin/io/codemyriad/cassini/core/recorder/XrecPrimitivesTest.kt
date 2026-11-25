@@ -2,8 +2,13 @@ package io.codemyriad.cassini.core.recorder
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.InputStream
 import java.security.SecureRandom
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class XrecPrimitivesTest {
     @Test fun crcMatchesTheSpecVectors() {
@@ -48,5 +53,69 @@ class XrecPrimitivesTest {
         val first = XrecAuth.newKey(random)
         assertEquals(32, first.size)
         assertEquals(false, first.contentEquals(XrecAuth.newKey(random)))
+    }
+
+    @Test fun closingAFullStreamXrecInputEndsItsPumpThread() {
+        val readOnce = CountDownLatch(1)
+        val closed = CountDownLatch(1)
+        val stream = object : InputStream() {
+            private var sent = false
+
+            override fun read(): Int = error("chunk reads only")
+
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (!sent) {
+                    sent = true
+                    val n = minOf(len, 128)
+                    repeat(n) { b[off + it] = it.toByte() }
+                    readOnce.countDown()
+                    return n
+                }
+                closed.await(5, TimeUnit.SECONDS)
+                return -1
+            }
+
+            override fun close() {
+                closed.countDown()
+            }
+        }
+        val threadName = "xrec-full-ring-test"
+        val input = StreamXrecInput(stream, capacity = 64, threadName = threadName)
+        assertTrue(readOnce.await(2, TimeUnit.SECONDS))
+        val pump = Thread.getAllStackTraces().keys.first { it.name == threadName }
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+        while (pump.state != Thread.State.WAITING && System.nanoTime() < deadline) {
+            Thread.sleep(5)
+        }
+        input.close()
+        pump.join(1_000)
+        assertFalse("Pump thread leaked in state ${pump.state}", pump.isAlive)
+    }
+
+    @Test fun closingStreamXrecInputWakesABlockedReaderAtOnce() {
+        val closed = CountDownLatch(1)
+        val stream = object : InputStream() {
+            override fun read(): Int = error("chunk reads only")
+
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                // Simulates a stream whose close() does not unblock read() right away.
+                Thread.sleep(2_000)
+                return -1
+            }
+
+            override fun close() {
+                closed.countDown()
+            }
+        }
+        val input = StreamXrecInput(stream, capacity = 64, threadName = "xrec-close-wake-test")
+        Thread {
+            Thread.sleep(50)
+            input.close()
+        }.apply { isDaemon = true }.start()
+        val started = System.nanoTime()
+        assertEquals(-1, input.read(ByteArray(16), 0, 16, timeoutMillis = 5_000))
+        val elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+        assertTrue("Reader waited $elapsedMillis ms after close()", elapsedMillis < 1_000)
+        assertTrue(closed.await(1, TimeUnit.SECONDS))
     }
 }

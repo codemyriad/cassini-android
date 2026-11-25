@@ -31,6 +31,7 @@ class StreamXrecInput(
     private val ring = ByteArray(capacity)
     private var head = 0
     private var count = 0
+    private var closed = false
     private var ended = false
     private var failure: IOException? = null
     private val pump = Thread(::pumpLoop, threadName).apply { isDaemon = true }
@@ -41,10 +42,11 @@ class StreamXrecInput(
 
     override fun read(buffer: ByteArray, offset: Int, length: Int, timeoutMillis: Long): Int = lock.withLock {
         var remaining = TimeUnit.MILLISECONDS.toNanos(timeoutMillis.coerceAtLeast(0))
-        while (count == 0 && !ended && remaining > 0) {
+        while (count == 0 && !ended && !closed && remaining > 0) {
             remaining = changed.awaitNanos(remaining)
         }
         when {
+            closed -> -1
             count > 0 -> take(buffer, offset, length)
             ended -> failure?.let { throw IOException("The XREC link failed", it) } ?: -1
             else -> 0
@@ -52,6 +54,10 @@ class StreamXrecInput(
     }
 
     override fun close() {
+        lock.withLock {
+            closed = true
+            changed.signalAll()
+        }
         stream.close()
     }
 
@@ -67,10 +73,9 @@ class StreamXrecInput(
     private fun pumpLoop() {
         val chunk = ByteArray(CHUNK)
         try {
-            while (true) {
+            while (!lock.withLock { closed }) {
                 val n = stream.read(chunk)
-                if (n < 0) break
-                put(chunk, n)
+                if (n < 0 || !put(chunk, n)) break
             }
         } catch (e: IOException) {
             lock.withLock { failure = e }
@@ -84,18 +89,21 @@ class StreamXrecInput(
         }
     }
 
-    private fun put(chunk: ByteArray, n: Int) = lock.withLock {
+    private fun put(chunk: ByteArray, n: Int): Boolean = lock.withLock {
         var written = 0
-        while (written < n) {
-            while (count == ring.size) {
+        while (written < n && !closed) {
+            while (count == ring.size && !closed) {
                 changed.signalAll()
                 changed.await()
             }
-            val tail = (head + count) % ring.size
-            ring[tail] = chunk[written++]
-            count++
+            if (!closed) {
+                val tail = (head + count) % ring.size
+                ring[tail] = chunk[written++]
+                count++
+            }
         }
         changed.signalAll()
+        !closed
     }
 
     private companion object {
