@@ -53,7 +53,16 @@ object AutoSyncBackoff {
 object TranscriptUploadProbe {
     const val RETRY_MS = 24 * 60 * 60_000L
 
-    /** True when an upload may run: the firmware [firmware] never refused, or it refused at [refusedAt], long ago. */
-    fun mayUpload(refusedFirmware: String?, refusedAt: Long?, firmware: String, now: Long): Boolean =
-        refusedFirmware != firmware || refusedAt == null || now - refusedAt !in 0 until RETRY_MS
+    /**
+     * True when an upload may run: the recorder [advertised] the target (`rec=1` in PONG), or the firmware [firmware]
+     * never refused, or it refused at [refusedAt], long ago.
+     */
+    fun mayUpload(
+        refusedFirmware: String?,
+        refusedAt: Long?,
+        firmware: String,
+        now: Long,
+        advertised: Boolean = false,
+    ): Boolean =
+        advertised || refusedFirmware != firmware || refusedAt == null || now - refusedAt !in 0 until RETRY_MS
 }

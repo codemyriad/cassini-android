@@ -80,6 +80,17 @@ class XrecProtocolTest {
             XrecReply.Pong("openfw_v5", "v5", bound = true, authenticated = false, pairingOpen = true),
             XrecReplies.parse("+XREC:PONG,openfw_v5,v5,bound=1,auth=0,pair=1"),
         )
+        assertEquals(
+            XrecReply.Pong(
+                "openfw_v5",
+                "v5",
+                bound = true,
+                authenticated = true,
+                pairingOpen = false,
+                recordTarget = true,
+            ),
+            XrecReplies.parse("+XREC:PONG,openfw_v5,v5,bound=1,auth=1,pair=0,rec=1,future=x"),
+        )
     }
 
     @Test fun parsesChallenge() {

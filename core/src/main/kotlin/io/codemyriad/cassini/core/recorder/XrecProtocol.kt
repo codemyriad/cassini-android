@@ -172,13 +172,17 @@ object XrecCommands {
 
 /** A `+XREC:` reply line, parsed. */
 sealed interface XrecReply {
-    /** `PONG,<firmware>,<protocol>,bound=,auth=,pair=`. */
+    /**
+     * `PONG,<firmware>,<protocol>,bound=,auth=,pair=[,rec=1]`. [recordTarget] is true when the recorder advertises the
+     * `REC,<stem>.cwx` upload target (`rec=1`); firmware without the flag may still have it (it is then probed).
+     */
     data class Pong(
         val firmware: String,
         val protocol: String,
         val bound: Boolean,
         val authenticated: Boolean,
         val pairingOpen: Boolean,
+        val recordTarget: Boolean = false,
     ) : XrecReply
 
     /** `CHAL,<32 hex>`. */
@@ -270,6 +274,7 @@ object XrecReplies {
             bound = flags["bound"] == "1",
             authenticated = flags["auth"] == "1",
             pairingOpen = flags["pair"] == "1",
+            recordTarget = flags["rec"] == "1",
         )
     }
 

@@ -6,6 +6,7 @@ import io.codemyriad.cassini.core.recorder.XrecAuth
 import io.codemyriad.cassini.core.recorder.XrecClient
 import io.codemyriad.cassini.core.recorder.XrecException
 import io.codemyriad.cassini.core.recorder.XrecFailure
+import io.codemyriad.cassini.core.recorder.XrecReply
 import io.codemyriad.cassini.core.recorder.XrecTimeouts
 import io.codemyriad.cassini.data.recorder.LastSync
 import io.codemyriad.cassini.data.recorder.RecorderBinding
@@ -300,7 +301,7 @@ class RecorderSync(private val parts: Parts) {
                 FileResult.CHANGED -> Unit
             }
         }
-        val uploaded = upload(session, address, pong.firmware, plan.uploads, transcripts)
+        val uploaded = upload(session, address, pong, plan.uploads, transcripts)
         withContext(parts.io) { deleteStrayParts(address) }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
         return SyncOutcome.Done(downloaded, uploaded, plan.skipped.size + deferred, recording, failed)
@@ -447,15 +448,24 @@ class RecorderSync(private val parts: Parts) {
     private suspend fun upload(
         session: Session,
         address: String,
-        firmware: String,
+        pong: XrecReply.Pong,
         uploads: List<PlannedUpload>,
         transcripts: Map<String, EncodedTranscript>,
     ): Int {
         if (uploads.isEmpty()) return 0
+        val firmware = pong.firmware
         val state = deviceState(address)
         val now = parts.clock()
         val refused = state.transcriptsUnsupportedFirmware
-        if (!TranscriptUploadProbe.mayUpload(refused, state.transcriptsUnsupportedAt, firmware, now)) return 0
+        val advertised = pong.recordTarget
+        val allowed = TranscriptUploadProbe.mayUpload(
+            refused,
+            state.transcriptsUnsupportedAt,
+            firmware,
+            now,
+            advertised,
+        )
+        if (!allowed) return 0
         var uploaded = 0
         for (upload in uploads) {
             val transcript = upload.recording.noteId?.let(transcripts::get) ?: continue

@@ -47,5 +47,7 @@ class RecorderPoliciesTest {
         assertTrue(TranscriptUploadProbe.mayUpload("openfw_v5", 1_000, "openfw_v5", 500))
         // A refusal stored without its time (an older state file) is asked again.
         assertTrue(TranscriptUploadProbe.mayUpload("openfw_v5", null, "openfw_v5", 0))
+        // A recorder that advertises the target (rec=1 in PONG) is used at once, even after an older refusal.
+        assertTrue(TranscriptUploadProbe.mayUpload("openfw_v5", 1_000, "openfw_v5", 1_001, advertised = true))
     }
 }
