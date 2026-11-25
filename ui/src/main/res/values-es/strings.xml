@@ -507,4 +507,5 @@
     <string name="ui_actions_export_body">Archivo Cassini, Markdown y más</string>
     <string name="ui_name_voices_off">El reconocimiento de voz está desactivado. Actívalo en %1$s para recordar voces.</string>
     <string name="ui_recording_title_placeholder">Añadir un título</string>
+    <string name="ui_settings_export_all">Exportar todas las reuniones</string>
 </resources>

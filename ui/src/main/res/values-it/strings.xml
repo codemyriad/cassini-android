@@ -499,4 +499,5 @@
     <string name="ui_actions_export_body">File Cassini, Markdown e altro</string>
     <string name="ui_name_voices_off">Il riconoscimento vocale è disattivato. Attivalo nelle %1$s per ricordare le voci.</string>
     <string name="ui_recording_title_placeholder">Aggiungi un titolo</string>
+    <string name="ui_settings_export_all">Esporta tutte le riunioni</string>
 </resources>

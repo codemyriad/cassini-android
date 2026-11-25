@@ -3,6 +3,8 @@ package io.codemyriad.cassini.ui.settings
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasText
@@ -96,9 +98,29 @@ class SettingsMapTest {
         rule.setContent {
             CassiniTheme { SettingsScreen(BoardFixtures.settings.copy(backup = backup.value), {}) }
         }
-        rule.onNodeWithText("Transcribed on this phone. Backups follow your phone’s settings.").assertExists()
-        rule.onNode(hasText("Backup") and hasText("On")).assertExists()
+        // QA 25 Nov: the Transcripts line says only where transcription runs; the backup line is on the Backup row.
+        rule.onNodeWithText("Transcribed on this phone.").assertExists()
+        rule.onNodeWithText("Transcribed on this phone. Backups follow your phone’s settings.").assertDoesNotExist()
+        val backupRow = hasText("Backup") and hasText("Backups follow your phone’s settings.")
+        rule.onNode(backupRow and hasText("On")).assertExists()
         rule.runOnIdle { backup.value = base.copy(cloud = false, transfer = false) }
-        rule.onNode(hasText("Backup") and hasText("Off")).assertExists()
+        rule.onNode(backupRow and hasText("Off")).assertExists()
+    }
+
+    /** QA 25 Nov: "Export all meetings" moved from the Library to Your meetings; it greys out with nothing to export. */
+    @Test fun yourMeetingsOffersExportAllMeetings() {
+        var exports = 0
+        val enabled = mutableStateOf(true)
+        rule.setContent {
+            CassiniTheme {
+                SettingsScreen(BoardFixtures.settings, {}, exportEnabled = enabled.value, onExport = { exports++ })
+            }
+        }
+        rule.onNodeWithText("Export all meetings").performScrollTo().assertIsEnabled().performClick()
+        rule.runOnIdle {
+            assertEquals(1, exports)
+            enabled.value = false
+        }
+        rule.onNodeWithText("Export all meetings").assertIsNotEnabled()
     }
 }
