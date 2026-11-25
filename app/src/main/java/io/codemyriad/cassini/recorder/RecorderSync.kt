@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
@@ -208,41 +209,62 @@ class RecorderSync(private val parts: Parts) {
 
     private val store = parts.store
     private val lock = Mutex()
+    private val stateLock = Any()
 
-    /** True while a sync or a binding holds [lock], for [awaitIdle]. */
-    private val held = MutableStateFlow(false)
+    /** Count of running or queued operations ([sync] and [bind]); drops to 0 only after [lock] is unlocked. */
+    private val active = MutableStateFlow(0)
 
-    /** The mode of the sync that holds [lock], or null (none, or a binding). */
-    @Volatile private var running: SyncMode? = null
+    /** Guarded by [stateLock]: the mode of the sync that holds [lock], and queued waiters behind it. */
+    private var running: SyncMode? = null
+    private var fullQueued = false
+    private var bindWaiters = 0
     private val current = MutableStateFlow<RecorderActivity>(RecorderActivity.Idle)
 
     val activity: StateFlow<RecorderActivity> = current.asStateFlow()
 
     /**
-     * Syncs with the bound recorder; [SyncOutcome.Busy] at once when a sync or a binding runs already. A full sync
-     * waits for an upload-only one (a transcript push, which is short) instead: "Sync now" and the first attempt of
-     * "Auto sync" are not lost to it.
+     * Syncs with the bound recorder; [SyncOutcome.Busy] at once when a sync or a binding runs already. At most one full
+     * sync waits for an upload-only one (a transcript push, which is short) instead: "Sync now" and the first attempt
+     * of "Auto sync" are not lost to it.
      */
     suspend fun sync(mode: SyncMode = SyncMode.FULL): SyncOutcome {
-        if (!lock.tryLock()) {
-            if (mode != SyncMode.FULL || running != SyncMode.UPLOADS) return SyncOutcome.Busy
-            lock.lock()
+        val acquired = synchronized(stateLock) {
+            if (lock.tryLock()) {
+                running = mode
+                active.update { it + 1 }
+                true
+            } else if (mode == SyncMode.FULL && running == SyncMode.UPLOADS && !fullQueued && bindWaiters == 0) {
+                fullQueued = true
+                active.update { it + 1 }
+                false
+            } else {
+                return SyncOutcome.Busy
+            }
         }
-        held.value = true
-        running = mode
+        if (!acquired) {
+            try {
+                lock.lock()
+            } catch (error: CancellationException) {
+                synchronized(stateLock) { fullQueued = false }
+                active.update { it - 1 }
+                throw error
+            }
+            synchronized(stateLock) {
+                fullQueued = false
+                running = mode
+            }
+        }
         return try {
             syncLocked(mode)
         } finally {
-            running = null
             current.value = RecorderActivity.Idle
-            held.value = false
-            lock.unlock()
+            releaseLock()
         }
     }
 
     /** Returns when no sync and no binding runs: at once when none does. */
     suspend fun awaitIdle() {
-        held.first { !it }
+        active.first { it == 0 }
     }
 
     /** True when a sync can try to connect now: a recorder is bound, its key is accepted, and Bluetooth is ready. */
@@ -291,8 +313,21 @@ class RecorderSync(private val parts: Parts) {
      */
     @Suppress("TooGenericExceptionCaught") // nothing may escape into the screen's scope; see below
     suspend fun bind(device: RecorderDevice, pin: suspend (wrong: Boolean) -> String?): BindOutcome {
-        lock.lock()
-        held.value = true
+        synchronized(stateLock) {
+            bindWaiters++
+            active.update { it + 1 }
+        }
+        try {
+            lock.lock()
+        } catch (error: CancellationException) {
+            synchronized(stateLock) { bindWaiters-- }
+            active.update { it - 1 }
+            throw error
+        }
+        synchronized(stateLock) {
+            bindWaiters--
+            running = null
+        }
         return try {
             bindLocked(device, pin)
         } catch (error: CancellationException) {
@@ -304,9 +339,16 @@ class RecorderSync(private val parts: Parts) {
             BindOutcome.Failed(null, error.javaClass.simpleName)
         } finally {
             current.value = RecorderActivity.Idle
-            held.value = false
+            releaseLock()
+        }
+    }
+
+    private fun releaseLock() {
+        synchronized(stateLock) {
+            running = null
             lock.unlock()
         }
+        active.update { it - 1 }
     }
 
     /** "Forget recorder": removes the binding and its key; the record of imported files stays. */

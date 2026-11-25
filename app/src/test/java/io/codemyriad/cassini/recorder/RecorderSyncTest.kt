@@ -208,6 +208,73 @@ class RecorderSyncTest {
         assertEquals(listOf("note-1", "note-2"), library.imported.keys.toList())
     }
 
+    @Test fun awaitIdleResumesOnlyAfterTheLockIsReleased() = runBlocking {
+        recorder.files["REC_0001.wav"] = recording(10_000)
+        val (sync, store) = sync()
+        store.bound(key)
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        recorder.beforeGets = {
+            started.countDown()
+            release.await(HOOK_MS, TimeUnit.MILLISECONDS)
+        }
+        coroutineScope {
+            val running = async(Dispatchers.Default) { sync.sync() }
+            assertTrue(started.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+            val followUp = async(Dispatchers.Unconfined) {
+                sync.awaitIdle()
+                sync.sync(SyncMode.UPLOADS)
+            }
+            release.countDown()
+            assertTrue(running.await() is SyncOutcome.Done)
+            assertTrue("Expected Done after awaitIdle, got ${followUp.await()}", followUp.await() is SyncOutcome.Done)
+        }
+    }
+
+    @Test fun atMostOneFullSyncQueuesBehindAnUploadOnlySyncAndAwaitIdleCoversTheHandoff() = runBlocking {
+        recorder.files["REC_0001.wav"] = recording(10_000)
+        val (sync, store) = sync()
+        store.bound(key)
+        sync.sync()
+        library.ready["note-1"] = RecorderTranscript("v1", transcript("Standup"))
+        radio.device.files["REC_0002.wav"] = recording(10_000, seed = 2)
+        val putting = CountDownLatch(1)
+        val releasePut = CountDownLatch(1)
+        val downloading = CountDownLatch(1)
+        val releaseDownload = CountDownLatch(1)
+        radio.device.beforePut = { offset ->
+            if (offset == 0L) {
+                putting.countDown()
+                releasePut.await(HOOK_MS, TimeUnit.MILLISECONDS)
+            }
+        }
+        radio.device.beforeGets = { name ->
+            if (name == "REC_0002.wav") {
+                downloading.countDown()
+                releaseDownload.await(HOOK_MS, TimeUnit.MILLISECONDS)
+            }
+        }
+        coroutineScope {
+            val uploads = async(Dispatchers.Default) { sync.sync(SyncMode.UPLOADS) }
+            assertTrue(putting.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+            val queuedFull = async(Dispatchers.Default) { sync.sync(SyncMode.FULL) }
+            delay(50)
+            val idleWaiter = async(Dispatchers.Unconfined) { sync.awaitIdle() }
+            // A second full sync while one is already queued behind UPLOADS is busy at once.
+            val duplicateFull = withTimeout(500) { sync.sync(SyncMode.FULL) }
+            assertEquals(SyncOutcome.Busy, duplicateFull)
+
+            releasePut.countDown()
+            assertTrue(uploads.await() is SyncOutcome.Done)
+            assertTrue(downloading.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+            // awaitIdle must not wake in the gap between UPLOADS ending and the queued FULL sync running.
+            assertFalse(idleWaiter.isCompleted)
+            releaseDownload.countDown()
+            assertDone(SyncOutcome.Done(1, 0, 0, false), queuedFull.await())
+            withTimeout(TIMEOUT_MS) { idleWaiter.await() }
+        }
+    }
+
     @Test fun aDownloadThatLosesTheLinkResumesAtTheNextSync() = runBlocking {
         val audio = recording(10_000, seed = 7)
         recorder.files["REC_0001.wav"] = audio
