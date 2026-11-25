@@ -54,6 +54,10 @@ data object SettingsKey : NavKey
 @Serializable
 data object SavedVoicesKey : NavKey
 
+/** The Recorder screen (docs/recorder-sync.md), reached from Settings. */
+@Serializable
+data object RecorderKey : NavKey
+
 @Serializable
 data object TrashKey : NavKey
 

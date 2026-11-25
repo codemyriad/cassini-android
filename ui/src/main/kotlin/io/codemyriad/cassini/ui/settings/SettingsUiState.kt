@@ -124,3 +124,10 @@ data class BackupSettingsUi(
 
 /** Second-layer Settings destinations. */
 enum class SettingsPage { MAP, TRANSCRIPTION, SPEAKERS, BACKUP, BACKUP_DETAILS, ABOUT }
+
+/**
+ * A row of the Settings map that `:app` owns, with its text already localized: the recorder (docs/recorder-sync.md).
+ * The fixtures of the screenshot tests have none.
+ */
+@Immutable
+data class SettingsExtraRow(val title: String, val answer: String)

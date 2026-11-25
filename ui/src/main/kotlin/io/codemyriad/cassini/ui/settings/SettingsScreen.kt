@@ -39,7 +39,7 @@ import io.codemyriad.cassini.ui.theme.Glyph
 
 /** D103: a short map, the choices, then source and licence details. */
 @Composable
-@Suppress("LongParameterList") // The optional ZIP action is owned by the existing process-wide transfer controller.
+@Suppress("LongParameterList") // The optional ZIP action and the extra row are owned by :app controllers.
 fun SettingsScreen(
     state: SettingsUiState,
     onEvent: (SettingsEvent) -> Unit,
@@ -47,6 +47,8 @@ fun SettingsScreen(
     initialPage: SettingsPage = SettingsPage.MAP,
     exportEnabled: Boolean = false,
     onExport: () -> Unit = {},
+    extraRow: SettingsExtraRow? = null,
+    onExtraRow: () -> Unit = {},
 ) {
     var page by rememberSaveable { mutableStateOf(initialPage) }
     val back = {
@@ -73,7 +75,7 @@ fun SettingsScreen(
             )
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
                 when (page) {
-                    SettingsPage.MAP -> SettingsMap(state, onEvent) { page = it }
+                    SettingsPage.MAP -> SettingsMap(state, onEvent, extraRow, onExtraRow) { page = it }
                     SettingsPage.TRANSCRIPTION -> TranscriptionSettings(state, onEvent)
                     SettingsPage.SPEAKERS -> SpeakerSettings(state, onEvent)
                     SettingsPage.BACKUP -> state.backup?.let {
@@ -88,7 +90,13 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsMap(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit, open: (SettingsPage) -> Unit) {
+private fun SettingsMap(
+    state: SettingsUiState,
+    onEvent: (SettingsEvent) -> Unit,
+    extraRow: SettingsExtraRow?,
+    onExtraRow: () -> Unit,
+    open: (SettingsPage) -> Unit,
+) {
     SectionHeader(stringResource(R.string.ui_settings_transcripts), first = true)
     SettingsGroup {
         MapRow(
@@ -135,6 +143,7 @@ private fun SettingsMap(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit
             libraryAudioDuration(state.audioDurationMs),
         ),
     )
+    if (extraRow != null) ExtraRow(extraRow, onExtraRow)
     SectionHeader(stringResource(R.string.ui_settings_app))
     LanguageSection(state.language, onEvent)
     if (state.notificationsOff) {
@@ -145,6 +154,13 @@ private fun SettingsMap(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit
         )
     }
     AboutRow(state.version) { open(SettingsPage.ABOUT) }
+}
+
+@Composable
+private fun ExtraRow(row: SettingsExtraRow, onClick: () -> Unit) {
+    SettingsGroup(Modifier.padding(top = 12.dp)) {
+        MapRow(row.title, row.answer, Glyph.PhoneTransfer, onClick = onClick)
+    }
 }
 
 @Composable

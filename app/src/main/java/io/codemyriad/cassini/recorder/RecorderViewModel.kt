@@ -1,0 +1,259 @@
+package io.codemyriad.cassini.recorder
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.data.recorder.LastSync
+import io.codemyriad.cassini.data.recorder.RecorderDevice
+import io.codemyriad.cassini.data.recorder.RecorderSettings
+import io.codemyriad.cassini.data.recorder.StoredRecording
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+/** What the Recorder screen needs from the app; [GraphRecorderScreenPorts] in the app, fakes in tests. */
+interface RecorderScreenPorts {
+    val settings: Flow<RecorderSettings>
+    val activity: StateFlow<RecorderActivity>
+
+    /** The live notes by id, as the recorder rows show them. */
+    val notes: Flow<Map<String, NoteSyncInfo>>
+
+    /** The companion device chooser exists; else the screen lists the bonded recorders. */
+    val companionSupported: Boolean
+
+    fun readiness(): RadioReadiness
+
+    fun bondedRecorders(): List<RecorderDevice>
+
+    fun syncNow()
+
+    suspend fun setAutoSync(enabled: Boolean)
+
+    suspend fun bind(device: RecorderDevice, pin: suspend (wrong: Boolean) -> String?): BindOutcome
+
+    suspend fun forget(device: RecorderDevice)
+}
+
+/** A note as the recorder rows show it: [transcribed] when it has a finished transcript. */
+data class NoteSyncInfo(val title: String, val jobState: JobState?, val transcribed: Boolean)
+
+enum class RecordingStatus {
+    IMPORT_FAILED,
+    NOTE_GONE,
+    WAITING_FOR_CONSENT,
+    TRANSCRIBING,
+    TRANSCRIPTION_FAILED,
+    IMPORTED,
+    TRANSCRIBED,
+    UPLOADED,
+    UPLOAD_FAILED,
+}
+
+/** One synced recording: its file [name], its note ([noteId], [title]) and where it is now. */
+data class RecordingRow(
+    val name: String,
+    val noteId: String?,
+    val title: String?,
+    val status: RecordingStatus,
+    val failure: String? = null,
+)
+
+sealed interface BindFailure {
+    data object NotBonded : BindFailure
+
+    data object Unreachable : BindFailure
+
+    data object PairingClosed : BindFailure
+
+    data class Chooser(val reason: String?) : BindFailure
+
+    data class Unavailable(val readiness: RadioReadiness) : BindFailure
+
+    data class Other(val reason: String?) : BindFailure
+}
+
+/** The steps of "Bind recorder". */
+sealed interface BindUi {
+    /** What to do on the recorder first, and "Find recorder". */
+    data object Instructions : BindUi
+
+    /** The bonded recorders, when Android has no companion device chooser. */
+    data class Choose(val devices: List<RecorderDevice>) : BindUi
+
+    /** Android pairs, or the app connects or binds: the activity tells which. */
+    data object Working : BindUi
+
+    data class Pin(val wrong: Boolean) : BindUi
+
+    data class Failed(val failure: BindFailure) : BindUi
+}
+
+data class RecorderUiState(
+    val readiness: RadioReadiness = RadioReadiness.READY,
+    val companionSupported: Boolean = true,
+    val device: RecorderDevice? = null,
+    val rebindNeeded: Boolean = false,
+    val autoSync: Boolean = false,
+    val activity: RecorderActivity = RecorderActivity.Idle,
+    val lastSync: LastSync? = null,
+    val transcriptsUnsupported: Boolean = false,
+    val recordings: List<RecordingRow> = emptyList(),
+    val bind: BindUi? = null,
+) {
+    val busy: Boolean get() = activity != RecorderActivity.Idle
+}
+
+sealed interface RecorderEvent {
+    data object StartBind : RecorderEvent
+
+    /** "Find recorder" without the companion chooser: list the bonded recorders. */
+    data object ListBonded : RecorderEvent
+
+    data class DevicePicked(val device: RecorderDevice) : RecorderEvent
+
+    data class ChooserFailed(val reason: String?) : RecorderEvent
+
+    data class PinEntered(val pin: String) : RecorderEvent
+
+    data object CancelBind : RecorderEvent
+
+    data object SyncNow : RecorderEvent
+
+    data class AutoSync(val enabled: Boolean) : RecorderEvent
+
+    data object Forget : RecorderEvent
+
+    /** The screen resumed or a permission answer came: read the Bluetooth state again. */
+    data object Refresh : RecorderEvent
+
+    data class OpenNote(val noteId: String) : RecorderEvent
+}
+
+sealed interface RecorderEffect {
+    data class OpenNote(val noteId: String) : RecorderEffect
+}
+
+/** The Recorder screen (docs/recorder-sync.md): the bound recorder, binding, sync and the synced recordings. */
+class RecorderViewModel(private val ports: RecorderScreenPorts) : ViewModel() {
+    private val readiness = MutableStateFlow(ports.readiness())
+    private val bind = MutableStateFlow<BindUi?>(null)
+    private val effectChannel = Channel<RecorderEffect>(Channel.BUFFERED)
+    private var pinAnswer: CompletableDeferred<String?>? = null
+    private var binding: Job? = null
+
+    val effects: Flow<RecorderEffect> = effectChannel.receiveAsFlow()
+
+    val state: StateFlow<RecorderUiState> = combine(
+        ports.settings,
+        ports.activity,
+        ports.notes,
+        readiness,
+        bind,
+    ) { settings, activity, notes, readiness, bind ->
+        val current = settings.current
+        RecorderUiState(
+            readiness = readiness,
+            companionSupported = ports.companionSupported,
+            device = settings.binding?.device,
+            rebindNeeded = current?.rebindNeeded == true,
+            autoSync = settings.autoSync,
+            activity = activity,
+            lastSync = current?.lastSync,
+            transcriptsUnsupported = current?.transcriptsUnsupportedFirmware != null,
+            recordings = RecorderRows.rows(current?.recordings.orEmpty(), notes),
+            bind = bind,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), RecorderUiState())
+
+    fun onEvent(event: RecorderEvent) {
+        when (event) {
+            RecorderEvent.StartBind -> bind.value = BindUi.Instructions
+            RecorderEvent.ListBonded -> bind.value = BindUi.Choose(ports.bondedRecorders())
+            is RecorderEvent.DevicePicked -> startBinding(event.device)
+            is RecorderEvent.ChooserFailed -> bind.value = BindUi.Failed(BindFailure.Chooser(event.reason))
+            is RecorderEvent.PinEntered -> if (PIN.matches(event.pin)) pinAnswer?.complete(event.pin)
+            RecorderEvent.CancelBind -> cancelBinding()
+            RecorderEvent.SyncNow -> ports.syncNow()
+            is RecorderEvent.AutoSync -> viewModelScope.launch { ports.setAutoSync(event.enabled) }
+            RecorderEvent.Forget -> state.value.device?.let { device -> viewModelScope.launch { ports.forget(device) } }
+            RecorderEvent.Refresh -> readiness.value = ports.readiness()
+            is RecorderEvent.OpenNote -> effectChannel.trySend(RecorderEffect.OpenNote(event.noteId))
+        }
+    }
+
+    private fun startBinding(device: RecorderDevice) {
+        binding?.cancel()
+        bind.value = BindUi.Working
+        binding = viewModelScope.launch {
+            val outcome = ports.bind(device) { wrong ->
+                val answer = CompletableDeferred<String?>()
+                pinAnswer = answer
+                bind.value = BindUi.Pin(wrong)
+                answer.await().also { bind.value = BindUi.Working }
+            }
+            pinAnswer = null
+            bind.value = failureOf(outcome)?.let(BindUi::Failed)
+            if (outcome == BindOutcome.Bound) ports.syncNow()
+        }
+    }
+
+    private fun cancelBinding() {
+        pinAnswer?.complete(null)
+        pinAnswer = null
+        binding?.cancel()
+        binding = null
+        bind.value = null
+    }
+
+    private fun failureOf(outcome: BindOutcome): BindFailure? = when (outcome) {
+        BindOutcome.Bound, BindOutcome.Cancelled -> null
+        BindOutcome.Busy -> BindFailure.Other(null)
+        is BindOutcome.Unavailable -> BindFailure.Unavailable(outcome.readiness)
+        BindOutcome.NotBonded -> BindFailure.NotBonded
+        BindOutcome.Unreachable -> BindFailure.Unreachable
+        BindOutcome.PairingClosed -> BindFailure.PairingClosed
+        is BindOutcome.Failed -> BindFailure.Other(outcome.failure?.name ?: outcome.message)
+    }
+
+    private companion object {
+        const val STOP_TIMEOUT_MS = 5_000L
+        val PIN = Regex("[0-9]{6}")
+    }
+}
+
+/** The rows of the synced recordings, newest first, with the state of their notes. */
+object RecorderRows {
+    fun rows(recordings: List<StoredRecording>, notes: Map<String, NoteSyncInfo>): List<RecordingRow> =
+        recordings.asReversed().map { stored ->
+            val recording = stored.recording
+            val note = recording.noteId?.let(notes::get)
+            RecordingRow(
+                name = recording.name,
+                noteId = recording.noteId.takeIf { note != null },
+                title = note?.title,
+                status = status(stored, note),
+                failure = stored.failure?.substringAfter('_'),
+            )
+        }
+
+    private fun status(stored: StoredRecording, note: NoteSyncInfo?): RecordingStatus = when {
+        stored.recording.noteId == null -> RecordingStatus.IMPORT_FAILED
+        note == null -> RecordingStatus.NOTE_GONE
+        stored.failure?.startsWith(RecorderSync.UPLOAD_FAILURE) == true -> RecordingStatus.UPLOAD_FAILED
+        note.transcribed && stored.recording.transcriptUploadedVersion != null -> RecordingStatus.UPLOADED
+        note.transcribed -> RecordingStatus.TRANSCRIBED
+        note.jobState == JobState.NEEDS_CONSENT -> RecordingStatus.WAITING_FOR_CONSENT
+        note.jobState == JobState.FAILED -> RecordingStatus.TRANSCRIPTION_FAILED
+        note.jobState != null -> RecordingStatus.TRANSCRIBING
+        else -> RecordingStatus.IMPORTED
+    }
+}
