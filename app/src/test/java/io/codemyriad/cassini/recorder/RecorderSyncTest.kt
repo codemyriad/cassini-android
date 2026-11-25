@@ -664,6 +664,30 @@ class RecorderSyncTest {
         assertEquals(listOf("note-2"), store.read().current!!.recordings.map { it.recording.noteId })
     }
 
+    @Test fun anUnreadableSuspectGetsNoOldTranscriptAndIsCheckedAgainLater() = runBlocking {
+        recorder.files["REC_0001.wav"] = recording(3_000, seed = 1)
+        val (sync, store) = sync()
+        store.bound(key)
+        sync.sync()
+        library.ready["note-1"] = RecorderTranscript("v1", transcript("Old"))
+        assertDone(SyncOutcome.Done(0, 1, 0, false), sync.sync())
+
+        // The card was wiped: a new recording with the same name and size, no sidecar, and a transient SD read error
+        // when the sync tries to compare its first 4 KiB.
+        radio.device.files.clear()
+        radio.device.files["REC_0001.wav"] = recording(3_000, seed = 9)
+        radio.device.unreadable += "REC_0001.wav"
+        assertDone(SyncOutcome.Done(0, 0, 0, false), sync.sync())
+        assertFalse(radio.device.files.containsKey("REC_0001.cwx"))
+
+        // Once the card reads cleanly again, the next sync compares the head, drops the old record and imports the new
+        // recording instead of leaving the old transcript attached to it.
+        radio.device.unreadable.clear()
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertFalse(radio.device.files.containsKey("REC_0001.cwx"))
+        assertEquals(listOf("note-2"), store.read().current!!.recordings.map { it.recording.noteId })
+    }
+
     @Test fun aWrongClockIsSetToThePhoneTime() = runBlocking {
         val (sync, store) = sync(clock = { NOW + 3_600_000L })
         store.bound(key)

@@ -389,13 +389,14 @@ class RecorderSync(private val parts: Parts) {
         val transcripts = encode(parts.library.transcripts(noteIds))
         val versions = transcripts.mapValues { it.value.version }
         val suspects = SyncPlanner.suspects(listing, deviceState(address).syncState(), versions)
-        verifySuspects(session, address, suspects)
+        val unverified = verifySuspects(session, address, suspects)
         val state = deviceState(address).syncState()
         val plan = SyncPlanner.plan(listing, status, state, versions, syncWhileRecording)
         // A firmware that names the file it records refuses every card write while it records: transcripts wait.
         val holdUploads = status.recording && status.namesActiveFile
         if (mode == SyncMode.UPLOADS) {
-            val sent = upload(session, address, pong, plan.uploads, transcripts, holdUploads)
+            val uploads = plan.uploads.filterNot { it.recording.name in unverified }
+            val sent = upload(session, address, pong, uploads, transcripts, holdUploads)
             return SyncOutcome.Done(
                 0,
                 sent.uploaded,
@@ -437,7 +438,7 @@ class RecorderSync(private val parts: Parts) {
         }
         // A transcript can have finished during the downloads (a long one, or an existing note): it goes now too.
         val checked = suspects.map { it.name }.toSet() + plan.downloads.map { it.name }
-        val (uploads, latest) = latestUploads(session, address, listing, status, checked)
+        val (uploads, latest) = latestUploads(session, address, listing, status, checked, unverified)
         val sent = upload(session, address, pong, uploads, latest, holdUploads)
         withContext(parts.io) { deleteStrayParts(address) }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
@@ -505,13 +506,17 @@ class RecorderSync(private val parts: Parts) {
         listing: List<XrecReply.Entry>,
         status: XrecReply.Status,
         checked: Set<String>,
+        unverified: Set<String>,
     ): Pair<List<PlannedUpload>, Map<String, EncodedTranscript>> {
         val noteIds = deviceState(address).recordings.mapNotNull { it.recording.noteId }
         val transcripts = encode(parts.library.transcripts(noteIds))
         val versions = transcripts.mapValues { it.value.version }
         val suspects = SyncPlanner.suspects(listing, deviceState(address).syncState(), versions)
-        verifySuspects(session, address, suspects.filterNot { it.name in checked })
-        return SyncPlanner.plan(listing, status, deviceState(address).syncState(), versions).uploads to transcripts
+        val skipped = unverified + verifySuspects(session, address, suspects.filterNot { it.name in checked })
+        val uploads = SyncPlanner.plan(listing, status, deviceState(address).syncState(), versions)
+            .uploads
+            .filterNot { it.recording.name in skipped }
+        return uploads to transcripts
     }
 
     private suspend fun setClock(session: Session) {
@@ -530,11 +535,18 @@ class RecorderSync(private val parts: Parts) {
     /**
      * Compares the first 4 KiB of each suspect with the stored hash. A different file with the old name and size (a
      * new recording after a card wipe) is not the old recording: its record goes, so the plan downloads it and the old
-     * note's transcript does not go to it.
+     * note's transcript does not go to it. Returns the names of suspects whose header could not be read now: their
+     * records stay, and no transcript goes to them until a later check reads their header.
      */
-    private suspend fun verifySuspects(session: Session, address: String, suspects: List<SyncedRecording>) {
+    private suspend fun verifySuspects(
+        session: Session,
+        address: String,
+        suspects: List<SyncedRecording>,
+    ): Set<String> {
+        val unverified = HashSet<String>()
         val replaced = suspects.filter { suspect ->
             val head = headOnRecorder(session, suspect)
+            if (head == null) unverified += suspect.name
             head != null && head != suspect.headSha256
         }
         for (suspect in replaced) {
@@ -543,6 +555,7 @@ class RecorderSync(private val parts: Parts) {
                 state.copy(recordings = state.recordings.filterNot { it.recording == suspect })
             }
         }
+        return unverified
     }
 
     /** The SHA-256 of the first 4 KiB of [recording] on the recorder; null when the recorder cannot give them now. */
