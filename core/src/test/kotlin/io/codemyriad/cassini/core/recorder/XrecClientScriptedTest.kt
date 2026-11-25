@@ -43,6 +43,10 @@ class XrecClientScriptedTest {
 
     private fun receive(text: String) = steps.add(Step.Bytes(text.toByteArray()))
 
+    private companion object {
+        const val PONG = "+XREC:PONG,openfw_v5,v5,bound=1,auth=1,pair=0\r\n"
+    }
+
     @Test fun skipsLinesThatAreNotReplies() {
         receive("garbage\r\n\r\nOK\r\n+XREC:PONG,openfw_v5,v5,bound=0,auth=0,pair=1\r\n")
         assertEquals(true, client.ping().pairingOpen)
@@ -120,13 +124,49 @@ class XrecClientScriptedTest {
     @Test fun aLostAckIsResentAfterAResync() {
         val bytes = ByteArray(700) { (it * 7).toByte() }
         steps.add(Step.Silence) // no ack for chunk 0
-        steps.add(Step.Silence) // resync drain
-        receive("+XREC:OK,PUT,0,600\r\n+XREC:OK,PUT,600,100\r\n+XREC:OK,PUTEND,700\r\n")
+        // The late ack and a stray error come before the PONG of the resync: all are dropped.
+        receive("+XREC:OK,PUT,0,64\r\n+XREC:ERR,LINE\r\n$PONG")
+        // A late duplicate ack of chunk 0 before the ack of chunk 1 is dropped too.
+        receive("+XREC:OK,PUT,0,64\r\n+XREC:OK,PUT,0,64\r\n+XREC:OK,PUT,64,600\r\n+XREC:OK,PUT,664,36\r\n")
+        receive("+XREC:OK,PUTEND,700\r\n")
         client.uploadSidecar("a.cwx", bytes)
-        val crc0 = Crc16CcittFalse.compute(bytes, 0, 600)
+        val crc0 = Crc16CcittFalse.compute(bytes, 0, 64)
         val text = sent.toString(Charsets.ISO_8859_1)
-        assertEquals(2, text.split("+XREC:PUT,0,600,$crc0,REC,a.cwx:").size - 1)
+        assertEquals(2, text.split("+XREC:PUT,0,64,$crc0,REC,a.cwx:").size - 1)
+        assertEquals(1, text.split("\r+XREC:PING\r").size - 1)
         assertEquals(true, text.endsWith("+XREC:PUTEND\r"))
+    }
+
+    @Test fun aResyncWithoutPongTimesOut() {
+        expect(XrecFailure.TIMEOUT) { client.resync() }
+        assertEquals(500L, now)
+    }
+
+    @Test fun aLostPutEndReplyIsAskedAgain() {
+        receive("+XREC:OK,PUT,0,5\r\n")
+        steps.add(Step.Silence) // no reply to PUTEND
+        receive(PONG + "+XREC:OK,PUTEND,5\r\n")
+        client.uploadSidecar("a.cwx", ByteArray(5))
+        assertEquals(2, sent.toString(Charsets.ISO_8859_1).split("+XREC:PUTEND\r").size - 1)
+    }
+
+    @Test fun olderFirmwareConfirmsARepeatedPutEndWithTheListing() {
+        receive("+XREC:OK,PUT,0,5\r\n")
+        steps.add(Step.Silence)
+        receive(PONG + "+XREC:ERR,NOPUT\r\n+XREC:F,100,a.wav\r\n+XREC:F,5,A.CWX\r\n+XREC:END\r\n")
+        client.uploadSidecar("a.cwx", ByteArray(5))
+        assertEquals(true, sent.toString(Charsets.ISO_8859_1).endsWith("+XREC:PUTEND\r+XREC:LS\r"))
+
+        // Not in the listing: the commit is not confirmed.
+        receive("+XREC:OK,PUT,0,5\r\n")
+        steps.add(Step.Silence)
+        receive(PONG + "+XREC:ERR,NOPUT\r\n+XREC:F,4,a.cwx\r\n+XREC:END\r\n")
+        expect(XrecFailure.INTEGRITY) { client.uploadSidecar("a.cwx", ByteArray(5)) }
+    }
+
+    @Test fun aFirstPutEndThatFindsNoUploadIsAnError() {
+        receive("+XREC:OK,PUT,0,5\r\n+XREC:ERR,NOPUT\r\n")
+        expect(XrecFailure.NO_UPLOAD) { client.uploadSidecar("a.cwx", ByteArray(5)) }
     }
 
     @Test fun aWrongPutEndTotalIsAProtocolError() {

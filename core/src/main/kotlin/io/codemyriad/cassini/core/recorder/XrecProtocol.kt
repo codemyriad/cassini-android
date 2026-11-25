@@ -27,6 +27,12 @@ object XrecLimits {
     /** The PUT chunk size the app sends: one chunk in flight must fit the device's 2048-byte receive ring. */
     const val PUT_CHUNK = 600
 
+    /**
+     * The size of the first PUT chunk of an upload: the CWX1 header. Firmware without the `REC` target reads the
+     * payload of the refused header as command lines, so the probe sends little.
+     */
+    const val PROBE_CHUNK = 64
+
     /** The bytes of a GETS frame header: "XREC", u32le offset, u16le length, u16le CRC. */
     const val FRAME_HEADER = 12
 

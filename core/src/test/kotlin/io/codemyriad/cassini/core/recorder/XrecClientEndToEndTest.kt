@@ -149,13 +149,15 @@ class XrecClientEndToEndTest {
 
     @Test fun uploadsASidecarInChunks() {
         val fake = device()
+        fake.files["REC_0001.wav"] = ByteArray(100)
         val bytes = Random(6).nextBytes(1_500)
         val client = authenticated(fake)
         val progress = mutableListOf<Int>()
         client.uploadSidecar("REC_0001.cwx", bytes) { progress += it }
         assertArrayEquals(bytes, fake.files["REC_0001.cwx"])
-        assertEquals(listOf(600, 1_200, 1_500), progress)
-        assertEquals(3, fake.putWrites)
+        // The first chunk is the short probe of the REC target.
+        assertEquals(listOf(64, 664, 1_264, 1_500), progress)
+        assertEquals(4, fake.putWrites)
         // A second upload replaces the file.
         client.uploadSidecar("REC_0001.cwx", byteArrayOf(1, 2, 3))
         assertArrayEquals(byteArrayOf(1, 2, 3), fake.files["REC_0001.cwx"])
@@ -163,22 +165,66 @@ class XrecClientEndToEndTest {
 
     @Test fun aLostAckIsResentWithoutWritingTwice() {
         val fake = device()
+        fake.files["a.wav"] = ByteArray(100)
         val bytes = Random(7).nextBytes(1_300)
-        fake.dropPutAcks += 600L
+        fake.dropPutAcks += 664L
         val client = connect(fake, timeouts.copy(replyMillis = 500)).also { it.authenticate(key) }
         client.uploadSidecar("a.cwx", bytes)
         assertArrayEquals(bytes, fake.files["a.cwx"])
-        assertEquals(3, fake.putWrites)
-        assertEquals(2, fake.commands.count { it.startsWith("+XREC:PUT,600,600,") })
+        assertEquals(4, fake.putWrites)
+        assertEquals(2, fake.commands.count { it.startsWith("+XREC:PUT,664,600,") })
+        // The resync is a PING whose PONG ends the stale replies.
+        assertTrue(fake.commands.contains("+XREC:PING"))
     }
 
     @Test fun aCorruptedChunkIsResent() {
         val fake = device()
+        fake.files["a.wav"] = ByteArray(100)
         val bytes = Random(8).nextBytes(900)
         fake.corruptPutChunks += 0L
         authenticated(fake).uploadSidecar("a.cwx", bytes)
         assertArrayEquals(bytes, fake.files["a.cwx"])
-        assertEquals(2, fake.commands.count { it.startsWith("+XREC:PUT,0,600,") })
+        assertEquals(2, fake.commands.count { it.startsWith("+XREC:PUT,0,64,") })
+    }
+
+    @Test fun aLostPutEndReplyIsAskedAgainAndTheCommitHappensOnce() {
+        val fake = device()
+        fake.files["a.wav"] = ByteArray(100)
+        fake.dropPutEndAck = true
+        val bytes = Random(10).nextBytes(700)
+        val client = connect(fake, timeouts.copy(replyMillis = 500)).also { it.authenticate(key) }
+        client.uploadSidecar("a.cwx", bytes)
+        assertArrayEquals(bytes, fake.files["a.cwx"])
+        assertEquals(2, fake.commands.count { it == "+XREC:PUTEND" })
+        assertEquals(87, client.stat().batteryPercent)
+    }
+
+    @Test fun aSidecarWithoutItsRecordingIsRefused() {
+        val fake = device()
+        val client = authenticated(fake)
+        expect(XrecFailure.NOT_FOUND) { client.uploadSidecar("a.cwx", Random(11).nextBytes(700)) }
+        assertNull(fake.files["a.cwx"])
+        // The refused chunk was eaten whole: the link stays usable.
+        assertEquals(87, client.stat().batteryPercent)
+
+        // The recording is deleted during the upload: PUTEND refuses, and no orphan sidecar stays.
+        fake.files["a.wav"] = ByteArray(100)
+        fake.beforePutEnd = { fake.files.remove("a.wav") }
+        expect(XrecFailure.NOT_FOUND) { client.uploadSidecar("a.cwx", Random(12).nextBytes(700)) }
+        assertTrue(fake.files.isEmpty())
+        assertEquals(87, client.stat().batteryPercent)
+    }
+
+    @Test fun namesAreCaseInsensitiveAsOnTheCard() {
+        val fake = device()
+        fake.files["REC_0001.WAV"] = ByteArray(100)
+        val client = authenticated(fake)
+        client.uploadSidecar("REC_0001.cwx", byteArrayOf(1, 2, 3))
+        client.uploadSidecar("rec_0001.cwx", byteArrayOf(4, 5))
+        assertEquals(setOf("REC_0001.WAV", "rec_0001.cwx"), fake.files.keys)
+        // DEL of a recording deletes its sidecar too.
+        client.delete("rec_0001.wav")
+        assertTrue(fake.files.isEmpty())
     }
 
     @Test fun oldFirmwareWithoutTheRecTargetIsReportedAndTheLinkRecovers() {
@@ -194,7 +240,9 @@ class XrecClientEndToEndTest {
     }
 
     @Test fun anUploadNeedsAuthentication() {
-        val client = connect(device())
+        val fake = device()
+        fake.files["a.wav"] = ByteArray(100)
+        val client = connect(fake)
         expect(XrecFailure.LOCKED) { client.uploadSidecar("a.cwx", ByteArray(10)) }
         client.authenticate(key)
         client.uploadSidecar("a.cwx", ByteArray(10))
@@ -218,6 +266,7 @@ class XrecClientEndToEndTest {
 
     @Test fun theCwxOfAnEncodedTranscriptSurvivesTheRoundTrip() {
         val fake = device()
+        fake.files["REC_0007.wav"] = ByteArray(100)
         val client = authenticated(fake)
         val words = (0 until 300).map { CwxWord(it * 400L, it * 400L + 350, it / 20 % 3, "word$it") }
         val speakers = listOf(CwxSpeaker("A"), CwxSpeaker("B"), CwxSpeaker("C"))

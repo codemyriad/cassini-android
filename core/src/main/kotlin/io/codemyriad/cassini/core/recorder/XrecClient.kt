@@ -94,11 +94,12 @@ class XrecClient(
             } catch (e: XrecException) {
                 if (!e.transient) throw e
                 failures = if (transfer.offset > before) 1 else failures + 1
+                // Frames of the burst can still arrive: the link is quiet again before a retry or the next command.
+                drain()
                 if (failures > maxRetries) {
                     val message = "Download of $name failed at ${transfer.offset}"
                     throw XrecException(XrecFailure.INTEGRITY, message, cause = e)
                 }
-                drain()
             }
         }
         return transfer.offset
@@ -107,7 +108,12 @@ class XrecClient(
     /**
      * Uploads [bytes] as the transcript sidecar /record/[name] (target `REC`) and commits it with PUTEND, which
      * replaces an older file atomically. Fails with [XrecFailure.FIRMWARE_TOO_OLD] when the device does not know the
-     * `REC` target. [progress] gets the acknowledged byte count after each chunk.
+     * `REC` target, and with [XrecFailure.NOT_FOUND] when the recording of the sidecar is not on the device (at the
+     * first chunk, or at PUTEND when it was deleted meanwhile). [progress] gets the acknowledged byte count after each
+     * chunk.
+     *
+     * The first chunk is short ([XrecLimits.PROBE_CHUNK]): firmware without the `REC` target feeds the payload of the
+     * refused header to its line parser, so the probe gives it as few bytes as possible.
      */
     fun uploadSidecar(name: String, bytes: ByteArray, progress: (Int) -> Unit = {}) {
         val target = PutTarget.Record(name)
@@ -116,7 +122,8 @@ class XrecClient(
         var failures = 0
         var restarts = 0
         while (offset < bytes.size) {
-            val length = minOf(XrecLimits.PUT_CHUNK, bytes.size - offset)
+            val chunk = if (offset == 0) XrecLimits.PROBE_CHUNK else XrecLimits.PUT_CHUNK
+            val length = minOf(chunk, bytes.size - offset)
             when (putChunk(target, bytes, offset, length)) {
                 PutResult.ACCEPTED -> {
                     offset += length
@@ -137,14 +144,51 @@ class XrecClient(
                 }
             }
         }
-        val done = request<XrecReply.Ok>(XrecCommands.putEnd())
-        if (done.tag != "PUTEND" || done.fields.firstOrNull() != bytes.size.toString()) throw unexpected(done)
+        commit(name, bytes.size)
     }
 
-    /** Sends a bare CR and discards what arrives until the link is quiet: after a rejected PUT header or a desync. */
+    /**
+     * Brings the link back to a known reply: a CR ends any partial line, then `PING`, and every reply up to its `PONG`
+     * is discarded. Used after a lost reply or a refused PUT header, whose payload older firmware reads as lines (each
+     * with its own `ERR` reply). Fails with [XrecFailure.TIMEOUT] when no `PONG` comes.
+     */
     fun resync() {
-        writeBytes(byteArrayOf(CR))
-        drain()
+        writeBytes(RESYNC)
+        val deadline = deadline(timeouts.drainMillis)
+        while (readReply(deadline) !is XrecReply.Pong) {
+            // A reply that came before the PONG belongs to an earlier command.
+        }
+    }
+
+    /**
+     * `PUTEND`, sent again after a lost reply: the device answers a repeated PUTEND with the same `OK,PUTEND,<total>`.
+     * Older firmware answers `ERR,NOPUT` to the repeat; then LS confirms the commit by the name and the size.
+     */
+    private fun commit(name: String, total: Int) {
+        var attempts = 0
+        while (true) {
+            send(XrecCommands.putEnd())
+            val reply = try {
+                replyAfterLateAcks(Long.MAX_VALUE)
+            } catch (e: XrecException) {
+                if (e.failure != XrecFailure.TIMEOUT || ++attempts > maxRetries) throw e
+                resync()
+                continue
+            }
+            when {
+                reply is XrecReply.Ok && reply.tag == "PUTEND" && reply.fields.firstOrNull() == total.toString() -> return
+                reply is XrecReply.Failed && reply.failure == XrecFailure.NO_UPLOAD && attempts > 0 -> {
+                    confirmCommitted(name, total)
+                    return
+                }
+                else -> throw unexpected(reply)
+            }
+        }
+    }
+
+    private fun confirmCommitted(name: String, total: Int) {
+        val committed = list().any { it.name.equals(name, ignoreCase = true) && it.size == total.toLong() }
+        if (!committed) throw XrecException(XrecFailure.INTEGRITY, "$name is not on the recorder after PUTEND")
     }
 
     private fun burst(name: String, size: Long, transfer: Transfer, sink: OutputStream, progress: (Long) -> Unit) {
@@ -174,7 +218,7 @@ class XrecClient(
         val header = XrecCommands.putHeader(offset.toLong(), length, crc, target).toByteArray(Charsets.UTF_8)
         writeBytes(header + bytes.copyOfRange(offset, offset + length))
         val reply = try {
-            readReply(deadline(timeouts.replyMillis))
+            replyAfterLateAcks(offset.toLong())
         } catch (e: XrecException) {
             if (e.transient) return PutResult.RETRY
             throw e
@@ -193,7 +237,7 @@ class XrecClient(
         XrecFailure.CRC -> PutResult.RETRY
         XrecFailure.OFFSET -> if (offset > 0) PutResult.RESTART else throw unexpected(reply)
         XrecFailure.BAD_ARGUMENT, XrecFailure.UNSUPPORTED, XrecFailure.BAD_NAME -> {
-            // The device rejected the header, so it reads the payload as a command line: resync before going on.
+            // Older firmware reads the payload of a refused header as command lines: resync before going on.
             resync()
             if (offset == 0 && reply.failure != XrecFailure.BAD_NAME) {
                 val message = "The recorder firmware is too old for transcript upload"
@@ -202,6 +246,20 @@ class XrecClient(
             throw unexpected(reply)
         }
         else -> throw unexpected(reply)
+    }
+
+    /**
+     * The next reply that is not a late `OK,PUT` for a chunk before [before]: the first reply of a chunk that was sent
+     * again after a timeout can arrive after the resend.
+     */
+    private fun replyAfterLateAcks(before: Long): XrecReply {
+        val deadline = deadline(timeouts.replyMillis)
+        while (true) {
+            val reply = readReply(deadline)
+            val late = reply is XrecReply.Ok && reply.tag == "PUT" &&
+                (reply.fields.firstOrNull()?.toLongOrNull() ?: before) < before
+            if (!late) return reply
+        }
     }
 
     private inline fun <reified T : XrecReply> request(command: String): T {
@@ -333,6 +391,7 @@ class XrecClient(
         const val DEFAULT_RETRIES = 5
         const val BUFFER_BYTES = 4096
         const val CR = '\r'.code.toByte()
+        val RESYNC = "\r${XrecCommands.ping()}\r".toByteArray(Charsets.US_ASCII)
         const val LF = '\n'.code.toByte()
         val FRAME_MAGIC = "XREC".toByteArray(Charsets.US_ASCII)
         const val OFFSET_FIELD = 4
