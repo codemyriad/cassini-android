@@ -532,4 +532,5 @@
     <string name="ui_name_voices_off">Voice recognition is off. Turn it on in %1$s to remember voices.</string>
     <string name="ui_recording_title_placeholder">Add a title</string>
     <string name="ui_settings_export_all">Export all meetings</string>
+    <string name="ui_voices_stale_body_each">Voice recognition was updated, and voices saved before the update can’t be recognised. Name each person again in a meeting to save their voice.</string>
 </resources>

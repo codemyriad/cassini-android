@@ -500,4 +500,5 @@
     <string name="ui_name_voices_off">Il riconoscimento vocale è disattivato. Attivalo nelle %1$s per ricordare le voci.</string>
     <string name="ui_recording_title_placeholder">Aggiungi un titolo</string>
     <string name="ui_settings_export_all">Esporta tutte le riunioni</string>
+    <string name="ui_voices_stale_body_each">Il riconoscimento vocale è stato aggiornato e le voci salvate prima dell’aggiornamento non possono essere riconosciute. Dai di nuovo un nome a ogni persona in una riunione per salvare la sua voce.</string>
 </resources>

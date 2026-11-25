@@ -172,7 +172,6 @@
         <item quantity="many">%1$s voix à renommer</item>
         <item quantity="other">%1$s voix à renommer</item>
     </plurals>
-    <string name="ui_voices_stale_body">La reconnaissance vocale a été mise à jour, et les voix mémorisées avant la mise à jour ne peuvent plus être reconnues. Nommez %1$s dans une réunion pour mémoriser à nouveau sa voix.</string>
     <string name="ui_voices_needs_naming">À renommer</string>
     <string name="ui_voices_caption">Pour ajouter quelqu’un, nommez un intervenant dans une réunion et laissez « Mémoriser cette voix » activé.</string>
     <string name="ui_voices_empty">Aucune voix mémorisée pour l’instant</string>

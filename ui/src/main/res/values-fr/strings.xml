@@ -509,4 +509,5 @@
     <string name="ui_name_voices_off">La reconnaissance vocale est désactivée. Activez-la dans les %1$s pour mémoriser les voix.</string>
     <string name="ui_recording_title_placeholder">Ajouter un titre</string>
     <string name="ui_settings_export_all">Exporter toutes les réunions</string>
+    <string name="ui_voices_stale_body_each">La reconnaissance vocale a été mise à jour, et les voix mémorisées avant la mise à jour ne peuvent plus être reconnues. Nommez de nouveau chaque personne dans une réunion pour mémoriser sa voix.</string>
 </resources>

@@ -508,4 +508,5 @@
     <string name="ui_name_voices_off">El reconocimiento de voz está desactivado. Actívalo en %1$s para recordar voces.</string>
     <string name="ui_recording_title_placeholder">Añadir un título</string>
     <string name="ui_settings_export_all">Exportar todas las reuniones</string>
+    <string name="ui_voices_stale_body_each">El reconocimiento de voz se ha actualizado y las voces guardadas antes de la actualización no se pueden reconocer. Vuelve a poner nombre a cada persona en una reunión para guardar su voz.</string>
 </resources>

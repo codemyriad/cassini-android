@@ -164,7 +164,6 @@
         <item quantity="one">%1$s voice needs naming again</item>
         <item quantity="other">%1$s voices need naming again</item>
     </plurals>
-    <string name="ui_voices_stale_body">Voice recognition was updated, and voices saved before the update can’t be recognised. Name %1$s in a meeting to save their voice again.</string>
     <string name="ui_voices_needs_naming">Needs naming again</string>
     <string name="ui_voices_caption">To add someone, name a speaker in a meeting and keep “Remember this voice” on.</string>
     <string name="ui_voices_empty">No saved voices yet</string>
