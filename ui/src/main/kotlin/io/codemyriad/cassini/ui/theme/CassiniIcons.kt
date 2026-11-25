@@ -119,6 +119,9 @@ enum class Glyph(internal val parts: List<GlyphPart>, val filled: Boolean = fals
 
     /** No board: the star on a starred Library row (L-34, D99). */
     StarFilled(paths(STAR), filled = true),
+
+    /** No board: "Set date and time" in the Note actions sheet (D112, L-87). */
+    Calendar(listOf(GlyphPart.Rect(4f, 5f, 16f, 15f, 2f)) + paths("M4 10h16M8 3v4M16 3v4")),
     ;
 
     companion object {

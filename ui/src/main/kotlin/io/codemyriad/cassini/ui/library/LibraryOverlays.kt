@@ -11,6 +11,7 @@ import io.codemyriad.cassini.ui.components.ConfirmSpec
 import io.codemyriad.cassini.ui.components.RenameDialog
 import io.codemyriad.cassini.ui.note.DocumentInfoDialog
 import io.codemyriad.cassini.ui.note.NoteActionsSheet
+import io.codemyriad.cassini.ui.note.SetDateTimeSheet
 import io.codemyriad.cassini.ui.note.startOverSpec
 import io.codemyriad.cassini.ui.note.stopAndTrashSpec
 import io.codemyriad.cassini.ui.note.transcribeFreshSpec
@@ -29,7 +30,7 @@ internal fun LibrarySheetWindow(sheet: LibrarySheet, onEvent: (LibraryEvent) -> 
     }
 }
 
-/** A Library dialog in its window: Rename, or a confirmation from the actions sheet. */
+/** A Library dialog in its window: Rename, Set date and time (a sheet), or a confirmation from the actions sheet. */
 @Composable
 internal fun LibraryDialogWindow(dialog: LibraryDialog, onEvent: (LibraryEvent) -> Unit) {
     val dismiss = { onEvent(LibraryEvent.DismissDialog) }
@@ -37,6 +38,11 @@ internal fun LibraryDialogWindow(dialog: LibraryDialog, onEvent: (LibraryEvent) 
         is LibraryDialog.Rename -> RenameDialog(
             title = dialog.title,
             onConfirm = { onEvent(LibraryEvent.RenameConfirmed(dialog.id, it)) },
+            onDismiss = dismiss,
+        )
+        is LibraryDialog.SetDateTime -> SetDateTimeSheet(
+            ui = dialog.ui,
+            onSave = { date, time -> onEvent(LibraryEvent.DateTimeConfirmed(dialog.ui.noteId, date, time)) },
             onDismiss = dismiss,
         )
         else -> ConfirmDialog(
@@ -53,6 +59,7 @@ private fun libraryConfirmSpec(dialog: LibraryDialog): ConfirmSpec = when (dialo
     is LibraryDialog.StartOver -> startOverSpec()
     is LibraryDialog.TranscribeFresh -> transcribeFreshSpec()
     is LibraryDialog.StopAndTrash -> stopAndTrashSpec()
-    // Rename has its own dialog; this copy is never shown.
+    // Rename and Set date and time have their own windows; this copy is never shown.
     is LibraryDialog.Rename -> ConfirmSpec(title = stringResource(R.string.ui_actions_rename_title))
+    is LibraryDialog.SetDateTime -> ConfirmSpec(title = stringResource(R.string.ui_meeting_set_date_time_title))
 }

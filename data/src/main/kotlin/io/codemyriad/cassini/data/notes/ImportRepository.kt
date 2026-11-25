@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.database.SQLException
 import android.database.sqlite.SQLiteFullException
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.audio.FlacStructure
@@ -35,9 +36,16 @@ import java.util.UUID
 interface ImportSource {
     /**
      * `OpenableColumns.DISPLAY_NAME` and `SIZE`, and the provider's MIME type (`ContentResolver.getType`); each is
-     * null when the provider does not say.
+     * null when the provider does not say. [lastModified] is the file's last-saved time in epoch milliseconds
+     * (`DocumentsContract.Document.COLUMN_LAST_MODIFIED`, or the file's mtime), null when unknown: only ever a
+     * suggestion in "Set date and time" (D112), never the meeting's start.
      */
-    data class Description(val displayName: String?, val size: Long?, val mimeType: String? = null)
+    data class Description(
+        val displayName: String?,
+        val size: Long?,
+        val mimeType: String? = null,
+        val lastModified: Long? = null,
+    )
 
     fun describe(uri: Uri): Description
 
@@ -54,9 +62,32 @@ private class ResolverImportSource(private val resolver: ContentResolver) : Impo
         if (uri.scheme == ContentResolver.SCHEME_FILE) {
             // No provider type: the display name's extension decides (ImportTypes.verdict).
             val file = uri.path?.let(::File)
-            return ImportSource.Description(file?.name, file?.takeIf { it.isFile }?.length())
+            val existing = file?.takeIf { it.isFile }
+            return ImportSource.Description(
+                file?.name,
+                existing?.length(),
+                lastModified = existing?.lastModified()?.takeIf { it > 0 },
+            )
         }
-        return columns(uri).copy(mimeType = typeOf(uri))
+        return columns(uri).copy(mimeType = typeOf(uri), lastModified = lastModified(uri))
+    }
+
+    /** A separate query: a provider that does not know the column may refuse the whole projection. */
+    private fun lastModified(uri: Uri): Long? = try {
+        resolver.query(uri, arrayOf(DocumentsContract.Document.COLUMN_LAST_MODIFIED), null, null, null)?.use { cursor ->
+            val column = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+            if (cursor.moveToFirst() && column >= 0 && !cursor.isNull(column)) {
+                cursor.getLong(column).takeIf { it > 0 }
+            } else {
+                null
+            }
+        }
+    } catch (_: SecurityException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    } catch (_: UnsupportedOperationException) {
+        null
     }
 
     private fun typeOf(uri: Uri): String? = try {
@@ -234,7 +265,7 @@ class ImportRepository(
                 notes.liveWithSource(copied.sha256)?.let { ImportOutcome.Existing(it) }
                     ?: when (val staged = locks.withNoteLock(id, dispatchers.io) { classify(tmp, description) }) {
                         is Classified.Rejected -> staged.outcome
-                        is Classified.Audio -> insert(id, description.displayName, staged, copied.sha256)
+                        is Classified.Audio -> insert(id, description, staged, copied.sha256)
                     }
             } catch (error: SQLiteFullException) {
                 ImportOutcome.Rejected(Failure.SPACE, error.message, neededBytes = copied.bytes + limits.minFreeBytes)
@@ -248,11 +279,16 @@ class ImportRepository(
     }
 
     /** Step 6: the row, written only when no live note has the same bytes by now. */
-    private suspend fun insert(id: String, name: String?, staged: Classified.Audio, sha256: String): ImportOutcome {
+    private suspend fun insert(
+        id: String,
+        description: ImportSource.Description,
+        staged: Classified.Audio,
+        sha256: String,
+    ): ImportOutcome {
         val now = clock()
         val row = NoteEntity(
             id = id,
-            title = titleOf(name, fallbackTitle()),
+            title = titleOf(description.displayName, fallbackTitle()),
             createdAt = now,
             addedAt = now,
             origin = staged.origin,
@@ -261,6 +297,7 @@ class ImportRepository(
             durationMs = staged.durationMs,
             sourceSha256 = sha256,
             updatedAt = now,
+            sourceModifiedAt = description.lastModified,
         )
         val duplicate = if (staged.kind == AudioKind.DOCUMENT) {
             documents.catalogueDocument(row) { notes.liveWithSourceBlocking(sha256) }

@@ -197,6 +197,10 @@ sealed interface NoteDialog {
     /** "Stop transcription and move to trash?" (Move to trash while the job runs). */
     data object StopAndTrash : NoteDialog
 
+    /** "When was this recorded?" (D112, L-87), a sheet opened from the actions sheet. */
+    @Immutable
+    data class SetDateTime(val ui: SetDateTimeUi) : NoteDialog
+
     /** A rename, merge or version change that [reason] does not allow. */
     @Immutable
     data class ReadOnly(val reason: ReadOnlyReason) : NoteDialog

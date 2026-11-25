@@ -164,6 +164,12 @@ LABELS = {
     'voices_forget_title': ('confirm.deleteVoiceProfile.title', 'name'),
     'voices_forget_body': ('confirm.deleteVoiceProfile.body', 'name'),
     'voices_forget_action': ('confirm.deleteVoiceProfile.primary', None),
+    # D112 (L-87, D-1164): Set date and time, under Rename in the actions sheet (phones: no ellipsis).
+    'meeting_set_date_time': ('meeting.setDateTime', None),
+    'meeting_set_date_time_title': ('meeting.setDateTime.title', None),
+    'meeting_set_date_time_date': ('meeting.setDateTime.dateLabel', None),
+    'meeting_set_date_time_time': ('meeting.setDateTime.timeLabel', None),
+    'meeting_set_date_time_saved_hint': ('meeting.setDateTime.prefillSavedHint', None),
 }
 
 

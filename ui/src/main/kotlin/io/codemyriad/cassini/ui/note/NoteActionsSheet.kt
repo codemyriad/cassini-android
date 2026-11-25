@@ -52,10 +52,10 @@ fun NoteActionsSheet(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, onDismis
  * The sheet's content (board 06; features.md section 6), also drawn inline in screenshots (`SheetBoardFrame`):
  * padding 12 (below the handle; 10.5 measured) / 12 / 20; the title (margin 12 horizontal, 2 below; 3.5 measured) and
  * the meta line "Yesterday, 15:10 · 23:50 · 3 speakers" (12 below). Then, in iPhone's order (QA 25 Nov): Rename,
- * Star or Unstar (L-34), the transcribe row(s), one "Export…" row ("Cassini file, Markdown and more") instead of the
- * three export rows on top, Document info (documents only) and Move to trash (hidden while recording). Export… turns
- * the sheet into its export page ([ExportPage]), which also shows while one of its rows writes. The content scrolls
- * when it does not fit (large fonts, landscape).
+ * Star or Unstar (L-34), Set date and time (D112), the transcribe row(s), one "Export…" row ("Cassini file, Markdown
+ * and more") instead of the three export rows on top, Document info (documents only) and Move to trash (hidden while
+ * recording). Export… turns the sheet into its export page ([ExportPage]), which also shows while one of its rows
+ * writes. The content scrolls when it does not fit (large fonts, landscape).
  */
 @Composable
 fun NoteActionsSheetContent(
@@ -104,7 +104,10 @@ private fun SheetTitle(ui: NoteActionsUi, document: Boolean) {
     )
 }
 
-/** The actions in iPhone's order (QA 25 Nov); "Set date and time…" joins them with the Imported recordings work. */
+/**
+ * The actions in iPhone's order (QA 25 Nov, D-1161): Rename, Star, Set date and time (D112, every meeting: a wrong
+ * date is as bad as none), the transcribe row(s), Export…, Document info, Move to trash.
+ */
 @Composable
 private fun ActionRows(ui: NoteActionsUi, document: Boolean, onAction: (NoteAction) -> Unit, onExport: () -> Unit) {
     SheetActionRow(stringResource(R.string.ui_action_rename), Glyph.Pencil, { onAction(NoteAction.RENAME) })
@@ -113,6 +116,12 @@ private fun ActionRows(ui: NoteActionsUi, document: Boolean, onAction: (NoteActi
         label = stringResource(if (ui.starred) R.string.ui_meeting_unstar else R.string.ui_meeting_star),
         glyph = Glyph.Star,
         onClick = { onAction(if (ui.starred) NoteAction.UNSTAR else NoteAction.STAR) },
+    )
+    SheetActionRow(
+        label = stringResource(R.string.ui_meeting_set_date_time),
+        glyph = Glyph.Calendar,
+        onClick = { onAction(NoteAction.SET_DATE_TIME) },
+        modifier = Modifier.testTag("actions-set-date-time"),
     )
     TranscribeRows(ui.transcribeRow, stopBusy = ui.busyRow == NoteAction.STOP, onAction = onAction)
     SheetActionRow(

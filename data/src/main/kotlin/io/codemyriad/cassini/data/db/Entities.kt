@@ -82,6 +82,17 @@ data class NoteEntity(
     @ColumnInfo(name = "capture_audio_sha256") val captureAudioSha256: String? = null,
     /** A v1 own-document clock, withheld until distinguished from a rebuilt packaging timestamp. */
     @ColumnInfo(name = "legacy_capture_candidate") val legacyCaptureCandidate: Long? = null,
+    /**
+     * D112 (L-87): the meeting start the person set in "Set date and time", RFC 3339 with their UTC offset
+     * (`StartedAt`). Authoritative, like [title]: it wins over every other start, and an OK document holds a copy
+     * (`meeting.startedAt`), written when no job runs. Null when the person never set one.
+     */
+    @ColumnInfo(name = "started_at") val startedAt: String? = null,
+    /**
+     * The imported file's last-saved time (epoch ms) as its provider reported it; null for recordings or when unknown.
+     * Only a prefill suggestion in "Set date and time" (D112), never shown or stored as the meeting's start.
+     */
+    @ColumnInfo(name = "source_modified_at") val sourceModifiedAt: Long? = null,
 )
 
 /** One transcript variant of a note's document, in manifest order. */

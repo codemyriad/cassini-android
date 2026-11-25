@@ -305,6 +305,11 @@ internal class FakeNotePorts : NotePorts {
         calls += "starred:$starred"
     }
 
+    override suspend fun setStartedAt(id: String, startedAt: String): Boolean {
+        calls += "startedAt:$startedAt"
+        return true
+    }
+
     override suspend fun selectVariant(id: String, variantId: String): Boolean {
         calls += "select:$variantId"
         return true

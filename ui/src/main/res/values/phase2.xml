@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 671abcd26e77d012583adc25f971e0d6b3742f7f; do not edit. -->
+<!-- Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Saved voices</string>
     <string name="ui_settings_trash">Trash</string>
@@ -171,4 +171,9 @@
     <string name="ui_voices_forget_title">Forget %1$s’s voice?</string>
     <string name="ui_voices_forget_body">Cassini will no longer recognise %1$s in new meetings. Names already in transcripts stay.</string>
     <string name="ui_voices_forget_action">Forget</string>
+    <string name="ui_meeting_set_date_time">Set date and time</string>
+    <string name="ui_meeting_set_date_time_title">When was this recorded?</string>
+    <string name="ui_meeting_set_date_time_date">Date</string>
+    <string name="ui_meeting_set_date_time_time">Started at</string>
+    <string name="ui_meeting_set_date_time_saved_hint">Filled in from when the file was saved. Change it if it’s wrong.</string>
 </resources>

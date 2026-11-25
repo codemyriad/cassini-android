@@ -90,6 +90,9 @@ enum class NoteAction {
     RENAME,
     STAR,
     UNSTAR,
+
+    /** "Set date and time" (D112, L-87): opens the "When was this recorded?" sheet, for every meeting. */
+    SET_DATE_TIME,
     TRANSCRIBE,
     TRANSCRIBE_AGAIN,
     STOP,

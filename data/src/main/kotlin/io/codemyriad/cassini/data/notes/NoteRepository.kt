@@ -3,6 +3,7 @@ package io.codemyriad.cassini.data.notes
 import androidx.annotation.WorkerThread
 import io.codemyriad.cassini.core.export.ReadingText
 import io.codemyriad.cassini.core.format.DocumentState
+import io.codemyriad.cassini.core.format.MeetingTime
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
@@ -217,6 +218,28 @@ class NoteRepository(
                 RenameOutcome.Renamed
             }
         }
+    }
+
+    /**
+     * D112 (L-87, "Set date and time"): stores [startedAt] (RFC 3339 with the person's offset, `StartedAt`) as the
+     * meeting's start in `notes.started_at`, which wins over every other start, and orders the note by it
+     * (`created_at`), so it moves to its day in the Library and Search at once and "Date unknown" empties. An OK
+     * document with no job row gets it in the background (`DocumentRepository.writeStart`); otherwise adopt, the
+     * startup pass or "Save a copy" writes it, and a document that is not OK keeps it in Room only. The file is
+     * never renamed and the import or copy time is never stored as the start. False without a row or for an
+     * invalid value.
+     */
+    suspend fun setStartedAt(id: String, startedAt: String): Boolean {
+        val start = MeetingTime.started(startedAt)
+        val at = start?.instant
+        val row = notes.note(id)
+        val stored = start != null && at != null && row != null &&
+            notes.setStartedAt(id, start.value, at.toEpochMilli(), clock())
+        val writable = row?.audioKind == AudioKind.DOCUMENT && row.documentState == DocumentState.OK
+        if (stored && writable && jobs.job(id) == null) {
+            background.launch(dispatchers.io) { documents.writeStart(id) }
+        }
+        return stored
     }
 
     /**

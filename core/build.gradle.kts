@@ -50,6 +50,10 @@ val importTypes: File = uxVendor.resolve("contract/import-types.json")
 val headStartModeVectors: File = uxVendor.resolve("vectors/head-start/transcription-mode-vectors.json")
 val headStartPrefixVectors: File = uxVendor.resolve("vectors/head-start/mobile-prefix-checkpoint-vectors.json")
 val uxPin: File = uxVendor.resolve("UPSTREAM.json")
+// StartedAtVectorsTest reads the D112 Set date and time round-trip vectors (D-1171).
+val roundTripVectors: List<File> = listOf("user-started-at", "legacy-import-time-date").flatMap { name ->
+    listOf("opus", "expected.json").map { uxVendor.resolve("vectors/library-vectors/round-trip/$name.$it") }
+}
 
 tasks.test {
     jvmArgumentProviders.add(
@@ -63,6 +67,7 @@ tasks.test {
                 headStartModeVectors,
                 headStartPrefixVectors,
                 uxPin,
+                roundTripVectors,
             ),
             properties = mapOf(
                 "cassini.conformance" to conformanceDirectory,

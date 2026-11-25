@@ -351,5 +351,21 @@
   {"screen": "library", "label": "Library", "scheme": "dark", "lang": "en", "device": "foldable-unfolded", "path": "foldable-unfolded-dark/00-library.png"},
   {"screen": "recording", "label": "Recording", "scheme": "dark", "lang": "en", "device": "foldable-unfolded", "path": "foldable-unfolded-dark/01-recording.png", "rendered_scheme": "dark"},
   {"screen": "read-and-listen", "label": "Read and listen", "scheme": "dark", "lang": "en", "device": "foldable-unfolded", "path": "foldable-unfolded-dark/03-read-and-listen.png"},
-  {"screen": "settings", "label": "Settings", "scheme": "dark", "lang": "en", "device": "foldable-unfolded", "path": "foldable-unfolded-dark/08-settings.png"}
+  {"screen": "settings", "label": "Settings", "scheme": "dark", "lang": "en", "device": "foldable-unfolded", "path": "foldable-unfolded-dark/08-settings.png"},
+  {"screen": "set-date-time-actions", "label": "Set date and time · actions sheet", "scheme": "light", "lang": "en", "device": "phone", "path": "light/set-date-time-actions.png"},
+  {"screen": "set-date-time-actions", "label": "Set date and time · actions sheet", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/set-date-time-actions.png"},
+  {"screen": "set-date-time", "label": "Set date and time · meeting with a date", "scheme": "light", "lang": "en", "device": "phone", "path": "light/set-date-time.png"},
+  {"screen": "set-date-time", "label": "Set date and time · meeting with a date", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/set-date-time.png"},
+  {"screen": "set-date-time-saved-hint", "label": "Set date and time · saved-time suggestion", "scheme": "light", "lang": "en", "device": "phone", "path": "light/set-date-time-saved-hint.png"},
+  {"screen": "set-date-time-saved-hint", "label": "Set date and time · saved-time suggestion", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/set-date-time-saved-hint.png"},
+  {"screen": "set-date-time-date-picker", "label": "Set date and time · date picker", "scheme": "light", "lang": "en", "device": "phone", "path": "light/set-date-time-date-picker.png"},
+  {"screen": "set-date-time-date-picker", "label": "Set date and time · date picker", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/set-date-time-date-picker.png"},
+  {"screen": "set-date-time-time-picker", "label": "Set date and time · time picker", "scheme": "light", "lang": "en", "device": "phone", "path": "light/set-date-time-time-picker.png"},
+  {"screen": "set-date-time-time-picker", "label": "Set date and time · time picker", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/set-date-time-time-picker.png"},
+  {"screen": "set-date-time-library-before", "label": "Set date and time · Library before Save", "scheme": "light", "lang": "en", "device": "phone", "path": "light/set-date-time-library-before.png"},
+  {"screen": "set-date-time-library-before", "label": "Set date and time · Library before Save", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/set-date-time-library-before.png"},
+  {"screen": "set-date-time-library-after", "label": "Set date and time · Library after Save", "scheme": "light", "lang": "en", "device": "phone", "path": "light/set-date-time-library-after.png"},
+  {"screen": "set-date-time-library-after", "label": "Set date and time · Library after Save", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/set-date-time-library-after.png"},
+  {"screen": "unfolded-set-date-time", "label": "Set date and time · unfolded, beside the Library", "scheme": "light", "lang": "en", "device": "phone", "path": "foldable-unfolded/set-date-time.png"},
+  {"screen": "unfolded-set-date-time", "label": "Set date and time · unfolded, beside the Library", "scheme": "dark", "lang": "en", "device": "phone", "path": "foldable-unfolded-dark/set-date-time.png"}
 ]}
