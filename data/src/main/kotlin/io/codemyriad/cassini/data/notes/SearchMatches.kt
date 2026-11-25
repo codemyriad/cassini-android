@@ -17,6 +17,7 @@ internal class SearchMatches(
         val title: String,
         val bounded: Boolean,
         val speakers: Set<String>?,
+        val background: Set<String> = emptySet(),
     )
 
     private data class Cached(val key: Key, val excerpt: SearchExcerpt?)
@@ -31,11 +32,14 @@ internal class SearchMatches(
         val variant = hit.row.selectedVariant
         val ids = speaker?.let { name ->
             hit.speakers.filter {
-                it.variantId == variant && !it.isPlaceholder && it.label.equals(name, ignoreCase = true)
+                it.variantId == variant && !it.isPlaceholder && !it.background && it.label.equals(name, ignoreCase = true)
             }.mapTo(HashSet()) { it.speakerId }
         }
         if (ids != null && ids.isEmpty()) return null
-        val key = Key(hit.documentSignature, variant, hit.row.title, hit.row.wordEndsBoundedByAudio == true, ids)
+        val background = hit.speakers.filter { it.variantId == variant && it.background }
+            .mapTo(HashSet()) { it.speakerId }
+        val bounded = hit.row.wordEndsBoundedByAudio == true
+        val key = Key(hit.documentSignature, variant, hit.row.title, bounded, ids, background)
         // A missing signature cannot attest a word snapshot; do not reuse it, even in partially derived caches.
         val previous = excerpts[hit.row.id]?.takeIf { key.signature != null && it.key == key }
         val cached = previous ?: index(hit, key, expression, matcher)?.also { excerpts[hit.row.id] = it }
@@ -51,7 +55,8 @@ internal class SearchMatches(
         if (key.variant != null && words.size != hit.row.wordCount) return null
         val speakers = key.speakers
         val excerpt = if (speakers == null) {
-            matcher.note(expression, hit.row.title, words)
+            // Background voices (D112 / L-86) are not searched, as in the persistent body.
+            matcher.note(expression, hit.row.title, words.filter { it.speaker !in key.background })
         } else {
             matcher.snippet(expression, words, speakers, key.bounded)?.let { SearchExcerpt(it, hit.row.title) }
         }

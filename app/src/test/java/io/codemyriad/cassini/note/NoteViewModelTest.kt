@@ -1002,6 +1002,41 @@ class NoteViewModelTest {
         assertTrue("enrol:b:null:Anna" in ports.calls)
     }
 
+    /** D112 / L-86: move to another speaker without closing, switch it to background, Save once, then Undo. */
+    @Test
+    fun theSpeakerRowSwitchesSpeakersAndOneSaveWithUndoCoversTheBackgroundVoice() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.SpeakerTap("b"))
+        val open = (viewModel.now().sheet as NoteSheet.NameSpeaker).ui
+        assertEquals(listOf("a", "b", "c"), open.speakers.map { it.speakerId })
+        assertTrue(open.canBackground)
+        send(viewModel, NoteEvent.NameSheet(NameSheetEvent.NameChanged("Marta")))
+        send(viewModel, NoteEvent.NameSheet(NameSheetEvent.SelectSpeaker("c")))
+        val third = (viewModel.now().sheet as NoteSheet.NameSpeaker).ui
+        assertEquals("c", third.speakerId)
+        send(viewModel, NoteEvent.NameSheet(NameSheetEvent.BackgroundChanged(true)))
+        val switched = (viewModel.now().sheet as NoteSheet.NameSpeaker).ui
+        assertTrue(switched.speakers.first { it.speakerId == "c" }.background)
+        // Back to b: the typed name is still there.
+        send(viewModel, NoteEvent.NameSheet(NameSheetEvent.SelectSpeaker("b")))
+        assertEquals("Marta", (viewModel.now().sheet as NoteSheet.NameSpeaker).ui.name)
+        send(viewModel, NoteEvent.NameSheet(NameSheetEvent.RememberChanged(false)))
+        send(viewModel, NoteEvent.NameSheet(NameSheetEvent.Save))
+        assertNull(viewModel.now().sheet)
+        assertEquals(listOf(mapOf("b" to "Marta")), ports.relabels)
+        assertEquals(listOf(mapOf("c" to true)), ports.backgrounds)
+        val snackbar = checkNotNull(viewModel.now().snackbar)
+        assertEquals(SnackbarKind.NAMED_AND_BACKGROUND, snackbar.kind)
+        assertEquals("Marta", snackbar.text)
+        assertEquals(1, snackbar.count)
+        assertTrue(snackbar.undo)
+
+        send(viewModel, NoteEvent.SnackbarUndo)
+        assertNull(viewModel.now().snackbar)
+        assertEquals(mapOf("c" to false), ports.backgrounds.last())
+        assertEquals("Speaker 2", ports.relabels.last()["b"])
+    }
+
     @Test
     fun aSealedMergeAddsAVersionAndCarriesThePrints() = runTest(dispatcher) {
         val viewModel = viewModel()

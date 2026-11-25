@@ -15,6 +15,7 @@ import io.codemyriad.cassini.ui.note.MergeVersionsUi
 import io.codemyriad.cassini.ui.note.NameSheetUi
 import io.codemyriad.cassini.ui.note.RememberReason
 import io.codemyriad.cassini.ui.note.SaveState
+import io.codemyriad.cassini.ui.note.SpeakerChipUi
 import io.codemyriad.cassini.ui.note.VoiceOptionUi
 import io.codemyriad.cassini.ui.theme.SpeakerTone
 import kotlinx.collections.immutable.toImmutableList
@@ -33,6 +34,8 @@ import kotlinx.collections.immutable.toImmutableList
  *   speaker not yet bound to a saved voice.
  * - [mergeTargets] are the other speakers of the shown transcript; [sealedVersions] the versions of a sealed merge.
  * - [canSample] is false when no player is open (the Transcribing mode has none).
+ * - [background] is whether the file marks the speaker as a background voice (cassini-ux D112 / L-86);
+ *   [canBackground] shows the switch (sealed notes only: a running job's draft names have no such flag).
  */
 data class NamingInput(
     val speakerId: String,
@@ -55,6 +58,8 @@ data class NamingInput(
     val sealedVersions: MergeVersionsUi? = null,
     val canSample: Boolean = true,
     val quote: String = "",
+    val background: Boolean = false,
+    val canBackground: Boolean = false,
 ) {
     /** The stored name, or null for a placeholder speaker. */
     val namedLabel: String? get() = (label as? SpeakerNameUi.Named)?.text
@@ -70,7 +75,8 @@ data class NamingInput(
         willHavePrint == other.willHavePrint && match == other.match && voices == other.voices &&
         voicesReadOnly == other.voicesReadOnly && voiceModelReady == other.voiceModelReady &&
         rememberDefault == other.rememberDefault && remembered == other.remembered &&
-        mergeTargets == other.mergeTargets && sealedVersions == other.sealedVersions && canSample == other.canSample && quote == other.quote
+        mergeTargets == other.mergeTargets && sealedVersions == other.sealedVersions && canSample == other.canSample &&
+        quote == other.quote && background == other.background && canBackground == other.canBackground
 
     override fun hashCode(): Int = speakerId.hashCode() * HASH + label.hashCode()
 
@@ -98,7 +104,49 @@ data class NamingState(
     /** The answer to "Also rename the saved voice?": true renames it, false keeps it (someone else). */
     val renameAnswer: Boolean? = null,
     val merge: MergeStep? = null,
+    /** The Background voice switch; it starts as the file has it ([NamingInput.background]). */
+    val background: Boolean = input.background,
 )
+
+/**
+ * The open sheet with its speaker row (cassini-ux D112 / L-86): every speaker of the shown transcript in [chips], in
+ * the order of the names under the meeting title, and one form per speaker visited so far in [forms]. [active] is the
+ * speaker whose form shows. Each form keeps its changes while the user moves between speakers; one Save applies them
+ * all.
+ */
+data class NamingSession(
+    val chips: List<SessionChip>,
+    val forms: Map<String, NamingState>,
+    val active: String,
+) {
+    val form: NamingState get() = forms.getValue(active)
+
+    /** [state] as the form of its speaker, shown. */
+    fun show(state: NamingState): NamingSession =
+        copy(forms = forms + (state.input.speakerId to state), active = state.input.speakerId)
+
+    companion object {
+        fun of(state: NamingState, chips: List<SessionChip>): NamingSession =
+            NamingSession(chips, mapOf(state.input.speakerId to state), state.input.speakerId)
+    }
+}
+
+/** One speaker of the row as stored: its label, colour and whether it is a background voice. */
+data class SessionChip(
+    val speakerId: String,
+    val label: SpeakerNameUi,
+    val tone: SpeakerTone,
+    val background: Boolean = false,
+)
+
+/** What one form would save. */
+enum class FormChange {
+    NONE,
+    READY,
+
+    /** A question is open: answer it first. */
+    BLOCKED,
+}
 
 /** The Merge sheet: [target] null shows the list of speakers, a speaker id shows the confirmation. */
 data class MergeStep(val target: String? = null)
@@ -128,6 +176,9 @@ sealed interface NamingEvent {
 
     data class RememberToggled(val remember: Boolean) : NamingEvent
 
+    /** The Background voice card (D112 / L-86). */
+    data class BackgroundToggled(val background: Boolean) : NamingEvent
+
     data object PlaySample : NamingEvent
 
     /** "Merge into…": the list of the other speakers. */
@@ -150,6 +201,9 @@ sealed interface NamingEvent {
 sealed interface NamingEffect {
     /** Sealed: write [label] for [speakerId] into the document. */
     data class Relabel(val speakerId: String, val label: String) : NamingEffect
+
+    /** Sealed: mark [speakerId] as a background voice, or switch that off (D112 / L-86), in the same write. */
+    data class Background(val speakerId: String, val background: Boolean) : NamingEffect
 
     /** Sealed: enrol the speaker's print into [voiceId] (a new person when null) called [name]; CONFIRMED. */
     data class RememberVoice(val speakerId: String, val voiceId: String?, val name: String) : NamingEffect
@@ -207,6 +261,9 @@ sealed interface NamingEffect {
 /** The sheet after an event ([state] null once it closed) and the effects to carry out. */
 data class NamingResult(val state: NamingState?, val effects: List<NamingEffect> = emptyList())
 
+/** The session after an event ([session] null once the sheet closed) and the effects to carry out. */
+data class SessionResult(val session: NamingSession?, val effects: List<NamingEffect> = emptyList())
+
 /**
  * The pure reducer of the Name a speaker sheet (features.md section 4; architecture section 6): events in, sheet
  * state and effects out. The ViewModel owns one [NamingState] while the sheet is open, builds the [NameSheetUi] and
@@ -252,8 +309,11 @@ object SpeakerNaming {
         NamingEvent.KeepSaved -> NamingResult(state.copy(renameAnswer = false))
         NamingEvent.NotThisPerson -> notThisPerson(state)
         is NamingEvent.RememberToggled -> NamingResult(state.copy(remember = event.remember && rememberable(state)))
+        is NamingEvent.BackgroundToggled ->
+            NamingResult(state.copy(background = event.background && state.input.canBackground))
         NamingEvent.PlaySample -> NamingResult(state, playSample(state))
-        NamingEvent.MergeInto -> NamingResult(if (canMerge(state)) state.copy(merge = MergeStep()) else state)
+        NamingEvent.MergeInto ->
+            NamingResult(if (canMerge(state) && !state.background) state.copy(merge = MergeStep()) else state)
         is NamingEvent.MergeTarget -> NamingResult(mergeTarget(state, event.speakerId))
         NamingEvent.CancelMerge -> NamingResult(state.copy(merge = state.merge?.copy(target = null)))
         NamingEvent.ConfirmMerge -> confirmMerge(state)
@@ -297,7 +357,98 @@ object SpeakerNaming {
             canMerge = canMerge(state),
             save = saveState(state),
             draft = input.draft,
+            background = state.background,
+            canBackground = input.canBackground,
         )
+    }
+
+    // The sheet with its speaker row (D112 / L-86). --------------------------------------------------------------
+
+    /**
+     * The session's sheet: the active form, the speaker row (each chip as its form has it, else as stored) and the
+     * Save state of every form together.
+     */
+    fun ui(session: NamingSession, sampling: Boolean = false): NameSheetUi {
+        val chips = if (session.chips.size > 1) {
+            session.chips.map { chip ->
+                SpeakerChipUi(
+                    chip.speakerId,
+                    chip.label,
+                    chip.tone,
+                    session.forms[chip.speakerId]?.background ?: chip.background,
+                )
+            }
+        } else {
+            emptyList()
+        }
+        return ui(session.form, sampling).copy(speakers = chips.toImmutableList(), save = saveState(session))
+    }
+
+    /** The Merge sheet of the active form, or null. */
+    fun mergeUi(session: NamingSession): MergeUi? = mergeUi(session.form)
+
+    /**
+     * Save for the whole sheet: enabled when any form has something to save, "answer first" when the shown form has an
+     * open question. A question open in another form is shown when Save is pressed.
+     */
+    fun saveState(session: NamingSession): SaveState {
+        val changes = session.forms.mapValues { change(it.value) }
+        return when {
+            changes[session.active] == FormChange.BLOCKED -> SaveState.BLOCKED_BY_QUESTION
+            changes.values.any { it != FormChange.NONE } -> SaveState.ENABLED
+            else -> SaveState.DISABLED
+        }
+    }
+
+    /**
+     * One event of the session. Save applies every form with a change, in the row's order, or shows the first form
+     * whose question is still open; Cancel drops every change. Other events go to the shown form; when it closes the
+     * sheet (Not <name>, a merge) only its own effects run.
+     */
+    fun reduce(session: NamingSession, event: NamingEvent): SessionResult = when (event) {
+        NamingEvent.Save -> saveAll(session)
+        NamingEvent.Cancel -> SessionResult(null, listOf(NamingEffect.Close))
+        else -> {
+            val result = reduce(session.form, event)
+            SessionResult(result.state?.let(session::show), result.effects)
+        }
+    }
+
+    private fun saveAll(session: NamingSession): SessionResult {
+        val order = session.chips.map { it.speakerId }.filter { it in session.forms } +
+            session.forms.keys.filter { id -> session.chips.none { it.speakerId == id } }
+        val forms = order.map { session.forms.getValue(it) }
+        val blocked = forms.firstOrNull { change(it) == FormChange.BLOCKED }
+        return when {
+            blocked != null -> SessionResult(session.show(blocked), listOf(NamingEffect.FocusQuestion))
+            forms.none { change(it) == FormChange.READY } -> SessionResult(session)
+            else -> {
+                val effects = forms.filter { change(it) == FormChange.READY }.flatMap(::formEffects)
+                SessionResult(null, effects + NamingEffect.Close)
+            }
+        }
+    }
+
+    /** What [state] would save: nothing, a change, or a change held back by an open question. */
+    fun change(state: NamingState): FormChange {
+        val switched = state.background != state.input.background
+        if (state.background) return if (switched) FormChange.READY else FormChange.NONE
+        val named = when (nameSaveState(state)) {
+            SaveState.DISABLED -> FormChange.NONE
+            SaveState.BLOCKED_BY_QUESTION -> FormChange.BLOCKED
+            SaveState.ENABLED -> FormChange.READY
+        }
+        return if (named == FormChange.NONE && switched) FormChange.READY else named
+    }
+
+    /** The effects of one form with a change: the background switch, then the name and voice effects. */
+    private fun formEffects(state: NamingState): List<NamingEffect> {
+        val input = state.input
+        val switched = state.background != input.background
+        val background = listOfNotNull(NamingEffect.Background(input.speakerId, state.background).takeIf { switched })
+        // A background voice keeps its name as it is and gets no voiceprint (D112).
+        if (state.background || nameSaveState(state) != SaveState.ENABLED) return background
+        return background + if (input.draft) draftSave(state) else sealedSave(state)
     }
 
     /** The Merge sheet of [state], or null while the Name sheet shows. */
@@ -313,8 +464,15 @@ object SpeakerNaming {
         )
     }
 
-    /** The Save button (features.md section 4, item 8). */
-    fun saveState(state: NamingState): SaveState {
+    /** The Save button of one form (features.md section 4, item 8), with the Background voice switch (D112). */
+    fun saveState(state: NamingState): SaveState = when (change(state)) {
+        FormChange.NONE -> SaveState.DISABLED
+        FormChange.READY -> SaveState.ENABLED
+        FormChange.BLOCKED -> SaveState.BLOCKED_BY_QUESTION
+    }
+
+    /** The name part of [saveState]: the rule from before background voices. */
+    private fun nameSaveState(state: NamingState): SaveState {
         val trimmed = state.name.trim()
         val unchanged = trimmed == state.initialName.trim() &&
             state.boundVoiceId == state.initialBound &&
@@ -420,13 +578,10 @@ object SpeakerNaming {
         return NamingResult(null, listOf(effect, NamingEffect.Close))
     }
 
-    private fun save(state: NamingState): NamingResult = when (saveState(state)) {
-        SaveState.DISABLED -> NamingResult(state)
-        SaveState.BLOCKED_BY_QUESTION -> NamingResult(state, listOf(NamingEffect.FocusQuestion))
-        SaveState.ENABLED -> {
-            val effects = if (state.input.draft) draftSave(state) else sealedSave(state)
-            NamingResult(null, effects + NamingEffect.Close)
-        }
+    private fun save(state: NamingState): NamingResult = when (change(state)) {
+        FormChange.NONE -> NamingResult(state)
+        FormChange.BLOCKED -> NamingResult(state, listOf(NamingEffect.FocusQuestion))
+        FormChange.READY -> NamingResult(null, formEffects(state) + NamingEffect.Close)
     }
 
     /** 0.1.0 `rememberVoice` after the relabel (features.md section 4, sealed save). */

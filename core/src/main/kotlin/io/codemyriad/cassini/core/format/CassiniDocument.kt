@@ -405,9 +405,16 @@ data class CassiniDocument(
 
         /**
          * Renames speakers, fixing any legacy missing colour slots before the edit and clearing an explicit
-         * unnamed marker on the renamed speaker. Bodies, variants and unrelated metadata/tags are retained.
+         * unnamed marker on the renamed speaker. [background] sets or clears background voices ([SpeakerBackground],
+         * D112). Bodies, variants and unrelated metadata/tags are retained.
          */
-        fun relabel(source: File, existing: CassiniDocument, labels: Map<String, String>, target: File): CassiniDocument {
+        fun relabel(
+            source: File,
+            existing: CassiniDocument,
+            labels: Map<String, String>,
+            target: File,
+            background: Map<String, Boolean> = emptyMap(),
+        ): CassiniDocument {
             require(existing.state == "ok" && existing.manifest != null)
             val manifest = JSONObject(existing.manifest.toString())
             val speakers = manifest.getJSONArray("speakers")
@@ -419,6 +426,8 @@ data class CassiniDocument(
                 speaker.put("label", label.trim())
                 if (speaker.optString("provenance") == "unnamed") speaker.remove("provenance")
             }
+            background.keys.forEach { id -> require(id in byId) { "Unknown speaker $id" } }
+            SpeakerBackground.apply(manifest, background)
             val digest = manifest.getJSONObject("integrity").getString("opusAudioSha256")
             val comments = existing.comments.filterNot { isManifestTag(it.substringBefore('=').uppercase(Locale.ROOT)) } +
                 CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second

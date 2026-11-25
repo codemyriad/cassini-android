@@ -161,6 +161,8 @@ data class SpeakerEntity(
     @ColumnInfo(name = "sample_start_ms") val sampleStartMs: Long? = null,
     @ColumnInfo(name = "sample_end_ms") val sampleEndMs: Long? = null,
     @ColumnInfo(name = "colour_index", defaultValue = "0") val colourIndex: Long = ordinal.toLong(),
+    /** A background voice (cassini-ux D112 / L-86, `SpeakerBackground`): kept out of names, search and exports. */
+    @ColumnInfo(name = "background", defaultValue = "0") val background: Boolean = false,
 )
 
 /**

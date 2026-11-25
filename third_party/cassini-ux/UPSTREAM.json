@@ -110,6 +110,11 @@
       "source": "vectors/library-vectors/round-trip/legacy-import-time-date.expected.json",
       "commit": "60ac93da94ce433412c93d8e96a76c68503dcec3",
       "sha256": "fb9d4ff933f95e1ed90d030849d93bf91bf644963cf35ca4eaabea397c7cdc64"
+    },
+    "d112/strings.json": {
+      "source": "strings/strings.json",
+      "sha256": "8272be2e315ff8cb6435b2eb6fba6568ecb11ee84975ff19fcb9bbaaf715a7fb",
+      "commit": "60ac93da94ce433412c93d8e96a76c68503dcec3"
     }
   }
 }

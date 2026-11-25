@@ -62,7 +62,6 @@
     <string name="ui_sp_remember_unnamed">O Cassini dará nome a esta pessoa automaticamente da próxima vez.\nA impressão vocal fica neste telemóvel.</string>
     <string name="ui_sp_remember_too_short">O Cassini precisa de, pelo menos, 4 segundos desta voz para a memorizar.</string>
     <string name="ui_sp_merge">Juntar a…</string>
-    <string name="ui_sp_save">Guardar nome</string>
     <plurals name="ui_tx_eta_minutes">
         <item quantity="one">cerca de %1$s min restante</item>
         <item quantity="many">cerca de %1$s min restantes</item>

@@ -78,7 +78,7 @@ class SheetBehaviourTest {
     @Test fun saveWithTheQuestionOpenMovesFocusToTheQuestion() {
         val events = mutableListOf<NameSheetEvent>()
         setThemed { NameSpeakerSheetContent(BoardFixtures.nameSpeaker, onEvent = { events += it }) }
-        rule.onNodeWithText("Save name")
+        rule.onNodeWithText("Save")
             .assertIsEnabled()
             .assert(answerFirst)
             .performClick()
@@ -99,7 +99,7 @@ class SheetBehaviourTest {
         rule.onNode(card).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
         rule.mainClock.autoAdvance = false
         repeat(2) {
-            rule.onNodeWithText("Save name").performClick()
+            rule.onNodeWithText("Save").performClick()
             rule.mainClock.advanceTimeBy(FRAME_MS)
             rule.onNode(card).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
             rule.mainClock.advanceTimeBy(ANNOUNCE_MS)
@@ -168,7 +168,7 @@ class SheetBehaviourTest {
         val events = mutableListOf<NameSheetEvent>()
         val draft = VariantFixtures.nameSheet.getValue("name-draft")
         setThemed { NameSpeakerSheetContent(draft, onEvent = { events += it }) }
-        rule.onNodeWithText("Save name").performClick()
+        rule.onNodeWithText("Save").performClick()
         rule.onNodeWithContentDescription("Play a sample of this voice").assertIsNotEnabled()
         rule.runOnIdle { assertEquals(listOf(NameSheetEvent.Save), events) }
     }
@@ -178,7 +178,7 @@ class SheetBehaviourTest {
         val showAll = VariantFixtures.nameSheet.getValue("name-show-all")
         assertEquals(SaveState.DISABLED, showAll.save)
         setThemed { NameSpeakerSheetContent(showAll.copy(notName = "Anna Ricci"), onEvent = { events += it }) }
-        rule.onNodeWithText("Save name").assertIsNotEnabled()
+        rule.onNodeWithText("Save").assertIsNotEnabled()
         rule.onNodeWithText("Show all").performClick()
         rule.onNodeWithText("Not Anna Ricci?").performClick()
         rule.runOnIdle { assertEquals(listOf(NameSheetEvent.ShowAll, NameSheetEvent.NotName), events) }

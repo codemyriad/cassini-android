@@ -107,6 +107,8 @@ data class TurnUi(
     val over: String = "",
     val crosstalk: Boolean = false,
     val inlineSuggestions: ImmutableList<InlineSuggestionUi> = persistentListOf(),
+    /** A background voice's turn (D112 / L-86): consecutive ones fold into "{n} background voices hidden". */
+    val background: Boolean = false,
 )
 
 /** An inline speaker still gets their naming suggestion, outside the unchanged transcript paragraph. */

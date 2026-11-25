@@ -54,7 +54,7 @@ internal fun MeetingHeader(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
     val c = CassiniTheme.colors
     val speakers = remember(state.meetingSpeakers, state.turns) {
         state.meetingSpeakers.ifEmpty {
-            state.turns.distinctBy { it.speakerId }.map {
+            state.turns.filterNot { it.background }.distinctBy { it.speakerId }.map {
                 MeetingSpeakerUi(it.speakerId, it.name, it.tone, it.auto, it.startMs)
             }
         }

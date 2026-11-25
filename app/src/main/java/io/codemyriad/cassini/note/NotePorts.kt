@@ -190,7 +190,10 @@ interface NotePorts {
 
     suspend fun acknowledgeTrust(id: String)
 
-    suspend fun relabel(id: String, labels: Map<String, String>): EditOutcome
+    suspend fun relabel(id: String, labels: Map<String, String>): EditOutcome = relabel(id, labels, emptyMap())
+
+    /** Renames speakers and switches background voices ([background] by speaker id, D112 / L-86) in one write. */
+    suspend fun relabel(id: String, labels: Map<String, String>, background: Map<String, Boolean>): EditOutcome
 
     suspend fun mergeSpeakers(id: String, variantId: String, source: String, target: String): EditOutcome
 
@@ -385,8 +388,8 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
         graph.awaitCatalogue().notes.acknowledgeTrust(id)
     }
 
-    override suspend fun relabel(id: String, labels: Map<String, String>): EditOutcome =
-        graph.awaitCatalogue().documents.relabel(id, labels)
+    override suspend fun relabel(id: String, labels: Map<String, String>, background: Map<String, Boolean>): EditOutcome =
+        graph.awaitCatalogue().documents.relabel(id, labels, background)
 
     override suspend fun mergeSpeakers(id: String, variantId: String, source: String, target: String): EditOutcome =
         graph.awaitCatalogue().documents.mergeSpeakers(id, variantId, source, target)

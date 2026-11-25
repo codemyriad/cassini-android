@@ -164,6 +164,7 @@ internal class FakeNotePorts : NotePorts {
     /** When set, openPlayer waits for it (a long file that prepares). */
     var openGate: CompletableDeferred<Unit>? = null
     val relabels = mutableListOf<Map<String, String>>()
+    val backgrounds = mutableListOf<Map<String, Boolean>>()
     val exports = mutableListOf<TranscriptExport>()
     val undo = mutableListOf<TrashedNote>()
     var transcribeOutcome: TranscribeOutcome = TranscribeOutcome.Queued(changed = true)
@@ -319,8 +320,9 @@ internal class FakeNotePorts : NotePorts {
         calls += "acknowledge"
     }
 
-    override suspend fun relabel(id: String, labels: Map<String, String>): EditOutcome {
-        relabels += labels
+    override suspend fun relabel(id: String, labels: Map<String, String>, background: Map<String, Boolean>): EditOutcome {
+        if (labels.isNotEmpty() || background.isEmpty()) relabels += labels
+        if (background.isNotEmpty()) backgrounds += background
         return if (details.value?.job != null) EditOutcome.JobPending else EditOutcome.Done()
     }
 
