@@ -6,6 +6,10 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
+### Added
+
+- Settings, Recorder binds your own Cassini voice recorder over Bluetooth. A sync copies its new recordings into notes, transcribes them on the phone, and sends each transcript back to the recorder, which shows it during playback. "Auto sync" tries every few minutes while Cassini runs.
+
 ## [0.4.2-beta.3] - 2026-11-11
 
 Google Play test build, version code 18.

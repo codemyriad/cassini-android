@@ -60,6 +60,7 @@ The privacy rules are:
 - Android can back up the catalogue, notes and saved voices to the encrypted cloud backup and transfer them to a new phone, according to the device-local choices in Settings (both on by default, D97 and D98). `BuildConfig.CLOUD_BACKUP_ENABLED` is the kill switch of the cloud channel. Downloaded models are excluded. See [Transfer and backup](backup.md).
 - The app downloads no model before the user agrees.
 - The app uses the network only for model downloads. It connects only to the model host `dist.gocassini.com`: first its manifest, then the pinned files (D53.1). `DistManifest` refuses a file URL on any other host, and `ArtifactFetcher` compares each redirect host with the same allow-list (section 5.6). `PRIVACY.md` lists the host and the allow-list.
+- Data leaves the app in one more way only: to the user's own bound Cassini recorder, over a Bluetooth SPP link, after the user binds it and then pushes "Sync now" or turns on "Auto sync". The app sends the transcripts of the recordings that it copied from that recorder (CWX sidecars), and it sets the clock of the recorder. It sends no voiceprints and no other notes. [`recorder-sync.md`](recorder-sync.md) gives the details.
 
 ## 2. Modules
 
@@ -164,6 +165,7 @@ The packages of `:app` are:
 - `playback/`: `PlaybackController`.
 - One package for each other screen, with its ViewModel and its `XxxRoute` composable: `library/`, `note/`, `models/`, `settings/`, `voices/`, `trash/` and `licenses/`.
 - `adapters/`: the adapters of the `:engine` ports over the `:data` repositories.
+- `recorder/`: the recorder binding and sync, its foreground service, and the ViewModel and route of the Recorder screen ([`recorder-sync.md`](recorder-sync.md)). The protocol layer is in `:core` (`core.recorder`), the sync plan in `:app-logic`, and the sync state store in `:data` (`data.recorder`).
 - `nav/`: the keys, `CassiniApp`, the deep links and the system bars.
 - `notices/`: `NoticeCenter`.
 
@@ -670,6 +672,7 @@ The purge does not use WorkManager, for these reasons:
 | `RecordingController` | `:app` | `MicrophoneCapture`, `StateFlow<RecordingState>`, the levels, the policy loop and `activeNoteId`. |
 | `RecordingService` | `:app` (`recording/`) | The foreground lifetime of the microphone, the notification, and the hand-off to the processing. |
 | `PlaybackController` | `:app` | Media3 ExoPlayer (`ExoAudioPlayer`), the position flow, the speed, the audio focus and `playRange`; `SessionPlayer` and `PlaybackService` give it a MediaSession. |
+| `RecorderSync`, `RecorderRunner`, `RecorderAutoSync` | `:app` (`recorder/`) | The recorder binding and sync, one at a time under a `Mutex`, in the application scope; `RecorderSyncService` (type `connectedDevice`) holds the process during an active sync. See [`recorder-sync.md`](recorder-sync.md). |
 | `NoticeCenter` | `:app` (P10) | It merges the state of the coordinator, the recorder, the recovery, the models and the imports into the banner list of each screen. |
 
 ### 5.2 The transcription queue
@@ -1070,6 +1073,7 @@ F-Droid: the app has no proprietary SDKs. `docs/release.md` gives the open probl
 - A redirect allow-list in `ArtifactFetcher`, so that the code enforces the privacy promise about the hosts.
 - The models install as on the desktop, from the manifest of the model host, in `models/<id>/<sourceSha256>/` (D53.1). The directories of 0.1.0 to 0.3.0 are not migrated (D51).
 - A foreground service, not WorkManager, for transcriptions and downloads. The job is interactive (draft naming, immediate Stop and Resume). After process death, WorkManager restarts the work in the background, where `setForeground` can throw an exception. The trash purge also does not use WorkManager (section 4.10).
+- "Auto sync" of the recorder is a loop in the application scope, not WorkManager: it runs only while the process lives. A link that connects starts a `connectedDevice` foreground service. Android 12 and later refuse that start from the background unless the recorder is a companion device of the app; the sync then continues without the service.
 - A persistent FIFO queue in Room with one RUNNING job, not the claim set in the process memory of 0.1.0.
 - `:engine` behind ports, with no dependency on `:data`. Thus the JVM tests of the job are possible, and P4 and P5 operated at the same time.
 - A separate `:ui` module with semantic `UiState` and a `ui_` resource prefix. Thus we built the design system and the screens, and tested them with screenshots, at the same time as the data and service layers.

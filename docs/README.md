@@ -21,6 +21,7 @@ The contributor entrypoints at the root of the repository are [`CONTRIBUTING.md`
 - [`data-formats.md`](data-formats.md): storage layout, the portable document, exports and the differences from gocassini.
 - [`backup.md`](backup.md): device-to-device transfer and backup (D97, D98).
 - [`recorded-at.md`](recorded-at.md): the recording time of a note (D95).
+- [`recorder-sync.md`](recorder-sync.md): binding and syncing the Cassini voice recorder over Bluetooth.
 - [`transcript-rendering.md`](transcript-rendering.md): how `ReadingTurns` groups the transcript into turns (D84).
 - [`whistle-speech-gate.md`](whistle-speech-gate.md): the Whistle speech gate, ported from the desktop `SpeechGate`.
 - [`whistle/included.md`](whistle/included.md): the included Whistle model and the default speech model.
