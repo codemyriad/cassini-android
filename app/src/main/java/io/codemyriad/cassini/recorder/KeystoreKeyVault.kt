@@ -17,7 +17,21 @@ import javax.crypto.spec.GCMParameterSpec
 class KeystoreKeyVault(private val alias: String = ALIAS) : KeyVault {
     override fun wrap(key: ByteArray): String {
         val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey())
+        val existing = try {
+            existingKey()
+        } catch (_: GeneralSecurityException) {
+            null
+        }
+        val initialized = existing != null && try {
+            cipher.init(Cipher.ENCRYPT_MODE, existing)
+            true
+        } catch (_: GeneralSecurityException) {
+            false
+        }
+        if (!initialized) {
+            clear()
+            cipher.init(Cipher.ENCRYPT_MODE, newKey())
+        }
         val iv = cipher.iv
         if (iv.size != IV_BYTES) throw GeneralSecurityException("Unexpected IV length")
         return Base64.getEncoder().encodeToString(iv + cipher.doFinal(key))
@@ -36,11 +50,18 @@ class KeystoreKeyVault(private val alias: String = ALIAS) : KeyVault {
         return cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES)
     }
 
+    override fun clear() {
+        try {
+            val store = keyStore()
+            if (store.containsAlias(alias)) store.deleteEntry(alias)
+        } catch (_: GeneralSecurityException) {
+            // Already gone or Keystore unavailable.
+        }
+    }
+
     private fun keyStore(): KeyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
 
     private fun existingKey(): SecretKey? = keyStore().getKey(alias, null) as? SecretKey
-
-    private fun secretKey(): SecretKey = existingKey() ?: newKey()
 
     private fun newKey(): SecretKey {
         val spec = KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)

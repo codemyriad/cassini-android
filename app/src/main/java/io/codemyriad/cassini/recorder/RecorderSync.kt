@@ -363,9 +363,24 @@ class RecorderSync(private val parts: Parts) {
         active.update { it - 1 }
     }
 
-    /** "Forget recorder": removes the binding and its key; the record of imported files stays. */
+    /**
+     * "Forget recorder": removes the binding, its wrapping key, and any unimported `.part` download cache; the record
+     * of imported files stays.
+     */
     suspend fun forget() {
-        store.update { it.copy(binding = null) }
+        store.update { settings ->
+            val address = settings.binding?.device?.address
+            val devices = if (address != null && address in settings.devices) {
+                settings.devices + (address to settings.devices.getValue(address).copy(partial = null))
+            } else {
+                settings.devices
+            }
+            settings.copy(binding = null, devices = devices)
+        }
+        withContext(parts.io) {
+            parts.vault.clear()
+            parts.downloads.deleteRecursively()
+        }
     }
 
     suspend fun setAutoSync(enabled: Boolean) {

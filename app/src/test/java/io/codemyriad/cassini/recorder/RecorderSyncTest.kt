@@ -44,8 +44,11 @@ class RecorderSyncTest {
 
     @After fun closeLink() = radio.device.close()
 
-    private fun sync(clock: () -> Long = { NOW }, stallMillis: Long = RecorderSync.DEFAULT_STALL_MS) =
-        recorderSync(root, radio, library, clock, stallMillis)
+    private fun sync(
+        clock: () -> Long = { NOW },
+        stallMillis: Long = RecorderSync.DEFAULT_STALL_MS,
+        vault: KeyVault = FakeVault(),
+    ) = recorderSync(root, radio, library, clock, stallMillis, vault)
 
     private fun transcript(title: String, first: String = "Ada") = CwxTranscript(
         title,
@@ -855,6 +858,35 @@ class RecorderSyncTest {
         assertEquals(BindOutcome.Unreachable, sync.bind(DEVICE) { "123456" })
         radio.bond = BondResult.BONDED_BEFORE
         assertEquals(BindOutcome.StaleBond, sync.bind(DEVICE) { "123456" })
+    }
+
+    @Test fun forgetDeletesCachedPartFilesAndWrappingKeyWhileKeepingImportedRecords() = runBlocking {
+        recorder.files["REC_0001.wav"] = recording(3_000, seed = 1)
+        val vault = FakeVault()
+        val (sync, store) = sync(vault = vault)
+        val wrapped = vault.wrap(key)
+        store.update { it.copy(binding = io.codemyriad.cassini.data.recorder.RecorderBinding(DEVICE, wrapped)) }
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+
+        // Start a second download that disconnects mid-file, leaving unimported audio in downloads/<addr>/*.part.
+        radio.device.files["REC_0002.wav"] = recording(10_000, seed = 2)
+        radio.device.disconnectAtFrame = 3_840L
+        assertEquals(SyncOutcome.Failed(XrecFailure.DISCONNECTED, "The link closed"), sync.sync())
+        assertFalse(parts.isEmpty())
+
+        sync.forget()
+        val after = store.read()
+        assertNull(after.binding)
+        val deviceState = after.devices.getValue(DEVICE.address)
+        assertEquals(listOf("note-1"), deviceState.recordings.map { it.recording.noteId })
+        assertNull(deviceState.partial)
+        assertTrue("Forgetting the recorder must delete unimported .part cache files", parts.isEmpty())
+        try {
+            vault.unwrap(wrapped)
+            throw AssertionError("Expected wrapped key to be unreadable after forget()")
+        } catch (_: java.security.GeneralSecurityException) {
+            // Expected.
+        }
     }
 
     private companion object {

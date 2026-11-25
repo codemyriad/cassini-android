@@ -83,11 +83,20 @@ internal class FakeRadio(var device: FakeRecorder) : RecorderRadio {
 
 /** "Wraps" a key as hex with a prefix; anything else does not unwrap, as a lost Keystore key. */
 internal class FakeVault : KeyVault {
-    override fun wrap(key: ByteArray): String = PREFIX + XrecAuth.toHex(key)
+    @Volatile private var generation = 0
+
+    fun invalidate() {
+        generation++
+    }
+
+    override fun clear() = invalidate()
+
+    override fun wrap(key: ByteArray): String = "$PREFIX$generation:${XrecAuth.toHex(key)}"
 
     override fun unwrap(wrapped: String): ByteArray {
-        if (!wrapped.startsWith(PREFIX)) throw GeneralSecurityException("Not a wrapped key")
-        return XrecAuth.fromHex(wrapped.removePrefix(PREFIX))
+        val currentPrefix = "$PREFIX$generation:"
+        if (!wrapped.startsWith(currentPrefix)) throw GeneralSecurityException("Not a wrapped key")
+        return XrecAuth.fromHex(wrapped.removePrefix(currentPrefix))
     }
 
     companion object {
@@ -148,13 +157,14 @@ internal fun recorderSync(
     library: FakeLibrary,
     clock: () -> Long = { NOW },
     stallMillis: Long = RecorderSync.DEFAULT_STALL_MS,
+    vault: KeyVault = FakeVault(),
 ): Pair<RecorderSync, RecorderStore> {
     val store = RecorderStore(File(root, "recorder.json"), Dispatchers.IO)
     val sync = RecorderSync(
         RecorderSync.Parts(
             store = store,
             radio = radio,
-            vault = FakeVault(),
+            vault = vault,
             library = library,
             downloads = File(root, "downloads"),
             io = Dispatchers.IO,

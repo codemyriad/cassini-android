@@ -66,6 +66,9 @@ interface KeyVault {
 
     /** The key of [wrapped]; throws [java.security.GeneralSecurityException] when this phone cannot decrypt it. */
     fun unwrap(wrapped: String): ByteArray
+
+    /** Deletes the wrapping key when no recorder is bound any more. */
+    fun clear() = Unit
 }
 
 /** What an import of a downloaded recording gave. */
