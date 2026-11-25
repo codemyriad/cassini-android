@@ -26,7 +26,10 @@ import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 
-/** Android retains its title in the bar; its scrolled edge has the native phone hairline (L-55). */
+/**
+ * The meeting's top bar; its scrolled edge has the native phone hairline (L-55). The full title is a heading under the
+ * bar (QA 25 Nov, [MeetingHeader]); the bar shows it, cut to one line, only once that heading has scrolled away.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MeetingTopBar(state: NoteUiState, scrolled: Boolean, onEvent: (NoteEvent) -> Unit) {
@@ -35,13 +38,15 @@ internal fun MeetingTopBar(state: NoteUiState, scrolled: Boolean, onEvent: (Note
         TopAppBar(
             modifier = Modifier.testTag("meeting-app-bar"),
             title = {
-                Text(
-                    state.title,
-                    style = CassiniTheme.type.noteTitle.copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.semantics { heading() },
-                )
+                if (scrolled) {
+                    Text(
+                        state.title,
+                        style = CassiniTheme.type.noteTitle.copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                }
             },
             navigationIcon = {
                 MeetingIcon(Glyph.Back, stringResource(R.string.ui_back_to_library)) { onEvent(NoteEvent.Back) }

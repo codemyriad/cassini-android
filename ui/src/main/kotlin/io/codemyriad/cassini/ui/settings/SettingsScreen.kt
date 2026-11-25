@@ -73,7 +73,7 @@ fun SettingsScreen(
             )
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
                 when (page) {
-                    SettingsPage.MAP -> SettingsMap(state, onEvent) { page = it }
+                    SettingsPage.MAP -> SettingsMap(state, onEvent, exportEnabled, onExport) { page = it }
                     SettingsPage.TRANSCRIPTION -> TranscriptionSettings(state, onEvent)
                     SettingsPage.SPEAKERS -> SpeakerSettings(state, onEvent)
                     SettingsPage.BACKUP -> state.backup?.let {
@@ -87,8 +87,20 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * The map (D103). QA 25 Nov: the line under Transcripts says only "Transcribed on this phone."; the backup wording sits
+ * on the Backup row, so it no longer contradicts its "Off"; Your meetings gains "Export all meetings" (it left the
+ * Library, Search and first run).
+ */
 @Composable
-private fun SettingsMap(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit, open: (SettingsPage) -> Unit) {
+@Suppress("LongMethod") // One group per section of the map.
+private fun SettingsMap(
+    state: SettingsUiState,
+    onEvent: (SettingsEvent) -> Unit,
+    exportEnabled: Boolean,
+    onExport: () -> Unit,
+    open: (SettingsPage) -> Unit,
+) {
     SectionHeader(stringResource(R.string.ui_settings_transcripts), first = true)
     SettingsGroup {
         MapRow(
@@ -111,13 +123,15 @@ private fun SettingsMap(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit
             onEvent(SettingsEvent.OpenVoices)
         }
     }
-    HelperText(
-        stringResource(R.string.ui_first_run_privacy_phone) + " " +
-            stringResource(R.string.ui_first_run_privacy_backups),
-    )
+    HelperText(stringResource(R.string.ui_first_run_privacy_phone))
     SectionHeader(stringResource(R.string.ui_settings_meetings))
     SettingsGroup {
-        MapRow(stringResource(R.string.ui_settings_backup), backupAnswer(state.backup), Glyph.Shield) {
+        MapRow(
+            stringResource(R.string.ui_settings_backup),
+            backupAnswer(state.backup),
+            Glyph.Shield,
+            subtitle = stringResource(R.string.ui_first_run_privacy_backups),
+        ) {
             open(SettingsPage.BACKUP)
         }
         MapRow(
@@ -127,6 +141,12 @@ private fun SettingsMap(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit
         ) {
             onEvent(SettingsEvent.OpenTrash)
         }
+        ActionRow(
+            stringResource(R.string.ui_settings_export_all),
+            Glyph.Import,
+            enabled = exportEnabled,
+            onClick = onExport,
+        )
     }
     HelperText(
         stringResource(

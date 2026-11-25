@@ -82,7 +82,6 @@ class ComponentScreenshotTest : BoardTest() {
             onClear = {},
             onClose = {},
             onSearch = {},
-            onTrash = {},
             onSettings = {},
         )
         Label("CassiniTopBar: Screen, Note with subtitle, Read, Trash with Empty")

@@ -72,6 +72,32 @@ internal fun MapRow(
     }
 }
 
+/**
+ * A row that does something here instead of opening a page ("Export all meetings"): the icon and the title of a
+ * [MapRow], no answer and no chevron. Disabled (nothing to export, or a transfer is running) it greys out.
+ */
+@Composable
+internal fun ActionRow(title: String, glyph: Glyph, enabled: Boolean, onClick: () -> Unit) {
+    val c = CassiniTheme.colors
+    Row(
+        Modifier.fillMaxWidth()
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 16.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(30.dp).background(c.accentTint, CircleShape), contentAlignment = Alignment.Center) {
+            CassiniIcon(glyph, 18.dp, 1.9f, c.accentInk, null)
+        }
+        Text(
+            title,
+            Modifier.weight(1f).padding(horizontal = 12.dp),
+            style = CassiniTheme.type.body16,
+            color = if (enabled) c.ink else c.text3,
+        )
+    }
+}
+
 @Composable
 internal fun AboutRow(version: String, onClick: () -> Unit) {
     SettingsGroup(Modifier.padding(top = 22.dp)) {

@@ -157,7 +157,6 @@ LABELS = {
     'voices_footnote_made_on': ('savedVoices.footnote.madeOn.phone', None),
     'voices_footnote_names_only': ('savedVoices.footnote.namesOnly', None),
     'voices_stale_title': ('savedVoices.stale.title', 'n'),
-    'voices_stale_body': ('savedVoices.stale.body', 'name'),
     'voices_needs_naming': ('savedVoices.row.needsNaming', None),
     'voices_caption': ('savedVoices.caption', None),
     'voices_empty': ('savedVoices.empty', None),

@@ -50,6 +50,7 @@ private val DialogMaxWidth = 560.dp
  * the safe area above the keyboard, with a 24 dp margin on each side, so screenshots can place the same content inline
  * (`DialogBoardFrame` in test sources) exactly where the window puts it. M3's `BasicAlertDialog` is not used: it caps
  * its content at 560 dp, so the scrim would not cover a wider window (landscape, tablets). The pane title is [title].
+ * Beside the Library on a wide window ([LocalDetailPane]), the card is centred over the detail pane.
  */
 @Composable
 @Suppress("LongParameterList") // ui.md section 6: title, body or content slot, actions and the dismiss request.
@@ -80,11 +81,13 @@ fun CassiniDialog(
                     .pointerInput(onDismissRequest) { detectTapGestures { onDismissRequest() } }
                     .clearAndSetSemantics {},
             )
+            val pane = LocalDetailPane.current
             CassiniDialogContent(
                 title = title,
                 actions = actions,
                 modifier = modifier
                     .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .then(pane?.let { Modifier.padding(it) } ?: Modifier)
                     // Taps on the card do not reach the scrim.
                     .pointerInput(Unit) { detectTapGestures {} },
                 body = body,

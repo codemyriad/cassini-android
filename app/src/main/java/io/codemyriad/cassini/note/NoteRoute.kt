@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import io.codemyriad.cassini.library.notificationSettings
+import io.codemyriad.cassini.nav.SettingsKey
 import io.codemyriad.cassini.ui.note.NoteScreen
 
 /**
@@ -57,6 +58,7 @@ fun NoteRoute(
                     NoteEffect.Close -> navigator.close()
                     NoteEffect.CloseToLibrary -> navigator.closeToLibrary()
                     is NoteEffect.OpenModelDownload -> navigator.open(effect.key)
+                    NoteEffect.OpenSettings -> navigator.open(SettingsKey)
                     is NoteEffect.CreateFile -> start(context) { createFile.launch(effect.mime to effect.name) }
                     is NoteEffect.Share -> start(context) { context.startActivity(shareChooser(context, effect)) }
                     NoteEffect.RequestNotifications -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

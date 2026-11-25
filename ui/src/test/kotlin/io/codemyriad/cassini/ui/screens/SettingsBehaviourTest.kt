@@ -302,18 +302,19 @@ class SettingsBehaviourTest {
         setThemed { SavedVoicesScreen(BoardFixtures.savedVoices, onEvent = {}) }
         rule.onNodeWithText("4 people").assertExists()
         rule.onNodeWithText("1 voice needs naming again").assertExists()
-        rule.onAllNodesWithText("Luca", substring = true).assertCountEquals(2)
+        // QA 25 Nov: the banner names nobody; Luca's row and its tag show who.
+        rule.onAllNodesWithText("Luca", substring = true).assertCountEquals(1)
         rule.onNodeWithText("Needs naming again").assertExists()
         rule.onNodeWithText("Voiceprints are made on this phone.").assertExists()
         rule.onNodeWithText("Exports and shares include names only.").assertExists()
     }
 
-    @Test fun twoStaleVoicesKeepPluralHeadingRowPillsAndSingleNameBody() {
+    @Test fun twoStaleVoicesKeepPluralHeadingRowPillsAndAskToNameEachPerson() {
         setThemed { SavedVoicesScreen(VariantFixtures.savedVoices.getValue("voices-stale"), onEvent = {}) }
         rule.onNodeWithText("2 voices need naming again").assertExists()
         rule.onNodeWithText(
             "Voice recognition was updated, and voices saved before the update can’t be recognised. " +
-                "Name Paolo Ferri in a meeting to save their voice again.",
+                "Name each person again in a meeting to save their voice.",
         ).assertExists()
         rule.onAllNodesWithText("Needs naming again").assertCountEquals(2)
     }

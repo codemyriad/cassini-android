@@ -300,7 +300,6 @@ class AcceptanceWalkTest {
     /** 03 Read & listen with a word playing, then 06 Note actions. */
     private fun readAndListen(noteId: String) {
         openRow(SUPPLIER_CALL)
-        see(rule.text(UiR.string.ui_trust_verified))
         val document = runBlocking { documentOf(noteId) }
         val words = document.selected(null)!!.transcript!!.words
         val word = words.first { it.text.filter(Char::isLetter).length >= WORD_LETTERS }
@@ -342,12 +341,11 @@ class AcceptanceWalkTest {
         rule.runOnUiThread { graph.playback.pause() }
 
         rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_more_actions))).performClick()
-        see(rule.text(UiR.string.ui_export_heading))
-        see(rule.text(UiR.string.ui_export_cassini_file))
+        see(rule.text(UiR.string.ui_actions_export))
         see(rule.text(UiR.string.ui_actions_document_info))
         shot("06-note-actions-and-export")
         Espresso.pressBack()
-        rule.waitGone(hasText(rule.text(UiR.string.ui_export_heading)))
+        rule.waitGone(hasText(rule.text(UiR.string.ui_actions_export)))
         library()
     }
 

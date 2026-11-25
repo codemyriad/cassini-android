@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.theme.CassiniTheme
@@ -74,9 +75,13 @@ internal fun NameNoticeButton(label: String, primary: Boolean, onClick: () -> Un
     }
 }
 
-/** One toggleable card with a decorative native switch avoids duplicate or competing click actions. */
+/**
+ * One toggleable card with a decorative native switch avoids duplicate or competing click actions. A [subtitle] with a
+ * link (the Settings link while voice recognition is off) is not merged into the card, so TalkBack reaches the link.
+ */
 @Composable
-internal fun RememberVoiceCard(ui: NameSheetUi, subtitle: String, onEvent: (NameSheetEvent) -> Unit) {
+internal fun RememberVoiceCard(ui: NameSheetUi, subtitle: AnnotatedString, onEvent: (NameSheetEvent) -> Unit) {
+    val linked = subtitle.getLinkAnnotations(0, subtitle.length).isNotEmpty()
     val c = CassiniTheme.colors
     Row(
         Modifier.fillMaxWidth().clip(CassiniTheme.shapes.row)
@@ -87,7 +92,7 @@ internal fun RememberVoiceCard(ui: NameSheetUi, subtitle: String, onEvent: (Name
                 enabled = ui.rememberEnabled,
                 role = Role.Switch,
                 onValueChange = { onEvent(NameSheetEvent.RememberChanged(it)) },
-            ).semantics(mergeDescendants = true) {}
+            ).semantics(mergeDescendants = !linked) {}
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,

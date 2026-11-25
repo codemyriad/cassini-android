@@ -27,12 +27,17 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.codemyriad.cassini.R
 import io.codemyriad.cassini.data.notes.ArchiveFailure
 import io.codemyriad.cassini.data.notes.ImportSummary
 import io.codemyriad.cassini.ui.R as UiR
 
-/** The explicit selector keeps bulk selection separate from a row's Open/long-press actions. */
+/**
+ * Settings › Your meetings › Export all meetings (QA 25 Nov; it left the Library): the chooser of the meetings to put in
+ * the ZIP and the destination picker. [content] draws the trigger. The progress and the result of a transfer show in
+ * [TransferResultHost], once for the app.
+ */
 @Composable
 fun BulkTransferControls(
     transfers: BulkTransfers,
@@ -87,19 +92,18 @@ fun BulkTransferControls(
             },
         )
     }
+}
+
+/**
+ * The progress and the result of an import (the Library's Import audio, Open with) or a ZIP export, drawn once above
+ * every screen: the Library and Settings can show side by side on a wide window, and each of them used to draw it.
+ */
+@Composable
+fun TransferResultHost(transfers: BulkTransfers) {
+    val state by transfers.state.collectAsStateWithLifecycle()
     if (state != BulkTransfers.TransferState()) {
         TransferResult(state, transfers)
     }
-}
-
-/** Only this inline trigger belongs in the Library's disposable lazy-list item. */
-@Composable
-fun BulkExportButton(enabled: Boolean, onClick: () -> Unit) {
-    TextButton(
-        onClick = onClick,
-        enabled = enabled,
-        colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-    ) { Text(stringResource(R.string.export_zip_all)) }
 }
 
 @Composable

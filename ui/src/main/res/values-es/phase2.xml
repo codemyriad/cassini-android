@@ -172,7 +172,6 @@
         <item quantity="many">%1$s voces necesitan un nombre de nuevo</item>
         <item quantity="other">%1$s voces necesitan un nombre de nuevo</item>
     </plurals>
-    <string name="ui_voices_stale_body">El reconocimiento de voz se ha actualizado y las voces guardadas antes de la actualización no se pueden reconocer. Pon nombre a %1$s en una reunión para volver a guardar su voz.</string>
     <string name="ui_voices_needs_naming">Necesita un nombre de nuevo</string>
     <string name="ui_voices_caption">Para añadir a alguien, pon nombre a un hablante en una reunión y deja activado «Recordar esta voz».</string>
     <string name="ui_voices_empty">Aún no hay voces guardadas</string>

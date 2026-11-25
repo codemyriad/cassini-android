@@ -7,14 +7,18 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.library.FirstRunHeroUi
+import io.codemyriad.cassini.ui.library.LibraryEvent
 import io.codemyriad.cassini.ui.library.LibraryScreen
 import io.codemyriad.cassini.ui.library.LibraryUiState
 import io.codemyriad.cassini.ui.theme.CassiniTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,5 +46,18 @@ class FirstRunHeroBehaviourTest {
         val expectedPrivacy = text(R.string.ui_first_run_privacy_phone) + "\n" +
             text(R.string.ui_first_run_privacy_backups)
         rule.onNodeWithTag("hero-privacy").assertIsDisplayed().assert(hasText(expectedPrivacy))
+    }
+
+    /** QA 25 Nov: before the first meeting there is no search, no Trash and no ZIP export; only Settings stays. */
+    @Test fun firstRunShowsOnlySettingsAtTheTop() {
+        val events = mutableListOf<LibraryEvent>()
+        rule.setContent {
+            CassiniTheme { LibraryScreen(LibraryUiState(hero = FirstRunHeroUi), onEvent = { events += it }) }
+        }
+        rule.onNodeWithTag("library-search-bar").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Trash").assertDoesNotExist()
+        rule.onNodeWithTag("first-run-top-bar").assertIsDisplayed()
+        rule.onNodeWithContentDescription(text(R.string.ui_library_settings)).assertIsDisplayed().performClick()
+        assertEquals(listOf<LibraryEvent>(LibraryEvent.OpenSettings), events)
     }
 }

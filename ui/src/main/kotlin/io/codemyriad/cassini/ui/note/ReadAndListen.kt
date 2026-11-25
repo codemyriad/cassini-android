@@ -82,6 +82,10 @@ private const val FOLLOW_RESUME_MS = 4_000L
 @Composable
 internal fun NoteChipsRow(chips: NoteChipsUi, onEvent: (NoteEvent) -> Unit, showSpeakerCount: Boolean = true) {
     val c = CassiniTheme.colors
+    // QA 25 Nov: no "Verified" tag; a document that is fine says nothing (Document info still shows its trust).
+    val trust = chips.trust.takeIf { it != TrustUi.VERIFIED }
+    val speakers = showSpeakerCount && chips.speakers > 0
+    if (trust == null && chips.version == null && !speakers) return
     FlowRow(
         modifier = Modifier
             .fillMaxWidth()
@@ -92,8 +96,10 @@ internal fun NoteChipsRow(chips: NoteChipsUi, onEvent: (NoteEvent) -> Unit, show
         verticalArrangement = Arrangement.spacedBy(8.dp - ChipSlack),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        val (label, tone) = trustChip(chips.trust)
-        LargeChip(text = label, tone = tone, onClick = { onEvent(NoteEvent.TrustChip) })
+        if (trust != null) {
+            val (label, tone) = trustChip(trust)
+            LargeChip(text = label, tone = tone, onClick = { onEvent(NoteEvent.TrustChip) })
+        }
         chips.version?.let { version ->
             val suffix = when (version.kind) {
                 VersionKindUi.ORIGINAL -> null
@@ -106,7 +112,7 @@ internal fun NoteChipsRow(chips: NoteChipsUi, onEvent: (NoteEvent) -> Unit, show
                 onClick = { onEvent(NoteEvent.OpenVersions) },
             )
         }
-        if (showSpeakerCount && chips.speakers > 0) {
+        if (speakers) {
             Box(Modifier.heightIn(min = 32.dp), contentAlignment = Alignment.Center) {
                 Text(
                     text = Counts.plural(R.plurals.ui_count_speakers, chips.speakers),

@@ -142,7 +142,8 @@ private fun LazyListScope.trashItems(
  * Android sets the 16 sp title 1 dp lower in its line than the browser, so the top padding is 1 dp less and the meta
  * line's top margin 0.5 dp more (measured on board 09). The
  * title (`rowTitle`) and the duration (`monoTime` text2) share the first row, gap 8; "Deleted 2 Oct · 23 days left"
- * (`caption` text2) follows 2 dp below; then Restore and "Delete now", gap 8.
+ * (`caption` text2) follows 2 dp below; then Restore and "Delete now", gap 8, both compact (32 dp visuals in 48 dp
+ * touch targets; QA 25 Nov, as on iPhone and iPad).
  */
 @Composable
 private fun TrashCard(item: TrashItemUi, onEvent: (TrashEvent) -> Unit) {
@@ -180,12 +181,12 @@ private fun TrashCard(item: TrashItemUi, onEvent: (TrashEvent) -> Unit) {
             SecondaryButton(
                 text = stringResource(R.string.ui_trash_restore),
                 onClick = { onEvent(TrashEvent.Restore(item.id)) },
-                size = SecondaryButtonSize.Medium,
+                size = SecondaryButtonSize.Compact,
             )
             DestructiveTextButton(
                 text = stringResource(R.string.ui_trash_delete_now),
                 onClick = { onEvent(TrashEvent.DeleteNow(item.id)) },
-                size = DestructiveTextButtonSize.Small,
+                size = DestructiveTextButtonSize.Compact,
             )
         }
     }

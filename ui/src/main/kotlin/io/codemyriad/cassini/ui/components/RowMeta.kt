@@ -1,23 +1,16 @@
-@file:Suppress("FunctionNaming", "MagicNumber") // Approved Row-Android metadata and people glyph geometry.
+@file:Suppress("FunctionNaming", "MagicNumber") // Approved Row-Android metadata geometry.
 
 package io.codemyriad.cassini.ui.components
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -54,9 +47,9 @@ internal fun RowMeta(row: NoteRowUi, day: DayLabel, status: RowStatus, onAction:
             color = c.text2,
         )
         if (row.status is NoteStatusUi.Transcribed) {
-            // L-10: the outline "Imported" badge comes before the speaker-count pill; any other badge replaces it.
+            // L-10: the outline "Imported" badge comes before the speaker count; any other badge replaces it.
             if (row.imported) StatusChip(stringResource(StatusBadgeKind.Received.label), StatusBadgeKind.Received)
-            FinishedPill(row.status)
+            FinishedDetail(row.status)
         } else {
             status.kind?.let { StatusChip(status.text, it) }
         }
@@ -94,50 +87,16 @@ internal fun spokenSuffix(state: NoteStatusUi, status: RowStatus): String? = whe
     else -> status.suffix
 }
 
+/**
+ * The speaker count of a finished meeting, or "No speech", as plain grey text after the time and any status pill (QA
+ * 25 Nov, as on the Mac): every status is a pill, the details are not, and there is no speaker icon.
+ */
 @Composable
-private fun FinishedPill(status: NoteStatusUi.Transcribed) {
-    if (status.words == 0) {
-        NeutralRowPill(stringResource(R.string.ui_row_no_speech), people = false)
-    } else if (status.speakers >= 1) {
-        NeutralRowPill(Counts.plural(R.plurals.ui_row_speaker_count, status.speakers), people = true)
+private fun FinishedDetail(status: NoteStatusUi.Transcribed) {
+    val text = when {
+        status.words == 0 -> stringResource(R.string.ui_row_no_speech)
+        status.speakers >= 1 -> Counts.plural(R.plurals.ui_row_speaker_count, status.speakers)
+        else -> return
     }
-}
-
-/** L-52 counts are neutral pills, not status badges. No-speech is intentionally text-only. */
-@Composable
-private fun NeutralRowPill(text: String, people: Boolean) {
-    val c = CassiniTheme.colors
-    Row(
-        Modifier.heightIn(min = 22.dp).background(c.ink.copy(alpha = 0.1f), CircleShape).padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (people) PeopleGlyph()
-        Text(text, style = CassiniTheme.type.chip, color = c.text2)
-    }
-}
-
-/** Exact people silhouette from Row-Android.dc.html (20 by 16 viewport, displayed at 13 by 11dp). */
-@Composable
-private fun PeopleGlyph() {
-    val color = CassiniTheme.colors.text2
-    Canvas(Modifier.size(13.dp, 11.dp)) {
-        val sx = size.width / 20f
-        val sy = size.height / 16f
-        drawOval(color, Offset(3.8f * sx, sy), androidx.compose.ui.geometry.Size(6.4f * sx, 6.4f * sy))
-        drawOval(color, Offset(11.6f * sx, 2.2f * sy), androidx.compose.ui.geometry.Size(5.2f * sx, 5.2f * sy))
-        val bodies = Path().apply {
-            moveTo(0.8f * sx, 15f * sy)
-            cubicTo(0.8f * sx, 11.4f * sy, 3.6f * sx, 9f * sy, 7f * sx, 9f * sy)
-            cubicTo(10.4f * sx, 9f * sy, 13.2f * sx, 11.4f * sy, 13.2f * sx, 15f * sy)
-            close()
-            moveTo(14.6f * sx, 9.2f * sy)
-            cubicTo(17.4f * sx, 9.4f * sy, 19.4f * sx, 11.6f * sy, 19.4f * sx, 15f * sy)
-            lineTo(14.8f * sx, 15f * sy)
-            cubicTo(14.8f * sx, 12.8f * sy, 14.2f * sx, 10.8f * sy, 12.7f * sx, 9.6f * sy)
-            cubicTo(13.3f * sx, 9.3f * sy, 13.9f * sx, 9.2f * sy, 14.6f * sx, 9.2f * sy)
-            close()
-        }
-        drawPath(bodies, color)
-    }
+    Text(text, style = CassiniTheme.type.chip, color = CassiniTheme.colors.text2)
 }

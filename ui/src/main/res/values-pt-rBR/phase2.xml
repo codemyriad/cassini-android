@@ -172,7 +172,6 @@
         <item quantity="many">%1$s vozes precisam ser nomeadas de novo</item>
         <item quantity="other">%1$s vozes precisam ser nomeadas de novo</item>
     </plurals>
-    <string name="ui_voices_stale_body">O reconhecimento de voz foi atualizado, e as vozes salvas antes da atualização não podem ser reconhecidas. Nomeie %1$s em uma reunião para salvar a voz de novo.</string>
     <string name="ui_voices_needs_naming">Precisa ser nomeada de novo</string>
     <string name="ui_voices_caption">Para adicionar alguém, nomeie um falante em uma reunião e deixe “Lembrar esta voz” ativado.</string>
     <string name="ui_voices_empty">Nenhuma voz salva ainda</string>

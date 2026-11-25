@@ -113,6 +113,9 @@ sealed interface NoteEffect {
 
     data class OpenModelDownload(val key: ModelDownloadKey) : NoteEffect
 
+    /** Settings, from the Name sheet's "Turn it on in Settings" link. */
+    data object OpenSettings : NoteEffect
+
     /** "Save a copy": `ACTION_CREATE_DOCUMENT` with [mime] and the suggested [name]; the Uri goes to `onExportTarget`. */
     data class CreateFile(val mime: String, val name: String) : NoteEffect
 
@@ -1330,6 +1333,11 @@ class NoteViewModel(
     @Suppress("CyclomaticComplexMethod") // one branch per Name sheet event
     private fun nameSheet(event: NameSheetEvent) {
         val naming = local.value.naming ?: return
+        if (event == NameSheetEvent.OpenSettings) {
+            // The sheet stays in the state: it shows again when the user comes back from Settings.
+            emit(NoteEffect.OpenSettings)
+            return
+        }
         val mapped = when (event) {
             is NameSheetEvent.NameChanged -> NamingEvent.NameChanged(event.text)
             NameSheetEvent.PlaySample -> NamingEvent.PlaySample
@@ -1347,6 +1355,7 @@ class NoteViewModel(
             NameSheetEvent.MergeInto -> NamingEvent.MergeInto
             NameSheetEvent.Cancel -> NamingEvent.Cancel
             NameSheetEvent.Save, NameSheetEvent.SaveBlocked -> NamingEvent.Save
+            NameSheetEvent.OpenSettings -> return
         }
         naming(mapped)
     }

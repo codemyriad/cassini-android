@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import kotlinx.coroutines.launch
@@ -49,6 +51,8 @@ import kotlinx.coroutines.launch
  * [SheetHider.hide] on the content's parameter: the sheet slides down, then [onDismissRequest] runs and the screen
  * drops the sheet from its state. A swipe or a scrim tap also ends in [onDismissRequest].
  * [confirmDismiss] can defer hiding until an asynchronous choice is stored; it is called before the hide transition.
+ * Beside the Library on a wide window ([LocalDetailPane]), the sheet rises from the bottom of the detail pane, at its
+ * width.
  * Screenshot tests render the same content inline in `SheetBoardFrame` (test sources).
  */
 @Composable
@@ -73,11 +77,14 @@ fun CassiniSheet(
             scope.launch { state.hide() }.invokeOnCompletion { if (!state.isVisible) dismiss() }
         }
     }
+    val pane = LocalDetailPane.current
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        // Outside the sheet's own measurement: the space for the sheet starts below the status bar.
-        modifier = modifier.windowInsetsPadding(SheetTopInsets),
+        // Outside the sheet's own measurement: the space for the sheet starts below the status bar, and beside the
+        // Library it is the detail pane's width.
+        modifier = modifier.windowInsetsPadding(SheetTopInsets).then(pane?.let { Modifier.padding(it) } ?: Modifier),
         sheetState = state,
+        sheetMaxWidth = if (pane != null) Dp.Unspecified else BottomSheetDefaults.SheetMaxWidth,
         shape = CassiniTheme.shapes.sheet,
         containerColor = containerColor,
         contentColor = c.ink,

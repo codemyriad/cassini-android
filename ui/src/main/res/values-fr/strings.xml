@@ -115,7 +115,6 @@
     </plurals>
 
     <!-- Library (board 00, features.md section 1). -->
-    <string name="ui_library_trash">Corbeille</string>
     <string name="ui_library_settings">Paramètres</string>
     <string name="ui_search_clear">Effacer la recherche</string>
     <string name="ui_library_recording_card">Enregistrement · %1$s</string>
@@ -505,4 +504,10 @@
     <string name="ui_progress_downloading_models">Téléchargement des modèles</string>
     <string name="ui_progress_getting_ready">Préparation de la transcription de %1$s</string>
     <string name="ui_transcription_after_recording">Après l’enregistrement</string>
+    <string name="ui_actions_export">Exporter…</string>
+    <string name="ui_actions_export_body">Fichier Cassini, Markdown et plus</string>
+    <string name="ui_name_voices_off">La reconnaissance vocale est désactivée. Activez-la dans les %1$s pour mémoriser les voix.</string>
+    <string name="ui_recording_title_placeholder">Ajouter un titre</string>
+    <string name="ui_settings_export_all">Exporter toutes les réunions</string>
+    <string name="ui_voices_stale_body_each">La reconnaissance vocale a été mise à jour, et les voix mémorisées avant la mise à jour ne peuvent plus être reconnues. Nommez de nouveau chaque personne dans une réunion pour mémoriser sa voix.</string>
 </resources>

@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performFirstLinkClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
@@ -183,8 +184,19 @@ class SheetBehaviourTest {
         rule.runOnIdle { assertEquals(listOf(NameSheetEvent.ShowAll, NameSheetEvent.NotName), events) }
     }
 
+    /** QA 25 Nov: with voice recognition off, one short line whose "Settings" opens Settings. */
+    @Test fun voiceRecognitionOffLinksToSettings() {
+        val events = mutableListOf<NameSheetEvent>()
+        setThemed {
+            NameSpeakerSheetContent(VariantFixtures.nameSheet.getValue("name-no-model"), onEvent = { events += it })
+        }
+        val line = "Voice recognition is off. Turn it on in Settings to remember voices."
+        rule.onNodeWithText(line, useUnmergedTree = true).performScrollTo().performFirstLinkClick()
+        rule.runOnIdle { assertEquals(listOf<NameSheetEvent>(NameSheetEvent.OpenSettings), events) }
+    }
+
     @Test fun exportShowsHeadingSizeAndOneLineDescriptions() {
-        setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = {}) }
+        setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = {}, exportPage = true) }
         rule.onNodeWithText("Export").assertExists()
         rule.onNodeWithText(".opus (24 MB)", substring = true).assertExists()
         rule.onNodeWithText("Audio and transcript in one file").assertExists()
@@ -198,38 +210,56 @@ class SheetBehaviourTest {
     @Test fun noteActionRowsSendTheirAction() {
         val actions = mutableListOf<NoteAction>()
         setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = { actions += it }) }
+        rule.onNodeWithText("Rename").performScrollTo().performClick()
+        rule.onNodeWithText("Transcribe again").performScrollTo().performClick()
+        rule.onNodeWithText("Document info").performScrollTo().performClick()
+        rule.onNodeWithText("Move to trash").performScrollTo().performClick()
+        // QA 25 Nov: one "Export…" row opens the export page with the rows the sheet used to start with.
+        rule.onNodeWithText("Export…").performScrollTo().performClick()
+        rule.onNodeWithText("Rename").assertDoesNotExist()
         rule.onNodeWithText("Cassini file", substring = true).performClick()
         rule.onNodeWithText("Markdown", substring = true).performClick()
         rule.onNodeWithText("More formats").performClick()
         rule.onNodeWithText("Plain text", substring = true).performScrollTo().performClick()
         rule.onNodeWithText(".srt", substring = true).performScrollTo().performClick()
         rule.onNodeWithText(".vtt", substring = true).performScrollTo().performClick()
-        rule.onNodeWithText("Rename").performScrollTo().performClick()
-        rule.onNodeWithText("Transcribe again").performScrollTo().performClick()
-        rule.onNodeWithText("Document info").performScrollTo().performClick()
-        rule.onNodeWithText("Move to trash").performScrollTo().performClick()
+        rule.onNodeWithText("Back").performScrollTo().performClick()
+        rule.onNodeWithText("Rename").assertExists()
         rule.runOnIdle {
             assertEquals(
                 listOf(
+                    NoteAction.RENAME,
+                    NoteAction.TRANSCRIBE_AGAIN,
+                    NoteAction.DOCUMENT_INFO,
+                    NoteAction.MOVE_TO_TRASH,
                     NoteAction.SAVE_DOCUMENT,
                     NoteAction.SAVE_MARKDOWN,
                     NoteAction.SAVE_TEXT,
                     NoteAction.SAVE_SRT,
                     NoteAction.SAVE_VTT,
-                    NoteAction.RENAME,
-                    NoteAction.TRANSCRIBE_AGAIN,
-                    NoteAction.DOCUMENT_INFO,
-                    NoteAction.MOVE_TO_TRASH,
                 ),
                 actions,
             )
         }
     }
 
+    /** QA 25 Nov: iPhone's order, with one Export… row ("Cassini file, Markdown and more") and no export rows on top. */
+    @Test fun theActionsFollowIphonesOrder() {
+        setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = {}) }
+        rule.onNodeWithText("Cassini file, Markdown and more").assertExists()
+        rule.onNodeWithText(".opus", substring = true).assertDoesNotExist()
+        val tops = listOf("Rename", "Star", "Transcribe again", "Export…", "Document info", "Move to trash").map {
+            rule.onNodeWithText(it).fetchSemanticsNode().boundsInRoot.top
+        }
+        assertEquals(tops.sorted(), tops)
+    }
+
     /** Each "Save a copy" row has its own Share button (D53), spoken as "Share" and the row's name. */
     @Test fun theShareButtonsSendTheirShareAction() {
         val actions = mutableListOf<NoteAction>()
-        setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = { actions += it }) }
+        setThemed {
+            NoteActionsSheetContent(BoardFixtures.noteActions, onAction = { actions += it }, exportPage = true)
+        }
         rule.onNodeWithContentDescription("Share Cassini file").performClick()
         rule.onNodeWithContentDescription("Share Markdown .md").performClick()
         rule.onNodeWithText("More formats").performClick()
@@ -252,7 +282,7 @@ class SheetBehaviourTest {
 
     /** L-11 (D99): Cassini file and Markdown first; the other text formats wait under More formats. */
     @Test fun moreFormatsStartsClosedAndToggles() {
-        setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = {}) }
+        setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = {}, exportPage = true) }
         rule.onNodeWithText("Plain text", substring = true).assertDoesNotExist()
         rule.onNodeWithText(".srt", substring = true).assertDoesNotExist()
         rule.onNodeWithText("More formats").assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand))
@@ -267,7 +297,11 @@ class SheetBehaviourTest {
     /** An audio-only meeting hides the text formats (not greyed out) and says why (L-11, D99). */
     @Test fun anAudioOnlyNoteHidesTheTextFormats() {
         setThemed {
-            NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-plain"), onAction = {})
+            NoteActionsSheetContent(
+                VariantFixtures.noteActions.getValue("actions-plain"),
+                onAction = {},
+                exportPage = true,
+            )
         }
         rule.onNodeWithContentDescription("Share Audio file").assertIsEnabled()
         rule.onNodeWithText("No transcript yet, so only the audio can be exported.").assertExists()
@@ -283,6 +317,7 @@ class SheetBehaviourTest {
             NoteActionsSheetContent(
                 VariantFixtures.noteActions.getValue("actions-imported-audio"),
                 onAction = { actions += it },
+                exportPage = true,
             )
         }
         rule.onNodeWithText("Original audio", substring = true).performClick()
@@ -295,7 +330,11 @@ class SheetBehaviourTest {
 
     @Test fun anUnreadableTranscriptSaysSoInsteadOfTheTextFormats() {
         setThemed {
-            NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-unreadable"), onAction = {})
+            NoteActionsSheetContent(
+                VariantFixtures.noteActions.getValue("actions-unreadable"),
+                onAction = {},
+                exportPage = true,
+            )
         }
         rule.onNodeWithText("Cassini file", substring = true).assertIsEnabled()
         rule.onNodeWithText("Not available for this transcript").assertExists()
@@ -313,10 +352,11 @@ class SheetBehaviourTest {
         setThemed {
             NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-plain"), onAction = { actions += it })
         }
-        rule.onNodeWithText("Audio file", substring = true).assertIsEnabled()
-        rule.onNode(hasText("Plain text", substring = true).and(hasClickAction())).assertDoesNotExist()
         rule.onNodeWithText("Document info").assertDoesNotExist()
         rule.onNodeWithText("Transcribe").performClick()
+        rule.onNodeWithText("Export…").performScrollTo().performClick()
+        rule.onNodeWithText("Audio file", substring = true).assertIsEnabled()
+        rule.onNode(hasText("Plain text", substring = true).and(hasClickAction())).assertDoesNotExist()
         rule.runOnIdle { assertEquals(listOf(NoteAction.TRANSCRIBE), actions) }
     }
 

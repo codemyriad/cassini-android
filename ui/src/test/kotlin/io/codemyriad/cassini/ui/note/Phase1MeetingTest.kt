@@ -174,9 +174,12 @@ class Phase1MeetingTest {
             }
         }
         rule.onAllNodesWithText("3 speakers").assertCountEquals(0)
-        rule.onNode(hasText("Verified")).performClick()
+        // QA 25 Nov: a verified meeting shows no "Verified" tag; a trust problem keeps its chip and banner toggle.
+        rule.onAllNodesWithText("Verified").assertCountEquals(0)
         rule.onNode(hasText("Version 2 of 2", substring = true)).performClick()
-        rule.runOnIdle { assertEquals(listOf(NoteEvent.TrustChip, NoteEvent.OpenVersions), events) }
+        rule.runOnIdle { state = state.copy(chips = state.chips?.copy(trust = TrustUi.AUDIO_CHANGED)) }
+        rule.onNode(hasText("Audio changed", substring = true)).performClick()
+        rule.runOnIdle { assertEquals(listOf(NoteEvent.OpenVersions, NoteEvent.TrustChip), events) }
         rule.runOnIdle { state = state.copy(mode = NoteMode.Queued(ahead = 0, overDocument = true)) }
         rule.onAllNodesWithText("3 speakers").assertCountEquals(1)
     }

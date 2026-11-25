@@ -57,7 +57,8 @@ enum class InkButtonSize(val visual: Dp) { Small(36.dp), Medium(40.dp) }
  * [Block] 44/48, full width, surface, `label14` ("Stop and keep progress");
  * [Medium] 40/48, 16, surface, `label14` ("Restore");
  * [MediumPlain] 40/48, 14, surface, `body14Plain` ("Someone else");
- * [Small] 36/48, 14, surface, `body14Plain` (banner and suggestion buttons).
+ * [Small] 36/48, 14, surface, `body14Plain` (banner and suggestion buttons);
+ * [Compact] 32/48, 14, surface, `label14` (Trash "Restore", QA 25 Nov).
  */
 enum class SecondaryButtonSize(val visual: Dp, val padding: Dp) {
     Large(52.dp, 20.dp),
@@ -66,13 +67,21 @@ enum class SecondaryButtonSize(val visual: Dp, val padding: Dp) {
     Medium(40.dp, 16.dp),
     MediumPlain(40.dp, 14.dp),
     Small(36.dp, 14.dp),
+    Compact(32.dp, 14.dp),
 }
 
 /** `TextButton` heights: 48 (Merge into…) or 52 (Not now — keep the audio). */
 enum class TextButtonSize(val visual: Dp) { Regular(48.dp), Tall(52.dp) }
 
-/** `DestructiveTextButton` sizes: [Header] 44/48, 14, `button` (Trash "Empty"); [Small] 40/48, 12, `body14Plain` ("Delete now"). */
-enum class DestructiveTextButtonSize(val visual: Dp, val padding: Dp) { Header(44.dp, 14.dp), Small(40.dp, 12.dp) }
+/**
+ * `DestructiveTextButton` sizes: [Header] 44/48, 14, `button` (Trash "Empty", "Forget everyone…"); [Small] 40/48, 12,
+ * `body14Plain`; [Compact] 32/48, 12, `body14Plain` (Trash "Delete now", the size of a compact "Restore").
+ */
+enum class DestructiveTextButtonSize(val visual: Dp, val padding: Dp) {
+    Header(44.dp, 14.dp),
+    Small(40.dp, 12.dp),
+    Compact(32.dp, 12.dp),
+}
 
 /**
  * The pill every button of the table draws. The clickable node is laid out at 48 dp at least ([touchTarget]); the
@@ -243,7 +252,7 @@ fun SecondaryButton(
     val style = when (size) {
         SecondaryButtonSize.Large -> t.button
         SecondaryButtonSize.Regular -> t.buttonRegular
-        SecondaryButtonSize.Block, SecondaryButtonSize.Medium -> t.label14
+        SecondaryButtonSize.Block, SecondaryButtonSize.Medium, SecondaryButtonSize.Compact -> t.label14
         SecondaryButtonSize.MediumPlain, SecondaryButtonSize.Small -> t.body14Plain
     }
     PillButton(

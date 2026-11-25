@@ -172,7 +172,6 @@
         <item quantity="other">%1$s voci da nominare di nuovo</item>
         <item quantity="many">%1$s voci da nominare di nuovo</item>
     </plurals>
-    <string name="ui_voices_stale_body">Il riconoscimento vocale è stato aggiornato e le voci salvate prima dell’aggiornamento non possono essere riconosciute. Dai un nome a %1$s in una riunione per salvare di nuovo la sua voce.</string>
     <string name="ui_voices_needs_naming">Da nominare di nuovo</string>
     <string name="ui_voices_caption">Per aggiungere qualcuno, dai un nome a una persona in una riunione e lascia attivo “Ricorda questa voce”.</string>
     <string name="ui_voices_empty">Ancora nessuna voce salvata</string>
