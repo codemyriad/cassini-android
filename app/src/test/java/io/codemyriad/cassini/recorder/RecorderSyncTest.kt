@@ -565,7 +565,8 @@ class RecorderSyncTest {
         radio.device.files.clear()
         radio.device.files["REC_0001.wav"] = recording(3_000, seed = 9)
         radio.device.unreadable += "REC_0001.wav"
-        assertDone(SyncOutcome.Done(0, 0, 0, false), sync.sync())
+        // The transcript waits (no failure) for a sync that can compare the recording.
+        assertDone(SyncOutcome.Done(0, 0, 0, false, deferredUploads = 1), sync.sync())
         assertFalse(radio.device.files.containsKey("REC_0001.cwx"))
 
         // Once the card reads cleanly again, the next sync compares the head, drops the old record and imports the new
