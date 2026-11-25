@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -46,9 +47,10 @@ import kotlinx.collections.immutable.persistentListOf
 import java.time.LocalTime
 
 /**
- * L-51..53 phone row: two-line title and duration, then time, an unfinished status or finished count/no-speech
- * pill, and recovery actions. Search results alone keep their highlighted snippet. The row retains explicit
- * localized spoken status and custom actions independently of its compact visual label.
+ * L-51..53 phone row: two-line title (three at the largest font sizes; QA 25 Nov) and duration, then time, an
+ * unfinished status pill or the finished count / no-speech as grey text, and recovery actions. Search results alone
+ * keep their highlighted snippet. The row retains explicit localized spoken status and custom actions independently
+ * of its compact visual label.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -114,7 +116,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
                 modifier = Modifier.weight(1f),
                 style = t.meetingTitle,
                 color = c.ink,
-                maxLines = 2,
+                maxLines = titleLines(),
             )
             Text(
                 text = Durations.clock(row.durationMs),
@@ -133,6 +135,13 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
         RowMeta(row, day, status, onAction)
     }
 }
+
+/** Two lines of title; three at the largest font sizes (QA 25 Nov), where two lines hold only a few words. */
+@Composable
+internal fun titleLines(): Int = if (LocalDensity.current.fontScale >= LARGEST_FONT_SCALE) 3 else 2
+
+/** Android 14's font scales from "Largest" up (1.5 to 2.0); below it a title keeps two lines. */
+private const val LARGEST_FONT_SCALE = 1.5f
 
 @Composable
 private fun noteRowBoundsModifiers(noteId: String): Pair<Modifier, Modifier> {

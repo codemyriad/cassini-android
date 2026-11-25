@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
@@ -80,6 +83,21 @@ class LargeFontScaleTest {
             assertTrue("\"$suffix\" needs $needs px and has $given px", needs <= given)
             val bounds = node.getUnclippedBoundsInRoot()
             assertTrue("\"$suffix\" ends at ${bounds.right}, past the row (${list.right})", bounds.right <= list.right)
+        }
+    }
+
+    /** QA 25 Nov: at the largest font sizes a Library title runs to three lines before it is cut; two below. */
+    @Test fun titlesRunToThreeLinesAtTheLargestFontSize() {
+        val title = "Quarterly planning with the supplier about the delivery schedule and the new price list"
+        val row = ComponentFixtures.board.copy(title = title)
+        var scale by mutableFloatStateOf(1f)
+        setThemed(fontScale = 1f) {
+            ScaledFont(scale) { Column(Modifier.width(390.dp)) { NoteRow(row, DayLabel.Yesterday, onAction = {}) } }
+        }
+        for ((fontScale, lines) in listOf(1f to 2, 2f to 3)) {
+            rule.runOnIdle { scale = fontScale }
+            val layout = rule.onNode(hasText(title.take(20), substring = true), useUnmergedTree = true).textLayout()
+            assertEquals("Title lines at font scale $fontScale", lines, layout.lineCount)
         }
     }
 
