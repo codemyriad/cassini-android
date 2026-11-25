@@ -25,18 +25,21 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.CassiniSheet
 import io.codemyriad.cassini.ui.components.PrimaryButton
@@ -199,7 +202,7 @@ private fun StartRow(label: String, value: String, onClick: () -> Unit, modifier
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun StartDatePicker(date: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
+internal fun StartDatePicker(date: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
     val state = rememberDatePickerState(
         initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
     )
@@ -215,6 +218,7 @@ private fun StartDatePicker(date: LocalDate, onPick: (LocalDate) -> Unit, onDism
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui_action_cancel)) } },
     ) {
+        AppScrim()
         DatePicker(state = state)
     }
 }
@@ -222,7 +226,7 @@ private fun StartDatePicker(date: LocalDate, onPick: (LocalDate) -> Unit, onDism
 /** The Material 3 time picker (`TimePickerDialog`), opened on [time], in the phone's 12- or 24-hour form. */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun StartTimePicker(time: LocalTime, onPick: (LocalTime) -> Unit, onDismiss: () -> Unit) {
+internal fun StartTimePicker(time: LocalTime, onPick: (LocalTime) -> Unit, onDismiss: () -> Unit) {
     val state = rememberTimePickerState(
         initialHour = time.hour,
         initialMinute = time.minute,
@@ -238,6 +242,18 @@ private fun StartTimePicker(time: LocalTime, onPick: (LocalTime) -> Unit, onDism
         title = { Text(stringResource(R.string.ui_meeting_set_date_time_time)) },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui_action_cancel)) } },
     ) {
+        AppScrim()
         TimePicker(state = state)
     }
+}
+
+/**
+ * Dims the picker's window as much as the app's own scrim token, as [io.codemyriad.cassini.ui.components.CassiniDialog]
+ * and the sheets do, instead of the platform's darker default.
+ */
+@Composable
+private fun AppScrim() {
+    val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+    val alpha = CassiniTheme.colors.scrim.alpha
+    SideEffect { window?.setDimAmount(alpha) }
 }

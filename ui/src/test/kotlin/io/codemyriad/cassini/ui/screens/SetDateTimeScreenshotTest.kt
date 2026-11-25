@@ -27,6 +27,9 @@ import io.codemyriad.cassini.ui.note.NoteDialog
 import io.codemyriad.cassini.ui.note.NoteScreen
 import io.codemyriad.cassini.ui.note.NoteSheet
 import io.codemyriad.cassini.ui.note.SetDateTimeUi
+import io.codemyriad.cassini.ui.note.StartDatePicker
+import io.codemyriad.cassini.ui.note.StartPicker
+import io.codemyriad.cassini.ui.note.StartTimePicker
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import kotlinx.collections.immutable.persistentListOf
 import org.junit.Assert.assertEquals
@@ -62,27 +65,21 @@ class SetDateTimeScreenshotTest : BoardTest() {
     @Config(qualifiers = "+night")
     fun sheetWithAStartDark() = sheet(dark = true, ui = prefill, name = "set-date-time")
 
-    @Test fun datePickerLight() = sheet(
-        dark = false,
-        ui = prefill,
-        name = "set-date-time-date-picker",
-        open = "start-date"
-    )
+    @Test fun dateRowOpensTheDatePicker() = opens("start-date")
+
+    @Test fun timeRowOpensTheTimePicker() = opens("start-time")
+
+    @Test fun datePickerLight() = picker(dark = false, kind = StartPicker.DATE)
 
     @Test
     @Config(qualifiers = "+night")
-    fun datePickerDark() = sheet(dark = true, ui = prefill, name = "set-date-time-date-picker", open = "start-date")
+    fun datePickerDark() = picker(dark = true, kind = StartPicker.DATE)
 
-    @Test fun timePickerLight() = sheet(
-        dark = false,
-        ui = prefill,
-        name = "set-date-time-time-picker",
-        open = "start-time"
-    )
+    @Test fun timePickerLight() = picker(dark = false, kind = StartPicker.TIME)
 
     @Test
     @Config(qualifiers = "+night")
-    fun timePickerDark() = sheet(dark = true, ui = prefill, name = "set-date-time-time-picker", open = "start-time")
+    fun timePickerDark() = picker(dark = true, kind = StartPicker.TIME)
 
     @Test
     @Config(qualifiers = FormFactorBoardTest.FOLDABLE_UNFOLDED)
@@ -155,6 +152,32 @@ class SetDateTimeScreenshotTest : BoardTest() {
         settle()
         rule.onNodeWithTag("actions-set-date-time").assertIsDisplayed()
         capture(if (dark) "dark" else "light", "set-date-time-actions", window = true)
+    }
+
+    /** Tapping a row of the sheet opens its Material 3 picker above it, with OK and Cancel. */
+    private fun opens(row: String) {
+        show { NoteScreen(BoardFixtures.readAndListen.copy(dialog = NoteDialog.SetDateTime(prefill)), {}) }
+        settle()
+        rule.onNodeWithTag(row).performClick()
+        settle()
+        rule.onNodeWithText("OK").assertIsDisplayed()
+    }
+
+    /**
+     * The picker as its dialog window shows it. Over the meeting, not over the sheet: two stacked scrims would make the
+     * light capture read as dark in the screenshot contract (`tests/pr_shots`).
+     */
+    private fun picker(dark: Boolean, kind: StartPicker) {
+        show(dark) {
+            NoteScreen(BoardFixtures.readAndListen, {})
+            when (kind) {
+                StartPicker.DATE -> StartDatePicker(prefill.date, onPick = {}, onDismiss = {})
+                StartPicker.TIME -> StartTimePicker(prefill.time, onPick = {}, onDismiss = {})
+            }
+        }
+        settle()
+        val name = if (kind == StartPicker.DATE) "set-date-time-date-picker" else "set-date-time-time-picker"
+        capture(if (dark) "dark" else "light", name, window = true)
     }
 
     private fun sheet(dark: Boolean, ui: SetDateTimeUi, name: String, open: String? = null) {
