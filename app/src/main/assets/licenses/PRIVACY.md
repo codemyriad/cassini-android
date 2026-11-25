@@ -81,7 +81,7 @@ You can bind your own Cassini voice recorder in Settings, Recorder. Cassini then
 - Cassini also sets the clock of the recorder to the time of your phone.
 - Cassini does not delete recordings from the recorder.
 
-"Forget recorder" removes the binding and its key from Cassini. The notes stay. The recorder keeps the key until a phone binds it again.
+"Forget recorder" removes the binding and its key from Cassini, with the Android Keystore key that encrypted it and any download that stopped before it finished. The notes stay. The recorder keeps the key until a phone binds it again.
 
 ## Permissions
 

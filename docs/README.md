@@ -52,6 +52,8 @@ These files are dated evidence. Read the current guides and reference documents 
   [D82 CI profile](review/android-ci-d82.md), [bulk transfer (D96)](review/android-bulk-transfer-d96.md),
   [Files-app access (D97)](review/android-documents-provider-d97.md),
   [API 29 heap failure](review/android-flake-api29-heap.md) and [CI memory evidence](review/ci-memory-evidence.md).
+- Recorder sync review: [the independent review](reviews/RECORDER_SYNC_REVIEW.md) and
+  [its triage after S4](reviews/RECORDER_SYNC_REVIEW_TRIAGE.md).
 - Test-suite benchmarks: [app unit-test JIT](benchmarks/app-unit-test-jit.md),
   [coordinator factory events](benchmarks/coordinator-factory-events.md), [export CPU work](benchmarks/export-cpu-work.md),
   [held-queue events](benchmarks/held-queue-events.md), [job cancellation](benchmarks/job-cancellation-events.md),

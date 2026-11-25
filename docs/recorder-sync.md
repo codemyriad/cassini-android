@@ -51,8 +51,10 @@ transcript push start then.
    encrypted form. The app never logs a key. A new binding also clears an earlier "firmware too old" result. Then it
    starts a sync.
 
-"Forget recorder" removes the binding and the key, and ends the companion association. The record of the copied
-recordings stays, so a recorder that is bound again does not give the same notes again.
+"Forget recorder" removes the binding and the key, deletes the Keystore key that wraps it and the `.part` files of
+stopped downloads (cache `recorder/`), and ends the companion association. The record of the copied recordings stays,
+so a recorder that is bound again does not give the same notes again. A Keystore key that can no longer encrypt
+(invalidated) is replaced at the next binding.
 
 ## A sync
 
@@ -74,7 +76,8 @@ One sync runs at a time (a `Mutex`). A sync does these steps:
    keeps the SHA-256 of the first 4 KiB of each recording. When the listing has a copied recording but not its
    sidecar, although the app sent one or has one to send, the app downloads the first 4 KiB again and compares them.
    A different file (a new recording with the same name and size after a card format) is a new recording: the app
-   copies it, and does not send the old transcript to it.
+   copies it, and does not send the old transcript to it. When those 4 KiB cannot be read now (for example
+   `ERR,SDIO`), no transcript goes to that recording in this sync; the next sync compares again.
 5. For each new `.wav` file larger than 44 bytes: `GETS` downloads it into the cache (`recorder/<address>/<name>.part`).
    Each `GETS` asks for a 64 KiB window (open_fw takes any total and paces the frames through its TX ring), so the
    link does not wait for a round trip every 3840 bytes. The stock firmware (`pen133` in the `PONG` firmware field)
@@ -95,6 +98,12 @@ One sync runs at a time (a `Mutex`). A sync does these steps:
    - A lost link or a timeout ends the sync. Another download failure (a card error, bad frames after all retries)
      skips the file: the other files and the transcripts still go, and the next sync tries the file again.
    - A file that changed or went after `LS` is skipped; the next `LS` decides.
+   - `PING` and `STAT` do not end a `GETS` window that still streams (only `LS`, `PUT` or another `GETS` do). After
+     a download that needed retries, and before a download failure after all retries, the app sends a 1-byte `GETS`
+     at the end of the file (which replaces the window and answers one empty frame) and then `PING`, so no frame of
+     the old window reaches the next command or file.
+   - Names on the card are case-insensitive (exFAT): the app matches a listed recording, a record and a stopped
+     download by name without case.
    - An import refused for lack of space or a save error keeps the downloaded file, and the next sync imports it
      again without a download. Another refusal (for example a WAV that is not 16-bit PCM) is final.
    - At the end of a sync, the app deletes the `.part` files that no stopped download continues.
