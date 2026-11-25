@@ -11,11 +11,14 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Starts the recorder sync's foreground service; false when Android refused it. */
@@ -39,20 +42,52 @@ class RecorderRunner(
     private val sync: RecorderSync,
     private val service: RecorderServiceStarter,
 ) {
+    private val serviceRuns = MutableStateFlow(0)
+    private val serviceRunning = MutableStateFlow(false)
+
+    /** True while at least one run has started the foreground service and has not finished yet. */
+    val serviceActive: StateFlow<Boolean> = serviceRunning
+
     fun syncNow(): Deferred<SyncOutcome> = scope.async {
-        if (sync.canSync()) service.start()
-        sync.sync()
+        var started = false
+        if (sync.canSync()) {
+            started = acquireService()
+        }
+        try {
+            sync.sync()
+        } finally {
+            if (started) releaseService()
+        }
     }
 
     fun attempt(mode: SyncMode = SyncMode.FULL): Deferred<SyncOutcome> = scope.async {
-        val holder = launch {
-            sync.activity.first { it is RecorderActivity.Syncing && it.step != SyncStep.CHECKING }
-            if (!service.start()) Log.i(TAG, "No foreground service for this sync; it goes on while the process lives")
-        }
+        var started = false
         try {
-            sync.sync(mode)
+            sync.sync(mode) {
+                if (!started) {
+                    started = acquireService()
+                    if (!started) Log.i(TAG, "No foreground service for this sync; it goes on while the process lives")
+                }
+            }
         } finally {
-            holder.cancel()
+            if (started) releaseService()
+        }
+    }
+
+    private fun acquireService(): Boolean {
+        updateServiceRuns(1)
+        val ok = service.start()
+        if (!ok) updateServiceRuns(-1)
+        return ok
+    }
+
+    private fun releaseService() = updateServiceRuns(-1)
+
+    private fun updateServiceRuns(delta: Int) {
+        serviceRuns.update { count ->
+            val next = (count + delta).coerceAtLeast(0)
+            serviceRunning.value = next > 0
+            next
         }
     }
 

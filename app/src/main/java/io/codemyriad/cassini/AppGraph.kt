@@ -155,6 +155,7 @@ class AppGraph(context: Context, val config: Config) {
         val onStartupStep: (String) -> Unit = {},
         val processing: ProcessingHooks = ProcessingHooks(),
         val recording: RecordingHooks = RecordingHooks(),
+        val recorder: ((Context, AppGraph) -> RecorderFeature)? = null,
         val audioPlayer: (Context) -> AudioPlayer = ::ExoAudioPlayer,
     )
 
@@ -344,7 +345,9 @@ class AppGraph(context: Context, val config: Config) {
      * The recorder sync (docs/recorder-sync.md), created on first use or when the app is first visible; "Auto sync"
      * starts with it.
      */
-    val recorder: RecorderFeature by lazy { RecorderFeature(app, this).also(RecorderFeature::start) }
+    val recorder: RecorderFeature by lazy {
+        (config.recorder?.invoke(app, this) ?: RecorderFeature(app, this)).also(RecorderFeature::start)
+    }
 
     /** The last full word lists that the Note screen showed (FAST NOTE OPENING: later opens skip the word cache). */
     val recentWords = RecentWords()

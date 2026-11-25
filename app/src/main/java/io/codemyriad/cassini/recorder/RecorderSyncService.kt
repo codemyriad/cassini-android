@@ -21,9 +21,8 @@ import io.codemyriad.cassini.inAppLanguage
 import io.codemyriad.cassini.processing.NotificationChannels
 import io.codemyriad.cassini.startForegroundWithType
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import io.codemyriad.cassini.ui.R as UiR
@@ -35,7 +34,9 @@ import io.codemyriad.cassini.ui.R as UiR
  * most every [POST_INTERVAL_MS]: Android drops the updates of a package that posts more than a few each second.
  */
 class RecorderSyncService : LifecycleService() {
-    private val sync: RecorderSync get() = (application as CassiniApplication).graph.recorder.sync
+    private val recorder: RecorderFeature get() = (application as CassiniApplication).graph.recorder
+    private val sync: RecorderSync get() = recorder.sync
+    private val runner: RecorderRunner get() = recorder.runner
     private var follower: Job? = null
     private var foreground = false
 
@@ -46,12 +47,13 @@ class RecorderSyncService : LifecycleService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         lastStartId = startId
-        if (!foreground) {
-            foreground = enterForeground(RecorderNotifications.build(this, sync.activity.value))
-            if (!foreground) {
-                stopSelf(startId)
-                return START_NOT_STICKY
-            }
+        val first = !foreground
+        // Android requires startForeground on every startForegroundService delivery, even when already foregrounded.
+        if (enterForeground(RecorderNotifications.build(this, sync.activity.value))) {
+            foreground = true
+        } else if (first) {
+            stopSelf(startId)
+            return START_NOT_STICKY
         }
         if (follower?.isActive == true) restarted = true else follower = lifecycleScope.launch { follow() }
         return START_NOT_STICKY
@@ -63,22 +65,36 @@ class RecorderSyncService : LifecycleService() {
     }
 
     /**
-     * Waits for the sync to start (the service can start first), shows its steps, then stops when it is idle, unless a
-     * new start request came meanwhile (then it follows the next sync).
+     * Waits for an in-flight service run to enter [RecorderSync.activity], shows its steps, then stops as soon as the
+     * sync is idle and no service run remains, unless a new start request came meanwhile.
      */
     private suspend fun follow() {
         do {
             restarted = false
-            withTimeoutOrNull(START_GRACE_MS) { sync.activity.first { it != RecorderActivity.Idle } }
-            // A StateFlow keeps only its last value: while the collector waits, the steps in between are skipped.
-            sync.activity.takeWhile { it != RecorderActivity.Idle }.collect { activity ->
-                post(RecorderNotifications.build(this, activity))
-                delay(POST_INTERVAL_MS)
+            if (sync.activity.value == RecorderActivity.Idle && runner.serviceActive.value) {
+                val changed = withTimeoutOrNull(START_GRACE_MS) {
+                    combine(sync.activity, runner.serviceActive) { activity, active ->
+                        activity != RecorderActivity.Idle || !active
+                    }.first { it }
+                }
+                if (changed == null) break
             }
-        } while (restarted)
+            followActiveSync()
+        } while (restarted || runner.serviceActive.value)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         foreground = false
         stopSelfResult(lastStartId)
+    }
+
+    private suspend fun followActiveSync() {
+        while (true) {
+            val activity = sync.activity.value
+            if (activity == RecorderActivity.Idle) break
+            post(RecorderNotifications.build(this, activity))
+            withTimeoutOrNull(POST_INTERVAL_MS) { sync.activity.first { it == RecorderActivity.Idle } }
+            if (sync.activity.value == RecorderActivity.Idle) break
+            sync.activity.first { it != activity }
+        }
     }
 
     private fun post(notification: Notification) {

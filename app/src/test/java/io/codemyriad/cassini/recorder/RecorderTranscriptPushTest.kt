@@ -98,10 +98,9 @@ class RecorderTranscriptPushTest {
 
     /** Lets the push's waits run until it has waited [count] times. */
     private suspend fun waitsUpTo(count: Int) {
-        while (waits.size < count) {
-            val seen = waits.size
-            withTimeout(TIMEOUT_MS) { while (waits.size == seen) delay(10) }
-            if (waits.size < count) proceed.send(Unit)
+        for (expected in 1..count) {
+            withTimeout(TIMEOUT_MS) { while (waits.size < expected) delay(10) }
+            if (expected < count) proceed.send(Unit)
         }
     }
 

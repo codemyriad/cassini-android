@@ -218,6 +218,8 @@ class RecorderSync(private val parts: Parts) {
     private var running: SyncMode? = null
     private var fullQueued = false
     private var bindWaiters = 0
+
+    @Volatile private var movingCallback: (() -> Unit)? = null
     private val current = MutableStateFlow<RecorderActivity>(RecorderActivity.Idle)
 
     val activity: StateFlow<RecorderActivity> = current.asStateFlow()
@@ -225,9 +227,9 @@ class RecorderSync(private val parts: Parts) {
     /**
      * Syncs with the bound recorder; [SyncOutcome.Busy] at once when a sync or a binding runs already. At most one full
      * sync waits for an upload-only one (a transcript push, which is short) instead: "Sync now" and the first attempt
-     * of "Auto sync" are not lost to it.
+     * of "Auto sync" are not lost to it. [onMovingFiles] runs once when this sync first downloads, imports or uploads.
      */
-    suspend fun sync(mode: SyncMode = SyncMode.FULL): SyncOutcome {
+    suspend fun sync(mode: SyncMode = SyncMode.FULL, onMovingFiles: (() -> Unit)? = null): SyncOutcome {
         val acquired = synchronized(stateLock) {
             if (lock.tryLock()) {
                 running = mode
@@ -254,9 +256,19 @@ class RecorderSync(private val parts: Parts) {
                 running = mode
             }
         }
+        var notified = false
+        movingCallback = onMovingFiles?.let { callback ->
+            {
+                if (!notified) {
+                    notified = true
+                    callback()
+                }
+            }
+        }
         return try {
             syncLocked(mode)
         } finally {
+            movingCallback = null
             current.value = RecorderActivity.Idle
             releaseLock()
         }
@@ -708,6 +720,7 @@ class RecorderSync(private val parts: Parts) {
 
     private suspend fun import(address: String, planned: PlannedDownload, part: File): FileResult {
         current.value = RecorderActivity.Syncing(SyncStep.IMPORTING, planned.name)
+        movingCallback?.invoke()
         val head = withContext(parts.io) { headSha256(part) }
         val noteId = when (val imported = parts.library.import(part, planned.name)) {
             is LibraryImport.Rejected -> return rejected(address, planned, part, head, imported.failure)
@@ -894,6 +907,7 @@ class RecorderSync(private val parts: Parts) {
         val same = shown != null && shown.step == step && shown.file == file && shown.total == total &&
             percent(shown.done, total) == percent(done, total)
         if (!same) current.value = RecorderActivity.Syncing(step, file, done, total)
+        if (step != SyncStep.CHECKING) movingCallback?.invoke()
     }
 
     private fun percent(done: Long, total: Long): Long = if (total > 0) done * PERCENT / total else 0
