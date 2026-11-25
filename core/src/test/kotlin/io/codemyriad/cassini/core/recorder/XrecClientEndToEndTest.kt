@@ -95,7 +95,7 @@ class XrecClientEndToEndTest {
     }
 
     @Test fun theStockFirmwareKeepsTheSmallWindow() {
-        val fake = device(FakeRecorder(key = key, firmware = "pen133_v2"))
+        val fake = device(FakeRecorder(key = key, firmware = "pen133_2.0.65"))
         val data = Random(11).nextBytes(10_000)
         fake.files["a.wav"] = data
         val client = connect(fake)
@@ -174,8 +174,8 @@ class XrecClientEndToEndTest {
             ),
             gets(fake),
         )
-        assertEquals(progress.distinct(), progress)
-        assertTrue(progress.zipWithNext().all { (a, b) -> b - a in 1..640 })
+        // The drain repeats the last good offset as a heartbeat; the offsets never go back and leave no gap.
+        assertTrue(progress.zipWithNext().all { (a, b) -> b - a in 0..640 })
         assertEquals(1, client.lastDownload!!.retries)
         // The link is quiet again: the next command gets its own reply.
         assertEquals(87, client.stat().batteryPercent)
@@ -212,9 +212,10 @@ class XrecClientEndToEndTest {
             ),
             gets(fake),
         )
-        assertEquals(progress.distinct(), progress)
-        assertEquals(32_000L, progress[49])
-        assertEquals(32_640L, progress[50])
+        assertTrue(progress.zipWithNext().all { (a, b) -> b - a in 0..640 })
+        val offsets = progress.distinct()
+        assertEquals(32_000L, offsets[49])
+        assertEquals(32_640L, offsets[50])
         assertEquals(1, client.lastDownload!!.retries)
     }
 

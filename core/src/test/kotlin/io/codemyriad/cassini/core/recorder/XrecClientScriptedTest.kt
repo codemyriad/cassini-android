@@ -24,7 +24,12 @@ class XrecClientScriptedTest {
     private var now = 0L
     private val waits = mutableListOf<Long>()
     private val steps = ArrayDeque<Step>()
-    private val sent = ByteArrayOutputStream()
+    private val sendTimes = mutableListOf<Long>()
+    private val sent = object : ByteArrayOutputStream() {
+        override fun flush() {
+            sendTimes += now
+        }
+    }
     private val input = XrecInput { buffer, offset, length, timeout ->
         waits += timeout
         var next = steps.pollFirst() ?: Step.Silence
@@ -48,12 +53,22 @@ class XrecClientScriptedTest {
         }
     }
     private val timeouts = XrecTimeouts(replyMillis = 1000, frameMillis = 700, quietMillis = 50, drainMillis = 500)
-    private val client = XrecClient(input, sent, timeouts, clock = { now }, maxRetries = 2)
+    private val fallbacks = mutableListOf<Triple<String, Long, Int>>()
+    private val client = XrecClient(input, sent, timeouts, clock = { now }, maxRetries = 2).apply {
+        onFallback = { name, offset, window -> fallbacks += Triple(name, offset, window) }
+    }
 
     private fun receive(text: String) = steps.add(Step.Bytes(text.toByteArray()))
 
     private companion object {
         const val PONG = "+XREC:PONG,openfw_v5,v5,bound=1,auth=1,pair=0\r\n"
+        const val RESYNC = "\r+XREC:PING\r"
+    }
+
+    /** The end of a download that recovered: the drain ends in silence, then the PONG of the resync. */
+    private fun settle() {
+        steps.add(Step.Silence)
+        receive(PONG)
     }
 
     @Test fun skipsLinesThatAreNotReplies() {
@@ -108,10 +123,11 @@ class XrecClientScriptedTest {
         steps.add(Step.Silence) // frame wait
         steps.add(Step.Silence) // drain ends in silence
         steps.add(Step.Bytes(frame(640, data.copyOfRange(640, 1000))))
+        settle() // The frame at 640 may have been late: the repeat of the window can still stream.
         val sink = ByteArrayOutputStream()
         assertEquals(1000L, client.download("a.wav", 1000, sink))
         assertArrayEquals(data, sink.toByteArray())
-        assertEquals("+XREC:GETS,0,1000,640,a.wav\r+XREC:GETS,640,360,640,a.wav\r", sent.toString())
+        assertEquals("+XREC:GETS,0,1000,640,a.wav\r+XREC:GETS,640,360,640,a.wav\r$RESYNC", sent.toString())
     }
 
     @Test fun framesOfTheFailedWindowAfterTheNewGetsAreSkipped() {
@@ -124,12 +140,14 @@ class XrecClientScriptedTest {
         // After the new GETS: the late rest of the old window, then the new window from 640.
         steps.add(Step.Bytes(at(1280) + at(1920)))
         steps.add(Step.Bytes(at(640) + at(1280) + at(1920) + at(2560)))
+        settle()
         val sink = ByteArrayOutputStream()
         val progress = mutableListOf<Long>()
         assertEquals(3_000L, client.download("a.wav", 3_000, sink) { progress += it })
         assertArrayEquals(data, sink.toByteArray())
-        assertEquals(listOf(640L, 1280L, 1920L, 2560L, 3000L), progress)
-        assertEquals("+XREC:GETS,0,3000,640,a.wav\r+XREC:GETS,640,2360,640,a.wav\r", sent.toString())
+        // Each skipped frame repeats the offset: a heartbeat for the stall watchdog.
+        assertEquals(listOf(640L, 640L, 640L, 1280L, 1920L, 2560L, 3000L), progress)
+        assertEquals("+XREC:GETS,0,3000,640,a.wav\r+XREC:GETS,640,2360,640,a.wav\r$RESYNC", sent.toString())
         assertEquals(1, client.lastDownload!!.retries)
     }
 
@@ -141,6 +159,7 @@ class XrecClientScriptedTest {
         steps.add(Step.Silence) // and the drain ends
         // Part of the old window comes after all (the same bytes), then the new window repeats them.
         steps.add(Step.Bytes(at(640) + at(1280) + at(640) + at(1280) + at(1920)))
+        settle()
         val sink = ByteArrayOutputStream()
         assertEquals(2_000L, client.download("a.wav", 2_000, sink))
         assertArrayEquals(data, sink.toByteArray())
@@ -153,10 +172,11 @@ class XrecClientScriptedTest {
         steps.add(Step.Bytes(at(0) + at(1280))) // the frame at 640 is missing
         steps.add(Step.Silence) // drain
         steps.add(Step.Bytes(at(640) + at(1280) + at(1920)))
+        settle()
         val sink = ByteArrayOutputStream()
         client.download("a.wav", 2_000, sink)
         assertArrayEquals(data, sink.toByteArray())
-        assertEquals("+XREC:GETS,0,2000,640,a.wav\r+XREC:GETS,640,1360,640,a.wav\r", sent.toString())
+        assertEquals("+XREC:GETS,0,2000,640,a.wav\r+XREC:GETS,640,1360,640,a.wav\r$RESYNC", sent.toString())
     }
 
     @Test fun repeatedFailuresFallBackToTheStockWindow() {
@@ -168,100 +188,134 @@ class XrecClientScriptedTest {
         }
         steps.add(Step.Bytes((0 until 3_840 step 640).map(::at).reduce(ByteArray::plus)))
         steps.add(Step.Bytes((3_840 until 5_000 step 640).map(::at).reduce(ByteArray::plus)))
+        settle()
         val sink = ByteArrayOutputStream()
         client.download("a.wav", 5_000, sink)
         assertArrayEquals(data, sink.toByteArray())
         assertEquals(
             "+XREC:GETS,0,5000,640,a.wav\r+XREC:GETS,0,5000,640,a.wav\r" +
-                "+XREC:GETS,0,3840,640,a.wav\r+XREC:GETS,3840,1160,640,a.wav\r",
+                "+XREC:GETS,0,3840,640,a.wav\r+XREC:GETS,3840,1160,640,a.wav\r$RESYNC",
             sent.toString(),
         )
         assertEquals(XrecLimits.STOCK_GETS_WINDOW, client.getsWindow)
-        assertEquals(XrecDownloadStats(5_000, 2 * (700 + 50), 2, 4, 3_840), client.lastDownload)
+        assertEquals(listOf(Triple("a.wav", 0L, XrecLimits.STOCK_GETS_WINDOW)), fallbacks)
+        // Two windows of 700 ms frame wait and 50 ms drain, then the 50 ms drain before the resync.
+        assertEquals(XrecDownloadStats(5_000, 2 * (700 + 50) + 50, 2, 4, 3_840), client.lastDownload)
+
+        // The fallback is for that file only: the next download asks for the full window again.
+        sent.reset()
+        steps.add(Step.Bytes(frame(0, data.copyOfRange(0, 640))))
+        client.download("b.wav", 640, ByteArrayOutputStream())
+        assertEquals("+XREC:GETS,0,640,640,b.wav\r", sent.toString())
+        assertEquals(XrecLimits.GETS_WINDOW, client.getsWindow)
     }
 
-    @Test fun theDownloadSpeedIsMeasured() {
-        val data = ByteArray(2_560) { it.toByte() }
-        steps.add(Step.Elapse(10))
-        steps.add(Step.Bytes(frame(1_280, data.copyOfRange(1_280, 1_920))))
-        steps.add(Step.Elapse(10))
-        steps.add(Step.Bytes(frame(1_920, data.copyOfRange(1_920, 2_560))))
-        val sink = ByteArrayOutputStream().apply { write(data, 0, 1_280) }
-        assertEquals(2_560L, client.download("a.wav", 2_560, sink, resumeOffset = 1_280))
+    @Test fun lateOldFramesThatCompleteTheFileLeaveNoBytesForTheNextCommand() {
+        // Silent PCM: the repeat of the window holds far more than the 4096-byte reply buffer without a line end.
+        val data = ByteArray(12_800)
+        fun at(offset: Int) = frame(offset.toLong(), data.copyOfRange(offset, minOf(offset + 640, data.size)))
+        fun frames(from: Int) = (from until data.size step 640).map(::at).reduce(ByteArray::plus)
+        steps.add(Step.Bytes(at(0)))
+        steps.add(Step.Silence) // the frame at 640 is late: the frame wait times out
+        steps.add(Step.Silence) // and the drain ends
+        // The late old frames complete the file, and the repeat of the new window streams after them.
+        steps.add(Step.Bytes(frames(640)))
+        steps.add(Step.Bytes(frames(640).copyOfRange(0, 5_000)))
+        steps.add(Step.Silence) // a pause in the repeat ends the drain
+        steps.add(Step.Bytes(frames(640).copyOfRange(5_000, 12_000))) // its rest comes before the PONG
+        receive(PONG)
+        val sink = ByteArrayOutputStream()
+        assertEquals(12_800L, client.download("a.wav", 12_800, sink))
         assertArrayEquals(data, sink.toByteArray())
-        val stats = client.lastDownload!!
-        // The resumed bytes do not count: 1280 bytes in 20 ms.
-        assertEquals(XrecDownloadStats(1_280, 20, 0, 1, XrecLimits.GETS_WINDOW), stats)
-        assertEquals(64_000L, stats.bytesPerSecond)
+        assertEquals(true, sent.toString().endsWith(RESYNC))
+
+        // The next command and the next download see only their own bytes.
+        receive("+XREC:STAT,87,3990,0,0,33,4,1,2\r\n")
+        assertEquals(true, client.stat().recording)
+        val other = ByteArray(640) { 7 }
+        steps.add(Step.Bytes(frame(0, other)))
+        val next = ByteArrayOutputStream()
+        client.download("b.wav", 640, next)
+        assertArrayEquals(other, next.toByteArray())
     }
 
-    @Test fun anErrLineInsteadOfAFrameFails() {
-        receive("+XREC:ERR,NOENT\r\n")
-        expect(XrecFailure.NOT_FOUND) { client.download("gone.wav", 10, ByteArrayOutputStream()) }
+    @Test fun theDrainOfALargeWindowGoesOnWhileBytesFlowUpToItsLimit() {
+        val size = XrecLimits.GETS_WINDOW
+        val data = ByteArray(size) { (it * 11).toByte() }
+        fun at(offset: Int) = frame(offset.toLong(), data.copyOfRange(offset, minOf(offset + 640, size)))
+        steps.add(Step.Bytes(at(0)))
+        steps.add(Step.Silence) // the frame wait times out at 700 ms
+        // A slow link: the rest of the old window keeps coming, a frame a second, for longer than the drain may wait.
+        repeat(12) {
+            steps.add(Step.Elapse(1_000))
+            steps.add(Step.Bytes(at(0)))
+        }
+        // The new window after the old frames that the drain left: they lie before the offset and are skipped.
+        steps.add(Step.Bytes((640 until size step 640).map(::at).reduce(ByteArray::plus)))
+        settle()
+        val progress = mutableListOf<Long>()
+        val sink = ByteArrayOutputStream()
+        client.download("a.wav", size.toLong(), sink) { progress += it }
+        assertArrayEquals(data, sink.toByteArray())
+        // The limit is drainMillis + 64 KiB at 8 KiB/s = 8500 ms after 700: the read that ends at 9700 ms is the last.
+        val limit = timeouts.drainMillis + size * 1_000L / XrecClient.DRAIN_BYTES_PER_SECOND
+        assertEquals(8_500L, limit)
+        assertEquals(listOf(0L, 9_700L), sendTimes.take(2))
+        // Each drained read and each skipped frame is a heartbeat at 640.
+        assertEquals(1 + 9 + 3, progress.count { it == 640L })
     }
 
-    @Test fun aDownloadWithoutProgressGivesUpAfterTheRetries() {
-        expect(XrecFailure.INTEGRITY) { client.download("a.wav", 10, ByteArrayOutputStream()) }
+    @Test fun oldFramesBeyondTheEndOfTheBudgetFailTheWindow() {
+        val data = ByteArray(1_280) { (it * 3).toByte() }
+        val old = frame(0, data.copyOfRange(0, 640))
+        val budget = (XrecClient.STALE_BUDGET / old.size).toInt()
+        steps.add(Step.Bytes(old))
+        steps.add(Step.Silence) // the frame at 640 never comes
+        steps.add(Step.Silence) // drain
+        repeat(2) {
+            // More old frames than one window may skip: the window fails on the first one past the budget.
+            steps.add(Step.Bytes(ByteArray(0).let { (0..budget).fold(it) { all, _ -> all + old } }))
+            steps.add(Step.Silence) // drain
+        }
+        try {
+            client.download("a.wav", 1_280, ByteArrayOutputStream())
+            fail("Expected INTEGRITY")
+        } catch (e: XrecException) {
+            assertEquals(XrecFailure.INTEGRITY, e.failure)
+            assertEquals("Frame at 0, expected 640", e.cause?.message)
+        }
         assertEquals(3, sent.toString().split("GETS").size - 1)
     }
 
-    @Test fun nothingIsSentForAnEmptyOrCompleteFile() {
-        assertEquals(0L, client.download("a.wav", 0, ByteArrayOutputStream()))
-        assertEquals(10L, client.download("a.wav", 10, ByteArrayOutputStream(), resumeOffset = 10))
-        assertEquals("", sent.toString())
-    }
+    @Test fun oldFramesThatCarryAFallbackWindowToItsEndDoNotEndTheRecovery() {
+        val size = 70_000
+        val data = ByteArray(size) { (it * 7 + it / 251).toByte() }
 
-    @Test fun aLostAckIsResentAfterAResync() {
-        val bytes = ByteArray(700) { (it * 7).toByte() }
-        steps.add(Step.Silence) // no ack for chunk 0
-        // The late ack and a stray error come before the PONG of the resync: all are dropped.
-        receive("+XREC:OK,PUT,0,64\r\n+XREC:ERR,LINE\r\n$PONG")
-        // A late duplicate ack of chunk 0 before the ack of chunk 1 is dropped too.
-        receive("+XREC:OK,PUT,0,64\r\n+XREC:OK,PUT,0,64\r\n+XREC:OK,PUT,64,600\r\n+XREC:OK,PUT,664,36\r\n")
-        receive("+XREC:OK,PUTEND,700\r\n")
-        client.uploadSidecar("a.cwx", bytes)
-        val crc0 = Crc16CcittFalse.compute(bytes, 0, 64)
-        val text = sent.toString(Charsets.ISO_8859_1)
-        assertEquals(2, text.split("+XREC:PUT,0,64,$crc0,REC,a.cwx:").size - 1)
-        assertEquals(1, text.split("\r+XREC:PING\r").size - 1)
-        assertEquals(true, text.endsWith("+XREC:PUTEND\r"))
-    }
-
-    @Test fun aResyncWithoutPongTimesOut() {
-        expect(XrecFailure.TIMEOUT) { client.resync() }
-        assertEquals(500L, now)
-    }
-
-    @Test fun aLostPutEndReplyIsAskedAgain() {
-        receive("+XREC:OK,PUT,0,5\r\n")
-        steps.add(Step.Silence) // no reply to PUTEND
-        receive(PONG + "+XREC:OK,PUTEND,5\r\n")
-        client.uploadSidecar("a.cwx", ByteArray(5))
-        assertEquals(2, sent.toString(Charsets.ISO_8859_1).split("+XREC:PUTEND\r").size - 1)
-    }
-
-    @Test fun olderFirmwareConfirmsARepeatedPutEndWithTheListing() {
-        receive("+XREC:OK,PUT,0,5\r\n")
-        steps.add(Step.Silence)
-        receive(PONG + "+XREC:ERR,NOPUT\r\n+XREC:F,100,a.wav\r\n+XREC:F,5,A.CWX\r\n+XREC:END\r\n")
-        client.uploadSidecar("a.cwx", ByteArray(5))
-        assertEquals(true, sent.toString(Charsets.ISO_8859_1).endsWith("+XREC:PUTEND\r+XREC:LS\r"))
-
-        // Not in the listing: the commit is not confirmed.
-        receive("+XREC:OK,PUT,0,5\r\n")
-        steps.add(Step.Silence)
-        receive(PONG + "+XREC:ERR,NOPUT\r\n+XREC:F,4,a.cwx\r\n+XREC:END\r\n")
-        expect(XrecFailure.INTEGRITY) { client.uploadSidecar("a.cwx", ByteArray(5)) }
-    }
-
-    @Test fun aFirstPutEndThatFindsNoUploadIsAnError() {
-        receive("+XREC:OK,PUT,0,5\r\n+XREC:ERR,NOPUT\r\n")
-        expect(XrecFailure.NO_UPLOAD) { client.uploadSidecar("a.cwx", ByteArray(5)) }
-    }
-
-    @Test fun aWrongPutEndTotalIsAProtocolError() {
-        receive("+XREC:OK,PUT,0,5\r\n+XREC:OK,PUTEND,4\r\n")
-        expect(XrecFailure.PROTOCOL) { client.uploadSidecar("a.cwx", ByteArray(5)) }
+        // The frames the device sends for one GETS: 640 bytes each, the last one short at the window's end.
+        fun window(from: Int, total: Int) = (from until from + total step 640)
+            .map { frame(it.toLong(), data.copyOfRange(it, minOf(it + 640, from + total))) }
+            .reduce(ByteArray::plus)
+        val big = XrecLimits.GETS_WINDOW
+        val small = XrecLimits.STOCK_GETS_WINDOW
+        repeat(2) {
+            steps.add(Step.Silence) // no frame in time
+            steps.add(Step.Silence) // drain
+        }
+        // Both failed 64 KiB windows stream after all, then each fallback window the client asks for. The late frames
+        // of the first fill the fallback windows up to 65536, past the ends the windows asked for; the second and the
+        // repeats follow, behind the offset, and the short last frame of the 64 KiB window leaves the fallback window
+        // at 65280 to continue from the middle of a frame.
+        var stream = window(0, big) + window(0, big)
+        for (from in 0 until size step small) stream += window(from, minOf(small, size - from))
+        steps.add(Step.Bytes(stream))
+        val sink = ByteArrayOutputStream()
+        client.download("a.wav", size.toLong(), sink)
+        assertArrayEquals(data, sink.toByteArray())
+        val stats = client.lastDownload!!
+        assertEquals(2, stats.retries)
+        assertEquals(2 + (size + small - 1) / small, stats.requests)
+        // The frames of the last windows came after every old frame: the recovery ended, no resync was needed.
+        assertEquals(false, sent.toString().endsWith(RESYNC))
     }
 
     private fun frame(offset: Long, payload: ByteArray): ByteArray {

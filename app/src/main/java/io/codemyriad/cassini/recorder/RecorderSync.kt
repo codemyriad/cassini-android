@@ -815,7 +815,12 @@ class RecorderSync(private val parts: Parts) {
      */
     private suspend fun <T> session(link: RecorderLink, block: suspend (Session) -> T): T = try {
         coroutineScope {
-            val session = Session(XrecClient(link.input, link.output, parts.timeouts), parts.io)
+            val client = XrecClient(link.input, link.output, parts.timeouts).apply {
+                onFallback = { name, offset, window ->
+                    Log.i(METRICS_TAG, "$name: repeated failed windows at $offset; GETS of $window bytes for this file")
+                }
+            }
+            val session = Session(client, parts.io)
             val watchdog = launch(parts.io) {
                 try {
                     val tick = (parts.stallMillis / WATCHDOG_TICKS).coerceIn(MIN_TICK_MS, MAX_TICK_MS)

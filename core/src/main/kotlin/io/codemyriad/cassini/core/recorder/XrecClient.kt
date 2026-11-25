@@ -63,12 +63,19 @@ class XrecClient(
     private var start = 0
     private var end = 0
 
+    /** The window each download starts with: lowered for the rest of the session when the PONG names stock firmware. */
+    private var baseWindow: Int = getsWindow
+
     /**
      * The bytes one GETS asks for. It drops to [XrecLimits.STOCK_GETS_WINDOW] for the rest of the session when the
-     * PONG names the stock firmware, or after [FALLBACK_FAILURES] failed windows in a row of one download.
+     * PONG names the stock firmware, and for the rest of one download after [FALLBACK_FAILURES] failed windows in a
+     * row; the next download starts again from the session's window.
      */
     var getsWindow: Int = getsWindow
         private set
+
+    /** Hears of each download that falls back to the stock window: the file, the offset and the new window. */
+    var onFallback: (name: String, offset: Long, window: Int) -> Unit = { _, _, _ -> }
 
     /** The measurements of the last download that finished, or null before the first one. */
     var lastDownload: XrecDownloadStats? = null
@@ -81,7 +88,8 @@ class XrecClient(
     /** `PING`: works without authentication. The stock firmware keeps the small window of its GETS. */
     fun ping(): XrecReply.Pong = request<XrecReply.Pong>(XrecCommands.ping()).also { pong ->
         if (XrecLimits.STOCK_FIRMWARE_MARK in pong.firmware) {
-            getsWindow = minOf(getsWindow, XrecLimits.STOCK_GETS_WINDOW)
+            baseWindow = minOf(baseWindow, XrecLimits.STOCK_GETS_WINDOW)
+            getsWindow = baseWindow
         }
     }
 
@@ -117,15 +125,17 @@ class XrecClient(
 
     /**
      * Downloads /record/[name] of the listed [size] into [sink], starting at [resumeOffset] (the bytes [sink] already
-     * has). Returns the final offset, equal to [size]. [progress] gets the offset after each good frame.
+     * has). Returns the final offset, equal to [size]. [progress] gets the offset after each good frame, and the same
+     * offset again as a heartbeat while a recovery skips old frames or drains the link.
      *
      * The end comes from [size], not from a short frame: the device shortens frames to its link MTU. A frame with no
      * payload at the expected offset is the end of the file on the device ([XrecFailure.SIZE_CHANGED]).
      *
      * After a failed window (a timeout, a bad CRC or offset), the device keeps streaming the rest of that window: the
      * client drains it until the link is quiet, then asks again from the last good offset. Frames of the old window
-     * that still come after the new GETS are skipped by their offset, within [STALE_BUDGET] bytes. [lastDownload]
-     * holds the measurements when the download ends.
+     * that still come after the new GETS are skipped by their offset, within [STALE_BUDGET] bytes. A download that
+     * ends while a repeated window can still stream drains the link and resyncs before it returns, so the next command
+     * starts on a quiet link. [lastDownload] holds the measurements when the download ends.
      */
     fun download(
         name: String,
@@ -137,6 +147,8 @@ class XrecClient(
         require(size in 0..XrecLimits.MAX_OFFSET + 1 && resumeOffset in 0..size) { "Bad size or resume offset" }
         val started = clock()
         val transfer = Transfer(resumeOffset)
+        val heartbeat = { progress(transfer.offset) }
+        getsWindow = baseWindow
         var failures = 0
         while (transfer.offset < size) {
             val before = transfer.offset
@@ -148,13 +160,21 @@ class XrecClient(
                 transfer.recovering = true
                 failures = if (transfer.offset > before) 1 else failures + 1
                 // The rest of the window still streams: the link is quiet again before a retry or the next command.
-                drain(drainLimit(getsWindow))
+                drain(drainLimit(transfer.lastWindow), heartbeat)
                 if (failures > maxRetries) {
                     val message = "Download of $name failed at ${transfer.offset}"
                     throw XrecException(XrecFailure.INTEGRITY, message, cause = e)
                 }
-                if (failures >= FALLBACK_FAILURES) getsWindow = minOf(getsWindow, XrecLimits.STOCK_GETS_WINDOW)
+                if (failures >= FALLBACK_FAILURES && getsWindow > XrecLimits.STOCK_GETS_WINDOW) {
+                    getsWindow = XrecLimits.STOCK_GETS_WINDOW
+                    onFallback(name, transfer.offset, getsWindow)
+                }
             }
+        }
+        if (transfer.recovering) {
+            // Late frames of an old window can complete the file while the repeat of a window still streams.
+            drain(drainLimit(transfer.lastWindow), heartbeat)
+            resync()
         }
         lastDownload = XrecDownloadStats(
             bytes = transfer.offset - resumeOffset,
@@ -216,8 +236,12 @@ class XrecClient(
     fun resync() {
         writeBytes(RESYNC)
         val deadline = deadline(timeouts.drainMillis)
-        while (readReply(deadline) !is XrecReply.Pong) {
-            // A reply that came before the PONG belongs to an earlier command.
+        while (true) {
+            // A reply that came before the PONG belongs to an earlier command. The bytes of a late frame are skipped,
+            // and a reply can follow them on the same line.
+            val line = readLine(deadline, lenient = true)
+            val reply = line.substring(maxOf(0, line.lastIndexOf(XrecLimits.PREFIX)))
+            if (XrecReplies.parse(reply) is XrecReply.Pong) return
         }
     }
 
@@ -254,42 +278,60 @@ class XrecClient(
 
     /**
      * One GETS window: frames until its end. Each frame must start at the expected offset; while [Transfer.recovering]
-     * after a failed window, a frame of that old window (before the expected offset, or after it while no frame of this
-     * window came yet) is skipped instead, within [STALE_BUDGET] bytes.
+     * after a failed window, a frame of an older window (before the expected offset, or after it while no frame of this
+     * window came yet) is skipped instead, within [STALE_BUDGET] bytes. A good frame that starts before the expected
+     * offset and ends past it gives its tail: the last frame of a 64 KiB window is short, and a later window's frames
+     * do not start where it ends.
+     *
+     * The recovery ends with the first good frame that no older window covered: the link is in order, so every frame
+     * of the older windows came before it, and the rest of this window follows it. Until then a good frame at the
+     * expected offset can be a late frame of an older window, and the repeat of this window can still stream.
      */
     private fun burst(name: String, size: Long, transfer: Transfer, sink: OutputStream, progress: (Long) -> Unit) {
         val total = minOf(getsWindow.toLong(), size - transfer.offset).toInt()
         val stop = transfer.offset + total
         send(XrecCommands.gets(transfer.offset, total, XrecLimits.GETS_CHUNK, name))
         transfer.requests++
+        transfer.lastWindow = total
+        val olderEnd = transfer.sentEnd
+        transfer.sentEnd = maxOf(transfer.sentEnd, stop)
         var accepted = false
         var stale = 0L
         while (transfer.offset < stop) {
             val frame = readFrame(deadline(timeouts.frameMillis))
-            val old = transfer.recovering &&
+            val frameEnd = frame.offset + frame.payload.size
+            val tail = transfer.recovering && frame.offset < transfer.offset && frameEnd > transfer.offset
+            val old = transfer.recovering && !tail &&
                 (frame.offset < transfer.offset || (frame.offset > transfer.offset && !accepted))
             if (old && stale + frame.payload.size + XrecLimits.FRAME_HEADER <= STALE_BUDGET) {
                 stale += frame.payload.size + XrecLimits.FRAME_HEADER
+                progress(transfer.offset) // A heartbeat: skipping a long old window is progress too.
                 continue
             }
-            when {
-                frame.offset != transfer.offset ->
-                    throw XrecException(XrecFailure.INTEGRITY, "Frame at ${frame.offset}, expected ${transfer.offset}")
-                frame.payload.isEmpty() ->
-                    throw XrecException(XrecFailure.SIZE_CHANGED, "$name ended at ${transfer.offset}, not at $size")
-                // A frame of an old, larger window can pass the end of this one, never the end of the file.
-                frame.payload.size > size - transfer.offset ->
-                    throw XrecException(XrecFailure.INTEGRITY, "Frame longer than requested")
-                Crc16CcittFalse.compute(frame.payload) != frame.crc ->
-                    throw XrecException(XrecFailure.INTEGRITY, "CRC error in the frame at ${frame.offset}")
-            }
-            sink.write(frame.payload) // A local storage failure is a plain IOException, not an XrecException.
-            transfer.offset += frame.payload.size
+            check(name, size, transfer.offset, frame, tail)
+            val skip = (transfer.offset - frame.offset).toInt()
+            // A local storage failure is a plain IOException, not an XrecException.
+            sink.write(frame.payload, skip, frame.payload.size - skip)
+            if (frame.offset >= olderEnd) transfer.recovering = false
+            transfer.offset = frameEnd
             accepted = true
             progress(transfer.offset)
         }
-        // A window without old frames ends the recovery; one that skipped some can leave more for the next window.
-        if (stale == 0L) transfer.recovering = false
+    }
+
+    /** Fails unless [frame] is good and gives the bytes at [expected] ([tail]: from the middle of the frame). */
+    private fun check(name: String, size: Long, expected: Long, frame: Frame, tail: Boolean) {
+        when {
+            frame.offset != expected && !tail ->
+                throw XrecException(XrecFailure.INTEGRITY, "Frame at ${frame.offset}, expected $expected")
+            frame.payload.isEmpty() ->
+                throw XrecException(XrecFailure.SIZE_CHANGED, "$name ended at $expected, not at $size")
+            // A frame of an old, larger window can pass the end of this one, never the end of the file.
+            frame.offset + frame.payload.size > size ->
+                throw XrecException(XrecFailure.INTEGRITY, "Frame longer than requested")
+            Crc16CcittFalse.compute(frame.payload) != frame.crc ->
+                throw XrecException(XrecFailure.INTEGRITY, "CRC error in the frame at ${frame.offset}")
+        }
     }
 
     private fun putChunk(target: PutTarget, bytes: ByteArray, offset: Int, length: Int): PutResult {
@@ -376,7 +418,11 @@ class XrecClient(
         }
     }
 
-    private fun readLine(deadline: Long): String {
+    /**
+     * The next line. A [lenient] read drops the bytes of a full buffer without a line end, except its tail (a reply
+     * can start there): late binary frames can hold more than a buffer of bytes without one.
+     */
+    private fun readLine(deadline: Long, lenient: Boolean = false): String {
         while (true) {
             for (i in start until end) {
                 if (buffer[i] == LF) {
@@ -385,6 +431,7 @@ class XrecClient(
                     return line
                 }
             }
+            if (lenient && end - start == buffer.size) start = end - LINE_TAIL
             fill(deadline)
         }
     }
@@ -453,13 +500,17 @@ class XrecClient(
     private fun drainLimit(window: Int): Long =
         timeouts.drainMillis + window * MILLIS_PER_SECOND / DRAIN_BYTES_PER_SECOND
 
-    /** Discards the buffered bytes and what arrives until [XrecTimeouts.quietMillis] of silence, at most [millis]. */
-    private fun drain(millis: Long) {
+    /**
+     * Discards the buffered bytes and what arrives until [XrecTimeouts.quietMillis] of silence, at most [millis].
+     * [heartbeat] runs after each read that brought bytes.
+     */
+    private fun drain(millis: Long, heartbeat: () -> Unit = {}) {
         start = 0
         end = 0
         val limit = clock() + millis
         while (clock() < limit) {
             if (readInput(scratch, 0, scratch.size, timeouts.quietMillis) == 0) return
+            heartbeat()
         }
     }
 
@@ -467,7 +518,13 @@ class XrecClient(
         var retries = 0
         var requests = 0
 
-        /** After a failed window: frames of that window can still come, and are skipped by their offset. */
+        /** The bytes the last GETS asked for. */
+        var lastWindow = 0
+
+        /** The end of the furthest window asked for: frames before it can come from an older window. */
+        var sentEnd = 0L
+
+        /** After a failed window: frames of older windows can still come, and are skipped by their offset. */
         var recovering = false
     }
 
@@ -492,6 +549,9 @@ class XrecClient(
         private const val NANOS_PER_MILLI = 1_000_000L
         private const val DEFAULT_RETRIES = 5
         private const val BUFFER_BYTES = 4096
+
+        /** The bytes a lenient line read keeps of a full buffer: room for the start of the longest reply. */
+        private const val LINE_TAIL = 256
         private const val CR = '\r'.code.toByte()
         private val RESYNC = "\r${XrecCommands.ping()}\r".toByteArray(Charsets.US_ASCII)
         private const val LF = '\n'.code.toByte()
