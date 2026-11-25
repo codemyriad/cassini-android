@@ -11,6 +11,7 @@ style:
     # detekt's default test paths, plus :bench, whose experiments are test code in a main source set.
     excludes:
       - '**/test/**'
+      - '**/testFixtures/**'
       - '**/androidTest/**'
       - '**/commonTest/**'
       - '**/jvmTest/**'

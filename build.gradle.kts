@@ -30,6 +30,7 @@ detekt {
             "bench/src/main/java",
             "core/src/main/kotlin",
             "core/src/test/kotlin",
+            "core/src/testFixtures/kotlin",
             "data/src/main/kotlin",
             "data/src/test/kotlin",
             "data/src/androidTest/kotlin",

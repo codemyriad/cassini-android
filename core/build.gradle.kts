@@ -5,6 +5,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // Android SDK, NDK, native AAR, libopus source or device. Without --configure-on-demand Gradle also configures :app
 // and :engine, which needs the Android SDK and its NDK (docs/development.md).
 plugins {
+    // FakeRecorder and CwxReader (src/testFixtures) serve the :core tests and the recorder sync tests of :app.
+    `java-test-fixtures`
     alias(libs.plugins.kotlin.jvm)
     // Lets :app's lint (checkDependencies) analyze this module too.
     alias(libs.plugins.android.lint)

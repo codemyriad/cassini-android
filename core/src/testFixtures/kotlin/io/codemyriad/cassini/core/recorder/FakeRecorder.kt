@@ -1,5 +1,5 @@
 // A test double that mirrors the firmware's C handlers, early returns and compound checks included.
-@file:Suppress("ReturnCount", "ComplexCondition", "CyclomaticComplexMethod")
+@file:Suppress("ReturnCount", "ComplexCondition", "CyclomaticComplexMethod", "TooManyFunctions")
 
 package io.codemyriad.cassini.core.recorder
 
@@ -19,8 +19,9 @@ import java.util.Collections
  * `len` raw payload bytes, so a rejected header makes the payload a (dropped) command line.
  *
  * GETS frames are clipped to `mtu - 12` bytes. Faults: [dropFrames] and [corruptFrames] (a GETS frame offset, once),
- * [dropPutAcks] (the reply of a written PUT chunk, once), [corruptPutChunks] (a received PUT chunk, once).
- * [recordTarget] false is the old firmware that knows only `CAS`.
+ * [dropPutAcks] (the reply of a written PUT chunk, once), [corruptPutChunks] (a received PUT chunk, once),
+ * [disconnectAtFrame] (the link closes instead of sending that GETS frame, once).
+ * [recordTarget] false is the old firmware that knows only `CAS`. [reconnect] opens a new link to the same device.
  */
 class FakeRecorder(
     @Volatile var key: ByteArray? = null,
@@ -35,6 +36,9 @@ class FakeRecorder(
     val corruptFrames: MutableSet<Long> = Collections.synchronizedSet(HashSet())
     val dropPutAcks: MutableSet<Long> = Collections.synchronizedSet(HashSet())
     val corruptPutChunks: MutableSet<Long> = Collections.synchronizedSet(HashSet())
+
+    /** The device closes the link instead of sending the GETS frame at this offset (once). */
+    @Volatile var disconnectAtFrame: Long? = null
 
     /** The command lines the device processed, in order (PUT headers without their payload). */
     val commands: MutableList<String> = Collections.synchronizedList(ArrayList())
@@ -71,6 +75,23 @@ class FakeRecorder(
     private val thread = Thread(::run, "fake-recorder").apply {
         isDaemon = true
         start()
+    }
+
+    /**
+     * A new link to this device after this one closed: the key, the PIN window, the faults that did not fire and the
+     * files stay; the session (authentication, a staged upload) starts again, as after a disconnect.
+     */
+    fun reconnect(): FakeRecorder {
+        close()
+        val next = FakeRecorder(key, pairingPin, mtu, recording, recordTarget)
+        synchronized(files) { next.files.putAll(files) }
+        synchronized(cassini) { next.cassini.putAll(cassini) }
+        next.dropFrames += dropFrames
+        next.corruptFrames += corruptFrames
+        next.dropPutAcks += dropPutAcks
+        next.corruptPutChunks += corruptPutChunks
+        next.disconnectAtFrame = disconnectAtFrame
+        return next
     }
 
     override fun close() {
@@ -209,6 +230,11 @@ class FakeRecorder(
     }
 
     private fun sendFrame(offset: Long, payload: ByteArray) {
+        if (disconnectAtFrame == offset) {
+            disconnectAtFrame = null
+            fromDevice.close()
+            throw IOException("The device dropped the link") // Ends the device thread, as a lost radio link does.
+        }
         if (dropFrames.remove(offset)) return
         val crc = Crc16CcittFalse.compute(payload)
         val body = payload.copyOf()
