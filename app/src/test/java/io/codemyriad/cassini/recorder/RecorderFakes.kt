@@ -107,6 +107,9 @@ internal class FakeLibrary : RecorderLibrary {
     /** The next transcription request fails, as if the process ended after the import. */
     @Volatile var failNextTranscribe = false
 
+    /** Each read of the transcripts fails, as a broken library would. */
+    @Volatile var failTranscripts = false
+
     override suspend fun import(file: File, displayName: String): LibraryImport {
         val bytes = file.readBytes()
         val existing = imported.entries.firstOrNull { it.value.contentEquals(bytes) }?.key
@@ -132,8 +135,10 @@ internal class FakeLibrary : RecorderLibrary {
 
     override suspend fun needsTranscription(noteId: String): Boolean = noteId !in transcribed && noteId !in ready
 
-    override suspend fun transcripts(noteIds: Collection<String>): Map<String, RecorderTranscript> =
-        synchronized(ready) { ready.filterKeys { it in noteIds } }
+    override suspend fun transcripts(noteIds: Collection<String>): Map<String, RecorderTranscript> {
+        check(!failTranscripts) { "The library cannot be read" }
+        return synchronized(ready) { ready.filterKeys { it in noteIds } }
+    }
 }
 
 /** A sync over [radio] with a store in [root]. */

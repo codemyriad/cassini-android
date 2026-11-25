@@ -5,7 +5,10 @@ import io.codemyriad.cassini.data.recorder.RecorderSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
@@ -52,6 +55,9 @@ class RecorderRunner(
             holder.cancel()
         }
     }
+
+    /** Returns when no sync and no binding runs. */
+    suspend fun awaitIdle() = sync.awaitIdle()
 
     private companion object {
         const val TAG = "RecorderRunner"
@@ -116,10 +122,14 @@ class RecorderAutoSync(
  * recorder is bound (and not waiting to be bound again). When a note of an imported recording gets its transcript
  * ([transcribed] gains a note), and once at the start when a transcript waits ([pending]), an upload-only attempt
  * ([SyncMode.UPLOADS]) runs. While the recorder does not answer (its radio is on only in its Bluetooth phone mode), the
- * attempt runs again after the waits of [TranscriptPushBackoff], as long as a transcript waits and the process lives.
- * A sync that connected ends the retries: what it did not send cannot go now (the recording went, or the recorder
- * refused it), and the next sync tries again. A sync that cannot connect before the user acts (no permission, no
- * Bluetooth, a refused key) ends them too.
+ * attempt runs again after the waits of [TranscriptPushBackoff], while a transcript waits and the process lives, up to
+ * [TranscriptPushBackoff.MAX_FAILURES] failures in a row; [TranscriptPushBackoff.MAX_SYNC_FAILURES] failed syncs in a
+ * row end them sooner. A running sync or binding ([SyncOutcome.Busy]) is no failure: the push waits for its end and
+ * tries again at once (a full sync sends the transcripts that finished during its downloads, so usually nothing is
+ * left). A sync that connected ends the retries: what it did not send cannot go now (the recording went, or the
+ * recorder refused it), and the next sync tries again. A sync that cannot connect before the user acts (no permission,
+ * no Bluetooth, a refused key) ends them too. [RecorderSync.pendingUploads] leaves out what no sync can send, so a new
+ * process does not start the attempts for it.
  */
 class RecorderTranscriptPush(
     private val scope: CoroutineScope,
@@ -138,30 +148,53 @@ class RecorderTranscriptPush(
         }
     }
 
-    /** Pushes at the start when a transcript waits, and again each time a note of a recording gets its transcript. */
-    private suspend fun follow() {
+    /**
+     * Pushes at the start when a transcript waits, and again, at once, each time a note of a recording gets its
+     * transcript. A note that leaves the set (deleted, or no longer transcribed) does not stop the attempts for the
+     * others.
+     */
+    private suspend fun follow() = coroutineScope {
         var known: Set<String>? = null
+        var pushing: Job? = null
         val mapped = settings.map { settings ->
             settings.current?.recordings.orEmpty().mapNotNull { it.recording.noteId }.toSet()
         }
         combine(mapped, transcribed) { notes, done -> notes intersect done }.distinctUntilChanged()
-            .collectLatest { ready ->
+            .collect { ready ->
                 val previous = known
                 known = ready
-                if (previous == null || (ready - previous).isNotEmpty()) push()
+                if (previous == null || (ready - previous).isNotEmpty()) {
+                    pushing?.cancelAndJoin()
+                    pushing = launch { push() }
+                }
             }
     }
 
     /** Upload-only attempts while a transcript waits and the last one ended in a way that can pass by itself. */
     private suspend fun push() {
         var failures = 0
-        while (true) {
-            val outcome = attempt() ?: return
-            if (!retry(outcome)) return
-            failures++
-            Log.i(TAG, "The transcript waits for the recorder ($outcome); try $failures")
-            wait(TranscriptPushBackoff.delayMs(failures))
+        var syncFailures = 0
+        var outcome = attempt()
+        while (outcome != null) {
+            if (outcome == SyncOutcome.Busy) {
+                // Another sync or a binding has the recorder: no failure, and no wait after it ends.
+                runner.awaitIdle()
+            } else {
+                failures++
+                syncFailures = if (outcome is SyncOutcome.Failed) syncFailures + 1 else 0
+                if (!tryAgain(outcome, failures, syncFailures)) return
+                Log.i(TAG, "The transcript waits for the recorder ($outcome); try $failures")
+                wait(TranscriptPushBackoff.delayMs(failures))
+            }
+            outcome = attempt()
         }
+    }
+
+    private fun tryAgain(outcome: SyncOutcome, failures: Int, syncFailures: Int): Boolean {
+        val giveUp = failures >= TranscriptPushBackoff.MAX_FAILURES ||
+            syncFailures >= TranscriptPushBackoff.MAX_SYNC_FAILURES
+        if (giveUp) Log.i(TAG, "The transcript waits for the next sync ($outcome, $failures failures)")
+        return retry(outcome) && !giveUp
     }
 
     /** One upload-only attempt, or null when no transcript waits or the attempt failed in the phone. */

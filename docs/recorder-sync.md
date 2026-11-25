@@ -123,16 +123,24 @@ The app does not delete recordings from the recorder (`TODO(recorder-sync)` in `
   download, so a transcript does not wait behind a long download. The next full sync copies the new recordings. The
   same check runs once when the push starts (the first time the app is visible, or after a binding), so a transcript
   that waited before the process ended goes too.
-  - A transcript waits when the app has not sent its version and the recorder did not refuse it
-    (`RecorderSync.pendingUploads`, read without the recorder).
-  - If the recorder does not answer (it is not in Bluetooth phone mode), a sync runs, Bluetooth is off, or the sync
-    stopped, the app tries again after 30 seconds. The wait doubles after each failure, up to 5 minutes
-    (`TranscriptPushBackoff`). The tries continue while a transcript waits and the process lives.
+  - A transcript waits when the app has not sent its version, the recorder did not refuse it, its recording was in
+    the last `LS` (each sync marks the records whose file is gone as `absent`) and has a sidecar name, and the
+    recorder's firmware did not refuse transcripts in the last day (`RecorderSync.pendingUploads`, read without the
+    recorder). So a transcript that no sync can send does not start attempts in each new process.
+  - If a sync or a binding runs, the push waits for its end and tries again at once, without a failure. A full sync
+    reads the transcripts again after its downloads, so a transcript that finished during a long download goes in the
+    same session. A full sync ("Sync now", the sync after a binding, "Auto sync") waits for an upload-only sync
+    instead of ending as busy.
+  - If the recorder does not answer (it is not in Bluetooth phone mode), Bluetooth is off, or the sync stopped, the app
+    tries again after 30 seconds. The wait doubles after each failure, up to 5 minutes (`TranscriptPushBackoff`).
   - The tries stop when no transcript waits, when a sync connected (what it did not send cannot go now: the recording
-    went, or the recorder refused it), or when only the user can make the sync possible (no permission, no Bluetooth,
-    a refused key).
+    went, or the recorder refused it), when only the user can make the sync possible (no permission, no Bluetooth,
+    a refused key), after 25 failures in a row (about 1 h 50 min), or after 3 failed syncs in a row (a failure that
+    comes back each time). A new transcript, a new process or a new binding starts them again; the next sync sends
+    what waits. A note that loses its transcript does not stop the tries for the others.
   - The Recorder screen shows "Transcribed. Waiting for the recorder: put it in Bluetooth phone mode." for a transcript
-    that waits, and "Transcript sent to the recorder" after the upload.
+    that waits, "Transcribed. The recording is no longer on the recorder." when its recording is gone, and "Transcript
+    sent to the recorder" after the upload.
   - A new variant or a renamed speaker of a note that has a transcript already does not start a push; the next sync
     sends it.
 - Android 12 and later refuse a foreground service start from the background. An app with a companion device (and
@@ -164,10 +172,13 @@ device chooser are optional features (`android:required="false"`).
   sync; a refused key; old firmware asked again after a day; a sidecar whose recording went; a refused sidecar name;
   an unreadable recording; a recording removed after `LS`; an import refused for lack of space; a sync that stopped
   before the transcription request; a reused name and size after a card format; a stalled link; a store that cannot
-  be written; binding with a wrong PIN; a stale bond),
+  be written; binding with a wrong PIN; a stale bond; a transcript that finishes during the downloads; a full sync
+  that waits for an upload-only one),
   `RecorderAutoSyncTest`, `RecorderTranscriptPushTest` (a new transcript goes at once with "Auto sync" off and without
-  a download; an unreachable recorder is tried again with growing waits until it takes the transcript; no attempt when
-  no transcript waits), `RecorderTranscriptsTest`, `GraphRecorderLibraryTest` and `RecorderViewModelTest`.
+  a download; a transcript that waits at the start goes; an unreachable recorder is tried again with growing waits
+  until it takes the transcript, and at most 25 times; a sync that fails each time is tried 3 times; a recording that
+  left the recorder ends the push after one sync; a busy recorder is no failure and a full sync takes the new
+  transcript; a note that loses its transcript does not stop the others; no attempt when no transcript waits), `RecorderTranscriptsTest`, `GraphRecorderLibraryTest` and `RecorderViewModelTest`.
 
 ## Limits
 

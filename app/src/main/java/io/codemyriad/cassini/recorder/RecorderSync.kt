@@ -6,6 +6,7 @@ import io.codemyriad.cassini.core.recorder.XrecAuth
 import io.codemyriad.cassini.core.recorder.XrecClient
 import io.codemyriad.cassini.core.recorder.XrecException
 import io.codemyriad.cassini.core.recorder.XrecFailure
+import io.codemyriad.cassini.core.recorder.XrecNames
 import io.codemyriad.cassini.core.recorder.XrecReply
 import io.codemyriad.cassini.core.recorder.XrecTimeouts
 import io.codemyriad.cassini.data.recorder.LastSync
@@ -22,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
@@ -177,19 +179,41 @@ class RecorderSync(private val parts: Parts) {
 
     private val store = parts.store
     private val lock = Mutex()
+
+    /** True while a sync or a binding holds [lock], for [awaitIdle]. */
+    private val held = MutableStateFlow(false)
+
+    /** The mode of the sync that holds [lock], or null (none, or a binding). */
+    @Volatile private var running: SyncMode? = null
     private val current = MutableStateFlow<RecorderActivity>(RecorderActivity.Idle)
 
     val activity: StateFlow<RecorderActivity> = current.asStateFlow()
 
-    /** Syncs with the bound recorder; [SyncOutcome.Busy] at once when a sync or a binding runs already. */
+    /**
+     * Syncs with the bound recorder; [SyncOutcome.Busy] at once when a sync or a binding runs already. A full sync
+     * waits for an upload-only one (a transcript push, which is short) instead: "Sync now" and the first attempt of
+     * "Auto sync" are not lost to it.
+     */
     suspend fun sync(mode: SyncMode = SyncMode.FULL): SyncOutcome {
-        if (!lock.tryLock()) return SyncOutcome.Busy
+        if (!lock.tryLock()) {
+            if (mode != SyncMode.FULL || running != SyncMode.UPLOADS) return SyncOutcome.Busy
+            lock.lock()
+        }
+        held.value = true
+        running = mode
         return try {
             syncLocked(mode)
         } finally {
+            running = null
             current.value = RecorderActivity.Idle
+            held.value = false
             lock.unlock()
         }
+    }
+
+    /** Returns when no sync and no binding runs: at once when none does. */
+    suspend fun awaitIdle() {
+        held.first { !it }
     }
 
     /** True when a sync can try to connect now: a recorder is bound, its key is accepted, and Bluetooth is ready. */
@@ -200,14 +224,19 @@ class RecorderSync(private val parts: Parts) {
     }
 
     /**
-     * The notes of the bound recorder's imported recordings whose finished transcript the recorder does not have yet
-     * (not sent in this version, and not refused for good). Read without the recorder: the sync itself checks with
-     * `LS` that the recording is still there. Empty when no recorder is bound or it needs a new binding.
+     * The notes of the bound recorder's imported recordings whose finished transcript a sync can send: the recorder
+     * does not have it yet (not sent in this version, and not refused for good), the recording was on the recorder at
+     * the last sync that listed its files and has a sidecar name, and its firmware did not refuse transcripts within
+     * [TranscriptUploadProbe.RETRY_MS]. Read without the recorder: the sync itself checks with `LS` that the recording
+     * is still there. Empty when no recorder is bound or it needs a new binding.
      */
     suspend fun pendingUploads(): Set<String> {
         val settings = store.read()
-        val state = settings.binding?.let { settings.devices[it.device.address] }?.takeUnless { it.rebindNeeded }
-        val recordings = state?.recordings.orEmpty().map { it.recording }.filter { it.noteId != null }
+        val state = settings.binding?.let { settings.devices[it.device.address] }
+            ?.takeIf { !it.rebindNeeded && takesTranscripts(it) } ?: return emptySet()
+        val recordings = state.recordings.filter { stored ->
+            !stored.absent && XrecNames.sidecarFor(stored.recording.name) != null
+        }.map { it.recording }.filter { it.noteId != null }
         val transcripts = parts.library.transcripts(recordings.mapNotNull { it.noteId })
         val versions = encode(transcripts).mapValues { it.value.version }
         return recordings.filter { recording ->
@@ -218,6 +247,15 @@ class RecorderSync(private val parts: Parts) {
     }
 
     /**
+     * False while the recorder's firmware refused transcripts less than [TranscriptUploadProbe.RETRY_MS] ago. Its
+     * name can change only on the recorder: until a sync sees a new one, the refusal holds for the day.
+     */
+    private fun takesTranscripts(state: RecorderDeviceState): Boolean {
+        val refused = state.transcriptsUnsupportedFirmware ?: return true
+        return TranscriptUploadProbe.mayUpload(refused, state.transcriptsUnsupportedAt, refused, parts.clock())
+    }
+
+    /**
      * Binds [device]: bonds, connects, checks that the pairing window is open, asks [pin] for the PIN that the
      * recorder shows (its argument is true after a wrong PIN; null cancels), and sends a new random key with PAIR. The
      * key is stored only in its Keystore-wrapped form. Waits for a sync that runs.
@@ -225,6 +263,7 @@ class RecorderSync(private val parts: Parts) {
     @Suppress("TooGenericExceptionCaught") // nothing may escape into the screen's scope; see below
     suspend fun bind(device: RecorderDevice, pin: suspend (wrong: Boolean) -> String?): BindOutcome {
         lock.lock()
+        held.value = true
         return try {
             bindLocked(device, pin)
         } catch (error: CancellationException) {
@@ -236,6 +275,7 @@ class RecorderSync(private val parts: Parts) {
             BindOutcome.Failed(null, error.javaClass.simpleName)
         } finally {
             current.value = RecorderActivity.Idle
+            held.value = false
             lock.unlock()
         }
     }
@@ -309,10 +349,12 @@ class RecorderSync(private val parts: Parts) {
         val status = session.call { stat() }
         setClock(session)
         val listing = session.call { list() }
+        markAbsent(address, listing)
         val noteIds = deviceState(address).recordings.mapNotNull { it.recording.noteId }
         val transcripts = encode(parts.library.transcripts(noteIds))
         val versions = transcripts.mapValues { it.value.version }
-        verifySuspects(session, address, SyncPlanner.suspects(listing, deviceState(address).syncState(), versions))
+        val suspects = SyncPlanner.suspects(listing, deviceState(address).syncState(), versions)
+        verifySuspects(session, address, suspects)
         val plan = SyncPlanner.plan(listing, status, deviceState(address).syncState(), versions)
         if (mode == SyncMode.UPLOADS) {
             val uploaded = upload(session, address, pong, plan.uploads, transcripts)
@@ -335,10 +377,42 @@ class RecorderSync(private val parts: Parts) {
                 FileResult.CHANGED -> Unit
             }
         }
-        val uploaded = upload(session, address, pong, plan.uploads, transcripts)
+        // A transcript can have finished during the downloads (a long one, or an existing note): it goes now too.
+        val checked = suspects.map { it.name }.toSet() + plan.downloads.map { it.name }
+        val (uploads, latest) = latestUploads(session, address, listing, status, checked)
+        val uploaded = upload(session, address, pong, uploads, latest)
         withContext(parts.io) { deleteStrayParts(address) }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
         return SyncOutcome.Done(downloaded, uploaded, plan.skipped.size + deferred, recording, failed)
+    }
+
+    /** Marks each record whose recording [listing] does not have (deleted, or the card was wiped), and the others not. */
+    private suspend fun markAbsent(address: String, listing: List<XrecReply.Entry>) {
+        val listed = listing.map { it.name to it.size }.toSet()
+        fun StoredRecording.absentNow() = (recording.name to recording.size) !in listed
+        if (deviceState(address).recordings.all { it.absent == it.absentNow() }) return
+        store.updateDevice(address) { state ->
+            state.copy(recordings = state.recordings.map { it.copy(absent = it.absentNow()) })
+        }
+    }
+
+    /**
+     * The uploads and their transcripts as the library has them now, after the downloads. A recording whose transcript
+     * finished meanwhile is compared first, unless [checked] (by name) already.
+     */
+    private suspend fun latestUploads(
+        session: Session,
+        address: String,
+        listing: List<XrecReply.Entry>,
+        status: XrecReply.Status,
+        checked: Set<String>,
+    ): Pair<List<PlannedUpload>, Map<String, EncodedTranscript>> {
+        val noteIds = deviceState(address).recordings.mapNotNull { it.recording.noteId }
+        val transcripts = encode(parts.library.transcripts(noteIds))
+        val versions = transcripts.mapValues { it.value.version }
+        val suspects = SyncPlanner.suspects(listing, deviceState(address).syncState(), versions)
+        verifySuspects(session, address, suspects.filterNot { it.name in checked })
+        return SyncPlanner.plan(listing, status, deviceState(address).syncState(), versions).uploads to transcripts
     }
 
     private suspend fun setClock(session: Session) {

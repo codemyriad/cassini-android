@@ -44,6 +44,9 @@ class RecorderPoliciesTest {
         assertEquals(240_000L, TranscriptPushBackoff.delayMs(4))
         assertEquals(TranscriptPushBackoff.MAX_MS, TranscriptPushBackoff.delayMs(5))
         assertEquals(TranscriptPushBackoff.MAX_MS, TranscriptPushBackoff.delayMs(Int.MAX_VALUE))
+        // The push gives up after about 1 h 50 min of waits: it does not poll the recorder for the life of the process.
+        val waited = (1 until TranscriptPushBackoff.MAX_FAILURES).sumOf(TranscriptPushBackoff::delayMs)
+        assertEquals(6_450_000L, waited)
     }
 
     @Test fun aFirmwareThatRefusedTranscriptsIsAskedAgainDailyOrAfterAChange() {

@@ -7,6 +7,10 @@ import io.codemyriad.cassini.core.recorder.CwxWord
 import io.codemyriad.cassini.core.recorder.FakeRecorder
 import io.codemyriad.cassini.core.recorder.XrecAuth
 import io.codemyriad.cassini.core.recorder.XrecFailure
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -21,6 +25,8 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * The recorder sync over [FakeRecorder], the recorder's XREC state machine behind pipes, with a fake library
@@ -115,6 +121,51 @@ class RecorderSyncTest {
         assertEquals(emptySet<String>(), sync.pendingUploads())
     }
 
+    @Test fun aTranscriptThatFinishesDuringTheDownloadsGoesInTheSameSync() = runBlocking {
+        recorder.files["REC_0001.wav"] = recording(10_000)
+        val (sync, store) = sync()
+        store.bound(key)
+        sync.sync()
+        radio.device.files["REC_0002.wav"] = recording(10_000, seed = 2)
+        radio.device.beforeGets = { name ->
+            if (name == "REC_0002.wav") library.ready["note-1"] = RecorderTranscript("v1", transcript("Standup"))
+        }
+        assertEquals(SyncOutcome.Done(1, 1, 0, false), sync.sync())
+        assertTrue(radio.device.files.containsKey("REC_0001.cwx"))
+        assertEquals(emptySet<String>(), sync.pendingUploads())
+    }
+
+    @Test fun aFullSyncWaitsForAnUploadOnlySyncInsteadOfBeingLost() = runBlocking {
+        recorder.files["REC_0001.wav"] = recording(10_000)
+        val (sync, store) = sync()
+        store.bound(key)
+        sync.sync()
+        library.ready["note-1"] = RecorderTranscript("v1", transcript("Standup"))
+        radio.device.files["REC_0002.wav"] = recording(10_000, seed = 2)
+        val putting = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        radio.device.beforePut = { offset ->
+            if (offset == 0L) {
+                putting.countDown()
+                release.await(HOOK_MS, TimeUnit.MILLISECONDS)
+            }
+        }
+        coroutineScope {
+            val uploads = async(Dispatchers.Default) { sync.sync(SyncMode.UPLOADS) }
+            assertTrue(putting.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+            val full = async(Dispatchers.Default) { sync.sync() }
+            // Another upload-only sync is busy at once; the full one waits.
+            assertEquals(SyncOutcome.Busy, sync.sync(SyncMode.UPLOADS))
+            delay(100)
+            assertFalse(full.isCompleted)
+            release.countDown()
+            assertEquals(SyncOutcome.Done(0, 1, 1, false), uploads.await())
+            assertEquals(SyncOutcome.Done(1, 0, 0, false), full.await())
+        }
+        sync.awaitIdle()
+        assertEquals(listOf("note-1", "note-2"), library.imported.keys.toList())
+    }
+
     @Test fun aDownloadThatLosesTheLinkResumesAtTheNextSync() = runBlocking {
         val audio = recording(10_000, seed = 7)
         recorder.files["REC_0001.wav"] = audio
@@ -200,6 +251,8 @@ class RecorderSyncTest {
         assertEquals(SyncOutcome.Done(0, 0, 0, false), sync.sync())
         assertEquals("openfw_v5", store.read().current!!.transcriptsUnsupportedFirmware)
         assertFalse(radio.device.files.containsKey("REC_0001.cwx"))
+        // Within the day the transcript does not wait: the push does not call the recorder for it.
+        assertEquals(emptySet<String>(), sync.pendingUploads())
         // The recorder gets the new firmware, which keeps the same name in PING. Within the day nothing is asked.
         radio.device.recordTarget = true
         now += TranscriptUploadProbe.RETRY_MS - 1
@@ -207,6 +260,7 @@ class RecorderSyncTest {
         assertFalse(radio.device.commands.any { it.startsWith("+XREC:PUT") })
         // A day later the app asks again, and the firmware takes the transcript.
         now += 1
+        assertEquals(setOf("note-1"), sync.pendingUploads())
         assertEquals(SyncOutcome.Done(0, 1, 0, false), sync.sync())
         assertTrue(radio.device.files.containsKey("REC_0001.cwx"))
         assertNull(store.read().current!!.transcriptsUnsupportedFirmware)
@@ -444,5 +498,8 @@ class RecorderSyncTest {
 
     private companion object {
         const val TIMEOUT_MS = 10_000L
+
+        /** Shorter than the reply timeout of [TEST_TIMEOUTS]: a hook that blocks the fake recorder longer fails the link. */
+        const val HOOK_MS = 1_500L
     }
 }

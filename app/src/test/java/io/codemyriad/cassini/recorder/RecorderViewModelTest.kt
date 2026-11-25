@@ -52,6 +52,8 @@ class RecorderViewModelTest {
                             stored("REC_0004.wav", null, failure = RecorderSync.IMPORT_FAILURE + "WAV"),
                             stored("REC_0005.wav", "gone"),
                             stored("REC_0006.wav", "d", failure = RecorderSync.UPLOAD_FAILURE + "BAD_NAME"),
+                            stored("REC_0007.wav", "e"),
+                            stored("REC_0008.wav", "f", absent = true),
                         ),
                         lastSync = LastSync(1, RecorderSync.OUTCOME_OK, downloaded = 2),
                     ),
@@ -62,6 +64,8 @@ class RecorderViewModelTest {
                 "b" to NoteSyncInfo("Call", JobState.NEEDS_CONSENT, transcribed = false),
                 "c" to NoteSyncInfo("Talk", JobState.RUNNING, transcribed = false),
                 "d" to NoteSyncInfo("Long name", null, transcribed = true),
+                "e" to NoteSyncInfo("Waits", null, transcribed = true),
+                "f" to NoteSyncInfo("Wiped", null, transcribed = true),
             )
             val state = expectMostRecentItem()
             assertEquals(DEVICE, state.device)
@@ -69,6 +73,8 @@ class RecorderViewModelTest {
             assertEquals(LastSync(1, RecorderSync.OUTCOME_OK, downloaded = 2), state.lastSync)
             assertEquals(
                 listOf(
+                    RecordingRow("REC_0008.wav", "f", "Wiped", RecordingStatus.TRANSCRIBED_NOT_ON_RECORDER),
+                    RecordingRow("REC_0007.wav", "e", "Waits", RecordingStatus.TRANSCRIBED),
                     RecordingRow("REC_0006.wav", "d", "Long name", RecordingStatus.UPLOAD_FAILED, "BAD_NAME"),
                     RecordingRow("REC_0005.wav", null, null, RecordingStatus.NOTE_GONE),
                     RecordingRow("REC_0004.wav", null, null, RecordingStatus.IMPORT_FAILED, "WAV"),
@@ -133,8 +139,13 @@ class RecorderViewModelTest {
         }
     }
 
-    private fun stored(name: String, noteId: String?, uploaded: String? = null, failure: String? = null) =
-        StoredRecording(SyncedRecording(name, 1_000, noteId, transcriptUploadedVersion = uploaded), failure)
+    private fun stored(
+        name: String,
+        noteId: String?,
+        uploaded: String? = null,
+        failure: String? = null,
+        absent: Boolean = false,
+    ) = StoredRecording(SyncedRecording(name, 1_000, noteId, transcriptUploadedVersion = uploaded), failure, absent)
 
     private class FakeScreenPorts : RecorderScreenPorts {
         override val settings = MutableStateFlow(RecorderSettings())

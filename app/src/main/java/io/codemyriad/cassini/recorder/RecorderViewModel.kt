@@ -54,6 +54,9 @@ enum class RecordingStatus {
     TRANSCRIPTION_FAILED,
     IMPORTED,
     TRANSCRIBED,
+
+    /** Transcribed, but the recording is no longer on the recorder: the transcript has nowhere to go. */
+    TRANSCRIBED_NOT_ON_RECORDER,
     UPLOADED,
     UPLOAD_FAILED,
 }
@@ -254,6 +257,7 @@ object RecorderRows {
         note == null -> RecordingStatus.NOTE_GONE
         stored.failure?.startsWith(RecorderSync.UPLOAD_FAILURE) == true -> RecordingStatus.UPLOAD_FAILED
         note.transcribed && stored.recording.transcriptUploadedVersion != null -> RecordingStatus.UPLOADED
+        note.transcribed && stored.absent -> RecordingStatus.TRANSCRIBED_NOT_ON_RECORDER
         note.transcribed -> RecordingStatus.TRANSCRIBED
         note.jobState == JobState.NEEDS_CONSENT -> RecordingStatus.WAITING_FOR_CONSENT
         note.jobState == JobState.FAILED -> RecordingStatus.TRANSCRIPTION_FAILED

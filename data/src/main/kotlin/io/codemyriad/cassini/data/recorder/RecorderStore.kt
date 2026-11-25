@@ -31,8 +31,13 @@ data class RecorderDevice(val address: String, val name: String)
  */
 data class RecorderBinding(val device: RecorderDevice, val wrappedKey: String)
 
-/** One recording of a recorder as the store keeps it: the planner's [recording] and the reason of a failed import. */
-data class StoredRecording(val recording: SyncedRecording, val failure: String? = null)
+/**
+ * One recording of a recorder as the store keeps it: the planner's [recording], the reason of a failed import, and
+ * whether the last sync that listed the recorder's files did not find it ([absent]: deleted, or the card was wiped).
+ * The record of an absent recording stays, so its file is not imported again if it comes back, but no transcript waits
+ * for it.
+ */
+data class StoredRecording(val recording: SyncedRecording, val failure: String? = null, val absent: Boolean = false)
 
 /**
  * How the last sync attempt ended, at [at] (ms since the epoch). [outcome] is a stable code that the app maps to
@@ -207,7 +212,8 @@ internal object RecorderJson {
                 JSONObject().put("name", recording.name).put("size", recording.size)
                     .putOpt("noteId", recording.noteId).putOpt("headSha256", recording.headSha256)
                     .putOpt("uploadedVersion", recording.transcriptUploadedVersion)
-                    .putOpt("refusedVersion", recording.transcriptRefusedVersion).putOpt("failure", stored.failure),
+                    .putOpt("refusedVersion", recording.transcriptRefusedVersion).putOpt("failure", stored.failure)
+                    .putOpt("absent", stored.absent.takeIf { it }),
             )
         }
         val json = JSONObject().put("recordings", recordings).put("rebindNeeded", state.rebindNeeded)
@@ -260,6 +266,7 @@ internal object RecorderJson {
             transcriptRefusedVersion = json.optStringOrNull("refusedVersion"),
         ),
         failure = json.optStringOrNull("failure"),
+        absent = json.optBoolean("absent", false),
     )
 
     private fun JSONObject.optStringOrNull(name: String): String? = if (isNull(name)) null else getString(name)

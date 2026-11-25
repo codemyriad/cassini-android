@@ -35,6 +35,7 @@ class RecorderStoreTest {
             recordings = listOf(
                 StoredRecording(SyncedRecording("REC_0001.wav", 1_000, "n1", "ab", "v1:00ff", "v0:11ee")),
                 StoredRecording(SyncedRecording("REC, with comma.wav", 2_000, null), failure = "IMPORT_WAV"),
+                StoredRecording(SyncedRecording("REC_0003.wav", 3_000, "n3"), absent = true),
             ),
             partial = PartialDownload("REC_0002.wav", 9_000, 3_840),
             lastSync = LastSync(42, "FAILED", "DISCONNECTED", downloaded = 1, uploaded = 2),

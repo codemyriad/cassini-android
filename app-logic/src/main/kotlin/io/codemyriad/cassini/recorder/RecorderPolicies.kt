@@ -49,11 +49,19 @@ object AutoSyncBackoff {
  * The waits between the attempts to send a new transcript to the recorder at once (whatever "Auto sync" is): 30 s
  * after the first failed attempt, doubled after each failure in a row, up to [MAX_MS]. The recorder answers only in its
  * Bluetooth phone mode, so a transcript usually waits for the user to turn that mode on; the short first waits let it
- * go soon after.
+ * go soon after. The attempts end after [MAX_FAILURES] failures in a row (about 1 h 50 min of waits), or after
+ * [MAX_SYNC_FAILURES] syncs in a row that connected and failed (a failure that would come back each time); a new
+ * transcript, a new process, or a new binding starts them again.
  */
 object TranscriptPushBackoff {
     const val FIRST_RETRY_MS = 30_000L
     const val MAX_MS = 5 * 60_000L
+
+    /** The failed attempts in a row after which the push stops: 4 short waits, then 20 of [MAX_MS]. */
+    const val MAX_FAILURES = 25
+
+    /** The failed syncs in a row (a failure after the link was up, or one in the phone) that stop the push. */
+    const val MAX_SYNC_FAILURES = 3
 
     private const val MAX_DOUBLINGS = 10
 
