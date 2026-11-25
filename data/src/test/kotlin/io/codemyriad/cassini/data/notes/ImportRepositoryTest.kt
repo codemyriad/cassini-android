@@ -210,6 +210,21 @@ class ImportRepositoryTest {
         assertEquals(ImportOutcome.Existing(opus), importer().import(input(fleurs("opus"), "c.ogg"), checkType = true))
     }
 
+    @Test fun theProvidersLastSavedTimeIsKeptOnlyAsASuggestion() = runTest {
+        val saved = 1_795_400_000_000L
+        val source = object : ImportSource {
+            override fun describe(uri: Uri) =
+                ImportSource.Description("REC001.opus", fleurs("opus").length(), "audio/ogg", lastModified = saved)
+
+            override fun open(uri: Uri) = fleurs("opus").inputStream()
+        }
+        val id = created(importer(source).import(provided, checkType = true))
+        val row = h.row(id)
+        assertEquals(saved, row.sourceModifiedAt)
+        assertEquals("never the meeting's start (D112)", null, row.recordingTime())
+        assertEquals(null, row.startedAt)
+    }
+
     @Test fun checkedImportsRejectOtherTypesBeforeTheCopy() = runTest {
         for (name in listOf("take.flac", "clip.aac", "clip.ogv", "clip.oga", "clip.spx", "voice.amr", "notes.txt")) {
             rejectedOpen(importer().import(input(fleurs("wav"), name), checkType = true))

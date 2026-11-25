@@ -55,6 +55,11 @@ internal fun NoteOverlays(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
             onConfirm = { onEvent(NoteEvent.RenameConfirmed(it)) },
             onDismiss = { onEvent(NoteEvent.DismissDialog) },
         )
+        is NoteDialog.SetDateTime -> SetDateTimeSheet(
+            ui = dialog.ui,
+            onSave = { date, time -> onEvent(NoteEvent.DateTimeConfirmed(date, time)) },
+            onDismiss = { onEvent(NoteEvent.DismissDialog) },
+        )
         null -> Unit
         else -> ConfirmDialog(
             spec = noteConfirmSpec(dialog),
@@ -70,7 +75,16 @@ internal fun NoteOverlays(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
  */
 @Composable
 fun NoteDialogContent(dialog: NoteDialog, onEvent: (NoteEvent) -> Unit) {
-    if (dialog is NoteDialog.Rename) {
+    if (dialog is NoteDialog.SetDateTime) {
+        SetDateTimeSheetContent(
+            ui = dialog.ui,
+            date = dialog.ui.date,
+            time = dialog.ui.time,
+            onPick = {},
+            onCancel = { onEvent(NoteEvent.DismissDialog) },
+            onSave = { onEvent(NoteEvent.DateTimeConfirmed(dialog.ui.date, dialog.ui.time)) },
+        )
+    } else if (dialog is NoteDialog.Rename) {
         RenameDialogContent(
             title = dialog.title,
             value = dialog.title,
@@ -97,8 +111,9 @@ internal fun noteConfirmSpec(dialog: NoteDialog): ConfirmSpec = when (dialog) {
     NoteDialog.TranscribeFresh -> transcribeFreshSpec()
     NoteDialog.StopAndTrash -> stopAndTrashSpec()
     is NoteDialog.ReadOnly -> ConfirmSpec(title = readOnlyMessage(dialog.reason))
-    // Rename has its own dialog; this copy is never shown.
+    // Rename and Set date and time have their own windows; this copy is never shown.
     is NoteDialog.Rename -> ConfirmSpec(title = stringResource(R.string.ui_actions_rename_title))
+    is NoteDialog.SetDateTime -> ConfirmSpec(title = stringResource(R.string.ui_meeting_set_date_time_title))
 }
 
 /** "Start over?" — "The draft so far is discarded. Your recording is kept." [Start over] (also from the Library). */

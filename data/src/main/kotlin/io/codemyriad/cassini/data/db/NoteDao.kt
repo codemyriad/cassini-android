@@ -193,6 +193,13 @@ abstract class NoteDao {
         return true
     }
 
+    /** D112: stores the start a person set and orders the note by it (`created_at`). False without a row. */
+    @Query("UPDATE notes SET started_at = :startedAt, created_at = :orderAt, updated_at = :now WHERE id = :id")
+    protected abstract suspend fun updateStartedAt(id: String, startedAt: String, orderAt: Long, now: Long): Int
+
+    open suspend fun setStartedAt(id: String, startedAt: String, orderAt: Long, now: Long): Boolean =
+        updateStartedAt(id, startedAt, orderAt, now) > 0
+
     @Query("UPDATE notes SET position_ms = :positionMs WHERE id = :id")
     abstract suspend fun setPosition(id: String, positionMs: Long)
 

@@ -5,6 +5,7 @@ import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.export.ExportNames
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
+import io.codemyriad.cassini.data.notes.startNotInDocument
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -26,6 +27,8 @@ internal class TransferSnapshots(private val graph: AppGraph) {
         if (before?.titleDirty == true && before.audioKind == AudioKind.DOCUMENT && before.documentState == DocumentState.OK) {
             catalogue.documents.retitle(id)
         }
+        // A start set in "Set date and time" (D112) that the file does not carry yet goes into the copy too.
+        if (catalogue.database.notes().note(id)?.startNotInDocument() == true) catalogue.documents.writeStart(id)
         val context = currentCoroutineContext()
         graph.locks.withNoteLock(id, graph.dispatchers.io) {
             val row = catalogue.database.notes().noteBlocking(id) ?: throw IOException("Note unavailable")

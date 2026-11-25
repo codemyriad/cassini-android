@@ -14,6 +14,7 @@ import io.codemyriad.cassini.core.export.TextExport
 import io.codemyriad.cassini.core.export.VttWriter
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.DocumentState
+import io.codemyriad.cassini.core.format.MeetingTime
 import io.codemyriad.cassini.core.format.SpeakerMerges
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
@@ -309,6 +310,23 @@ class DocumentRepository(
     }
 
     /**
+     * D112 (L-87): writes `notes.started_at`, the start the person set, into the document
+     * (`CassiniDocument.withStartedAt`). Read from the row under the note's lock, so the latest choice wins. Refused
+     * while a job row exists (adopt writes it then) and for a document that is not OK, which keeps the start in Room
+     * only, like a title. `Done` without a write when the file already states that start.
+     */
+    suspend fun writeStart(noteId: String): EditOutcome = edit(noteId) { row, document ->
+        writeStartDocument(noteId, row, document)
+    }
+
+    /**
+     * Writes the start of every OK document note whose file does not carry the start the person set (D112), after a
+     * job, a failed write or process death. A startup step beside [retitleDirty]. Returns the notes written.
+     */
+    suspend fun writeDirtyStarts(): List<String> =
+        notes.all().filter { it.startNotInDocument() }.map { it.id }.filter { writeStart(it) == EditOutcome.Done() }
+
+    /**
      * Merges speaker [source] into [target] in variant [variantId]: a new variant from `SpeakerMerges.apply` with the
      * `SpeakerMerges.processing` provenance, which becomes the default and the selected variant (version N+1). The
      * earlier variants stay. Refused while a job row exists or unless OK. Voiceprints are copied by the caller.
@@ -354,6 +372,8 @@ class DocumentRepository(
      */
     suspend fun exportCopy(noteId: String, dest: Uri): ExportOutcome {
         notes.note(noteId)?.takeIf(::needsRetitle)?.let { retitle(noteId) }
+        // D112: the copy carries the start the person set.
+        notes.note(noteId)?.takeIf { it.startNotInDocument() }?.let { writeStart(noteId) }
         return copyAudio(noteId, dest)
     }
 
@@ -380,9 +400,8 @@ class DocumentRepository(
                 } else {
                     row.knownCaptureStart()
                 }
-                if (document?.documentState == DocumentState.OK &&
-                    document.meetingTime?.source != io.codemyriad.cassini.core.format.MeetingTime.UTC && start != null
-                ) {
+                val stated = document?.meetingTime?.source in STATED_STARTS
+                if (document?.documentState == DocumentState.OK && !stated && start != null) {
                     exportTimeMetadata(file, document, start, dest)
                 } else {
                     writeTo(dest) { out -> file.inputStream().use { it.copyTo(out) } }
@@ -577,6 +596,14 @@ class DocumentRepository(
         if ((written.note.titleDirty || tagDiffers) && document.documentState == DocumentState.OK) {
             guarded { retitleDocument(noteId, written.note, document) }
         }
+        // A start set before or while the job ran (D112) goes into the new document too, over the retitled file.
+        if (written.note.startNotInDocument()) {
+            val current = DocumentSignature.of(file)?.let { readLocked(file, it) }
+            val row = notes.noteBlocking(noteId)
+            if (current?.documentState == DocumentState.OK && row != null) {
+                guarded { writeStartDocument(noteId, row, current) }
+            }
+        }
         dir.listFiles().orEmpty().filter { it.isFile && NoteFiles.isPreviousAudio(it.name) }.forEach { it.delete() }
         return AdoptOutcome.Adopted(document.documentState)
     }
@@ -589,6 +616,20 @@ class DocumentRepository(
         if (document.title != row.title || titleTag(document) != row.title) {
             rewrite(noteId) { source, target -> CassiniDocument.retitle(source, document, row.title, target) }
         } else if (row.titleDirty) {
+            writeCache(noteId, document, DocumentSignature.of(documentFile(noteId)))
+        }
+        return EditOutcome.Done()
+    }
+
+    /**
+     * Writes [row]'s start into [document] when the file states another one (or none); otherwise only refreshes a
+     * stale `recorded_at` cache.
+     */
+    private fun writeStartDocument(noteId: String, row: NoteEntity, document: CassiniDocument): EditOutcome {
+        val start = row.userStart() ?: return EditOutcome.Done()
+        if (document.meetingTime != start) {
+            rewrite(noteId) { source, target -> CassiniDocument.withStartedAt(source, document, start.value, target) }
+        } else if (row.startNotInDocument()) {
             writeCache(noteId, document, DocumentSignature.of(documentFile(noteId)))
         }
         return EditOutcome.Done()
@@ -707,7 +748,7 @@ class DocumentRepository(
         val meeting = document.manifest?.optJSONObject("meeting")
         val time = row.recordingTime(document)
         // Packaging time can order an unknown meeting, but never becomes its displayed time.
-        val createdAt = time?.instant?.toEpochMilli() ?: meeting?.optString("createdAtUtc")?.let { text ->
+        val createdAt = (row.userStart() ?: time)?.instant?.toEpochMilli() ?: meeting?.optString("createdAtUtc")?.let { text ->
             try {
                 Instant.parse(text).toEpochMilli()
             } catch (_: DateTimeParseException) {
@@ -752,6 +793,9 @@ class DocumentRepository(
 
         /** Document states whose transcript cannot be exported (features.md section 6). */
         val NOT_EXPORTABLE = setOf(DocumentState.UNREADABLE, DocumentState.UNKNOWN_FORMAT)
+
+        /** A start the file states itself; export never adds the capture clock over it. */
+        val STATED_STARTS = setOf(MeetingTime.UTC, MeetingTime.STARTED)
 
         /** The Vorbis comment that names the recording; players show it. */
         const val TITLE_TAG = "TITLE"

@@ -93,6 +93,11 @@ sealed interface LibraryEvent {
     @Immutable
     data class RenameConfirmed(val id: String, val title: String) : LibraryEvent
 
+    /** Save in "When was this recorded?" (D112): the day and minute the person chose, in the phone's zone. */
+    @Immutable
+    data class DateTimeConfirmed(val id: String, val date: java.time.LocalDate, val time: java.time.LocalTime) :
+        LibraryEvent
+
     /** The confirm button of [LibraryUiState.dialog] (Start over, Transcribe again, Stop and move to trash). */
     data object ConfirmDialog : LibraryEvent
 

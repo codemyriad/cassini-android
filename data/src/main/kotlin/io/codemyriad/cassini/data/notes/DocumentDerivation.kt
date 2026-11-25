@@ -51,7 +51,9 @@ internal object DocumentDerivation {
             captureStartedAt = capture.start,
             captureAudioSha256 = capture.audioSha256,
             legacyCaptureCandidate = capture.legacyCandidate,
-            createdAt = time?.instant?.toEpochMilli() ?: document.packagingInstant()?.toEpochMilli() ?: row.createdAt,
+            // The start the person set orders the note (D112); the cache keeps what the file states.
+            createdAt = (row.userStart() ?: time)?.instant?.toEpochMilli() ?: document.packagingInstant()?.toEpochMilli()
+                ?: row.createdAt,
             audioFile = NoteFiles.DOCUMENT,
             audioKind = AudioKind.DOCUMENT,
             durationMs = meeting?.optLong("durationMs", row.durationMs) ?: row.durationMs,

@@ -91,4 +91,6 @@ internal val GlyphUses: Map<Glyph, List<GlyphUse>> = mapOf(
     // L-34 starring (D99): no board shows it yet.
     Glyph.Star to listOf(use(24, 1.7f, onBoard = false)),
     Glyph.StarFilled to listOf(use(14, 0f, IconTint.Accent, onBoard = false)),
+    // D112 (L-87) Set date and time: the actions-sheet row, like Star (no board).
+    Glyph.Calendar to listOf(use(24, 1.7f, onBoard = false)),
 )

@@ -198,6 +198,11 @@ internal class FakeLibraryPorts : LibraryPorts {
         return RenameOutcome.Renamed
     }
 
+    override suspend fun setStartedAt(id: String, startedAt: String): Boolean {
+        actions += "startedAt $id $startedAt"
+        return true
+    }
+
     override suspend fun setStarred(id: String, starred: Boolean) {
         actions += "starred $id $starred"
         rows.value = rows.value.map { if (it.id == id) it.copy(starred = starred) else it }

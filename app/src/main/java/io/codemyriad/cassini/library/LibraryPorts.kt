@@ -83,6 +83,9 @@ interface LibraryPorts {
 
     suspend fun rename(id: String, title: String): RenameOutcome
 
+    /** "Set date and time" (D112): [startedAt] is RFC 3339 with the person's offset. False when not stored. */
+    suspend fun setStartedAt(id: String, startedAt: String): Boolean
+
     /** Stars or unstars a note on this device (L-34); never written into its Cassini file (D53.1). */
     suspend fun setStarred(id: String, starred: Boolean)
 
@@ -186,6 +189,9 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
 
     override suspend fun rename(id: String, title: String): RenameOutcome =
         graph.awaitCatalogue().notes.rename(id, title)
+
+    override suspend fun setStartedAt(id: String, startedAt: String): Boolean =
+        graph.awaitCatalogue().notes.setStartedAt(id, startedAt)
 
     override suspend fun setStarred(id: String, starred: Boolean) =
         graph.awaitCatalogue().notes.setStarred(id, starred)

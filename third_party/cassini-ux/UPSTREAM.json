@@ -78,8 +78,8 @@
     },
     "phase2/strings.json": {
       "source": "strings/strings.json",
-      "commit": "671abcd26e77d012583adc25f971e0d6b3742f7f",
-      "sha256": "4305e038950b5dccc02e64218b970d54028e7b3d0902f6fea18373a162955ce3"
+      "commit": "60ac93da94ce433412c93d8e96a76c68503dcec3",
+      "sha256": "8272be2e315ff8cb6435b2eb6fba6568ecb11ee84975ff19fcb9bbaaf715a7fb"
     },
     "vectors/head-start/transcription-mode-vectors.json": {
       "source": "vectors/head-start/transcription-mode-vectors.json",
@@ -90,6 +90,26 @@
       "source": "vectors/head-start/mobile-prefix-checkpoint-vectors.json",
       "commit": "8cbef9e1cf3365300c3d83535dbacde10c0411f4",
       "sha256": "68959d02d1c473b83934f53b8b72cb96237512bb14079c8ebd57c4143920e939"
+    },
+    "vectors/library-vectors/round-trip/user-started-at.opus": {
+      "source": "vectors/library-vectors/round-trip/user-started-at.opus",
+      "commit": "60ac93da94ce433412c93d8e96a76c68503dcec3",
+      "sha256": "e1e09691c86ac94ef3b954b261e12a0083492adee72836f2604abf363124e72b"
+    },
+    "vectors/library-vectors/round-trip/user-started-at.expected.json": {
+      "source": "vectors/library-vectors/round-trip/user-started-at.expected.json",
+      "commit": "60ac93da94ce433412c93d8e96a76c68503dcec3",
+      "sha256": "cf4771ce46eb133914304a944bd329d762a8a0a378845ff79dd770be5f717a56"
+    },
+    "vectors/library-vectors/round-trip/legacy-import-time-date.opus": {
+      "source": "vectors/library-vectors/round-trip/legacy-import-time-date.opus",
+      "commit": "60ac93da94ce433412c93d8e96a76c68503dcec3",
+      "sha256": "d9850461c6f70e77f4bef471ba1dff9c01efe919564b89456de58a57481cbce4"
+    },
+    "vectors/library-vectors/round-trip/legacy-import-time-date.expected.json": {
+      "source": "vectors/library-vectors/round-trip/legacy-import-time-date.expected.json",
+      "commit": "60ac93da94ce433412c93d8e96a76c68503dcec3",
+      "sha256": "fb9d4ff933f95e1ed90d030849d93bf91bf644963cf35ca4eaabea397c7cdc64"
     }
   }
 }

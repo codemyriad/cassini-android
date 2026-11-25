@@ -11,6 +11,7 @@ import io.codemyriad.cassini.ui.note.MergeConfirmContent
 import io.codemyriad.cassini.ui.note.MergeSheetContent
 import io.codemyriad.cassini.ui.note.NameSpeakerSheetContent
 import io.codemyriad.cassini.ui.note.NoteActionsSheetContent
+import io.codemyriad.cassini.ui.note.NoteDialog
 import io.codemyriad.cassini.ui.note.NoteDialogContent
 import io.codemyriad.cassini.ui.note.NoteSheet
 import io.codemyriad.cassini.ui.note.NoteUiState
@@ -27,6 +28,7 @@ internal fun NoteOverlayFrame(state: NoteUiState) {
     val dialog = state.dialog
     val sheet = state.sheet
     when {
+        dialog is NoteDialog.SetDateTime -> SheetBoardFrame { NoteDialogContent(dialog, onEvent = {}) }
         dialog != null -> DialogBoardFrame { NoteDialogContent(dialog, onEvent = {}) }
         sheet is NoteSheet.Info -> DialogBoardFrame { DocumentInfoDialogContent(sheet.ui, onDismiss = {}) }
         sheet is NoteSheet.Merge && sheet.ui.confirm != null -> DialogBoardFrame {

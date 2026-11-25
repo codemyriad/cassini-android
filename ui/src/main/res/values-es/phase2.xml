@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 671abcd26e77d012583adc25f971e0d6b3742f7f; do not edit. -->
+<!-- Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Voces guardadas</string>
     <string name="ui_settings_trash">Papelera</string>
@@ -179,4 +179,9 @@
     <string name="ui_voices_forget_title">¿Olvidar la voz de %1$s?</string>
     <string name="ui_voices_forget_body">Cassini ya no reconocerá a %1$s en las reuniones nuevas. Los nombres que ya están en las transcripciones se mantienen.</string>
     <string name="ui_voices_forget_action">Olvidar</string>
+    <string name="ui_meeting_set_date_time">Establecer fecha y hora</string>
+    <string name="ui_meeting_set_date_time_title">¿Cuándo se grabó?</string>
+    <string name="ui_meeting_set_date_time_date">Fecha</string>
+    <string name="ui_meeting_set_date_time_time">Empezó a las</string>
+    <string name="ui_meeting_set_date_time_saved_hint">Rellenado según cuándo se guardó el archivo. Cámbialo si no es correcto.</string>
 </resources>

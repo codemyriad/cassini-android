@@ -491,7 +491,10 @@ class AppGraph(context: Context, val config: Config) {
             catalogue.notes.purgeExpired(Instant.ofEpochMilli(now), config.zone()).also { settings.recordPurge(now) }
         }
         val sweep = bestEffort(STEP_SWEEP, failed) { catalogue.documents.sweep() }
-        val retitled = bestEffort(STEP_RETITLE, failed) { catalogue.documents.retitleDirty() }
+        // The same pass writes a start the person set (D112) that an OK document does not carry yet.
+        val retitled = bestEffort(STEP_RETITLE, failed) {
+            (catalogue.documents.retitleDirty() + catalogue.documents.writeDirtyStarts()).distinct()
+        }
         report.value = StartupReport(
             rebuild = rebuild,
             recovered = recovered.orEmpty(),

@@ -770,6 +770,26 @@ class NoteViewModelTest {
         assertEquals("starred:false", ports.calls.last())
     }
 
+    // Set date and time (D112, L-87). ----------------------------------------------------------------------------
+
+    @Test
+    fun theActionsSheetSetsTheDateAndTimeAndTheSheetSurvivesProcessDeath() = runTest(dispatcher) {
+        val first = viewModel()
+        send(first, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SET_DATE_TIME))
+        val expected = io.codemyriad.cassini.ui.note.SetDateTimeUi(
+            NOTE,
+            java.time.LocalDate.of(2026, 10, 8),
+            java.time.LocalTime.of(9, 0),
+        )
+        assertNull(first.now().sheet)
+        assertEquals("the meeting's start is the prefill", NoteDialog.SetDateTime(expected), first.now().dialog)
+        assertEquals(NoteDialog.SetDateTime(expected), viewModel().now().dialog)
+
+        send(first, NoteEvent.DateTimeConfirmed(java.time.LocalDate.of(2026, 10, 6), java.time.LocalTime.of(18, 30)))
+        assertNull(first.now().dialog)
+        assertEquals("startedAt:2026-10-06T18:30:00+02:00", ports.calls.last())
+    }
+
     // Trash. ----------------------------------------------------------------------------------------------------
 
     @Test

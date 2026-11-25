@@ -646,6 +646,13 @@ class NoteViewModel(
                 local.update { it.copy(dialog = null) }
                 launch { ports.rename(noteId, event.title) }
             }
+            is NoteEvent.DateTimeConfirmed -> {
+                local.update { it.copy(dialog = null) }
+                launch {
+                    val startedAt = StartPrefill.startedAt(event.date, event.time, clock.zone)
+                    if (!ports.setStartedAt(noteId, startedAt)) Log.w(TAG, "Set date and time: not stored")
+                }
+            }
             NoteEvent.ConfirmDialog -> confirmDialog()
             is NoteEvent.NameSheet -> nameSheet(event.event)
             is NoteEvent.Merge -> mergeSheet(event.event)
@@ -820,8 +827,13 @@ class NoteViewModel(
                 NoteDialog.TranscribeFresh -> DIALOG_FRESH
                 NoteDialog.StopAndTrash -> DIALOG_STOP_AND_TRASH
                 is NoteDialog.ReadOnly -> DIALOG_READ_ONLY + dialog.reason.name
+                is NoteDialog.SetDateTime -> DIALOG_SET_DATE_TIME
             }
-            saved[KEY_DIALOG_TITLE] = (dialog as? NoteDialog.Rename)?.title
+            saved[KEY_DIALOG_TITLE] = when (dialog) {
+                is NoteDialog.Rename -> dialog.title
+                is NoteDialog.SetDateTime -> StartPrefill.encode(dialog.ui)
+                else -> null
+            }
         }
     }
 
@@ -836,6 +848,8 @@ class NoteViewModel(
             key == DIALOG_START_OVER -> NoteDialog.StartOver
             key == DIALOG_FRESH -> NoteDialog.TranscribeFresh
             key == DIALOG_STOP_AND_TRASH -> NoteDialog.StopAndTrash
+            key == DIALOG_SET_DATE_TIME -> StartPrefill.decode(saved.get<String>(KEY_DIALOG_TITLE))
+                ?.let(NoteDialog::SetDateTime)
             readOnly != null -> ReadOnlyReason.entries.firstOrNull { it.name == readOnly }?.let(NoteDialog::ReadOnly)
             else -> null
         }
@@ -961,7 +975,7 @@ class NoteViewModel(
             NoteDialog.StartOver -> launch { consentOrDone(ports.startOver(noteId)) }
             NoteDialog.TranscribeFresh -> launch { transcribe(JobKind.TRANSCRIBE_AGAIN) }
             NoteDialog.StopAndTrash -> launch { moveToTrash() }
-            is NoteDialog.Rename, is NoteDialog.ReadOnly -> Unit
+            is NoteDialog.Rename, is NoteDialog.ReadOnly, is NoteDialog.SetDateTime -> Unit
         }
     }
 
@@ -986,6 +1000,11 @@ class NoteViewModel(
             NoteAction.STAR, NoteAction.UNSTAR -> {
                 closeSheet()
                 ports.setStarred(noteId, action == NoteAction.STAR)
+            }
+            NoteAction.SET_DATE_TIME -> {
+                closeSheet()
+                val prefill = StartPrefill.of(details.note, Instant.now(clock), clock.zone)
+                local.update { it.copy(dialog = NoteDialog.SetDateTime(prefill)) }
             }
             NoteAction.TRANSCRIBE -> {
                 closeSheet()
@@ -1633,5 +1652,6 @@ class NoteViewModel(
         private const val DIALOG_FRESH = "transcribeFresh"
         private const val DIALOG_STOP_AND_TRASH = "stopAndTrash"
         private const val DIALOG_READ_ONLY = "readOnly:"
+        private const val DIALOG_SET_DATE_TIME = "setDateTime"
     }
 }

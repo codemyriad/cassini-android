@@ -86,6 +86,7 @@ class GlyphMarkupTest {
                 Glyph.Warn,
                 Glyph.Star,
                 Glyph.StarFilled,
+                Glyph.Calendar,
             ),
             noBoard,
         )

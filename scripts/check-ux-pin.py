@@ -19,6 +19,11 @@ OWN_COMMIT = {
     'phase2/strings.json',
     'vectors/head-start/transcription-mode-vectors.json',
     'vectors/head-start/mobile-prefix-checkpoint-vectors.json',
+    # D112 (L-87, D-1164): the Set date and time round-trip vectors of D-1171.
+    'vectors/library-vectors/round-trip/user-started-at.opus',
+    'vectors/library-vectors/round-trip/user-started-at.expected.json',
+    'vectors/library-vectors/round-trip/legacy-import-time-date.opus',
+    'vectors/library-vectors/round-trip/legacy-import-time-date.expected.json',
 }
 
 
