@@ -389,34 +389,41 @@ class DocumentRepository(
         when {
             row == null || file == null -> ExportOutcome.NoNote
             row.audioKind == AudioKind.LIVE_CAPTURE || !file.isFile -> ExportOutcome.NotAvailable
-            else -> {
-                val document = if (row.audioKind == AudioKind.DOCUMENT) {
-                    DocumentSignature.of(file)?.let { readLocked(file, it) }
-                } else {
-                    null
-                }
-                val start = if (document != null) {
-                    row.captureProvenance(document).start?.let(Instant::ofEpochMilli)
-                } else {
-                    row.knownCaptureStart()
-                }
-                val stated = document?.meetingTime?.source in STATED_STARTS
-                if (document?.documentState == DocumentState.OK && !stated && start != null) {
-                    exportTimeMetadata(file, document, start, dest)
-                } else {
-                    writeTo(dest) { out -> file.inputStream().use { it.copyTo(out) } }
-                }
+            else -> copyAvailableAudio(row, file, dest)
+        }
+    }
+
+    private fun copyAvailableAudio(row: NoteEntity, file: File, dest: Uri): ExportOutcome {
+        val document = if (row.audioKind == AudioKind.DOCUMENT) {
+            DocumentSignature.of(file)?.let { readLocked(file, it) }
+        } else {
+            null
+        }
+        val ok = document?.takeIf { it.documentState == DocumentState.OK }
+        val pendingStart = ok?.let { doc -> row.userStart()?.takeIf { doc.meetingTime != it } }
+        val captureStart = if (ok != null && ok.meetingTime?.source !in STATED_STARTS) {
+            row.captureProvenance(ok).start?.let(Instant::ofEpochMilli)
+        } else {
+            null
+        }
+        return when {
+            ok != null && pendingStart != null -> exportStaged(dest) { output ->
+                CassiniDocument.withStartedAt(file, ok, pendingStart.value, output)
             }
+            ok != null && captureStart != null -> exportStaged(dest) { output ->
+                CassiniDocument.withRecordedAtUtc(file, ok, captureStart, output)
+            }
+            else -> writeTo(dest) { out -> file.inputStream().use { it.copyTo(out) } }
         }
     }
 
     /** Stage the annotated copy; never change a running job's canonical file or checkpoint signature. */
-    private fun exportTimeMetadata(file: File, document: CassiniDocument, start: Instant, dest: Uri): ExportOutcome {
+    private fun exportStaged(dest: Uri, stage: (File) -> Unit): ExportOutcome {
         var staged: File? = null
         return try {
             java.nio.file.Files.createDirectories(paths.exports.toPath())
             val output = File.createTempFile("recorded-", ".opus", paths.exports).also { staged = it }
-            CassiniDocument.withRecordedAtUtc(file, document, start, output)
+            stage(output)
             writeTo(dest) { out -> output.inputStream().use { it.copyTo(out) } }
         } catch (error: IOException) {
             ExportOutcome.Failed(Failure.SAVE, error.message)

@@ -41,13 +41,15 @@ abstract class CassiniDatabase : RoomDatabase() {
         private const val STARS_VERSION = 4
 
         /**
-         * No one has set a start yet, and earlier imports kept no last-saved time: two nullable columns, every row
-         * and cache untouched.
+         * Schema 5 adds `started_at` and `source_modified_at` and supersedes the document date reader rules (D112):
+         * invalidate cached document signatures so startup refresh re-derives `recorded_at` and `created_at` from each
+         * file without touching authoritative rows or jobs.
          */
         val MIGRATION_4_5 = object : androidx.room.migration.Migration(STARS_VERSION, VERSION) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE notes ADD COLUMN started_at TEXT")
                 db.execSQL("ALTER TABLE notes ADD COLUMN source_modified_at INTEGER")
+                db.execSQL("UPDATE notes SET document_signature = NULL WHERE audio_kind = 'DOCUMENT'")
             }
         }
 

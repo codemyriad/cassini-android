@@ -7,6 +7,7 @@ import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.DocumentState
+import io.codemyriad.cassini.core.format.MeetingTime
 import io.codemyriad.cassini.core.format.OggOpus
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
@@ -247,6 +248,38 @@ class BulkTransferReviewTest {
                 assertEquals("Hello", CassiniDocument.read(exported).selected(null)?.transcript?.words?.single()?.text)
             }
             database.jobs().delete(row.id)
+        }
+    }
+
+    @Test fun zipExportWithAPendingJobIncludesTheSavedStartWithoutChangingTheSource() = runBlocking {
+        val source = document("Paused meeting", "Paused meeting")
+        graph.transfers.import(listOf(source.toUri()))
+        assertEquals(1, finished().summary?.imported)
+        val catalogue = graph.awaitCatalogue()
+        val row = catalogue.database.notes().all().single()
+        val stored = File(paths.note(row.id), row.audioFile)
+        val originalBytes = stored.readBytes()
+        val start = "2026-11-23T14:36:00+01:00"
+
+        for (state in listOf(JobState.PAUSED, JobState.QUEUED, JobState.RUNNING)) {
+            val job = JobEntity(row.id, 1, JobKind.TRANSCRIBE_AGAIN, state, enqueuedAt = 1, updatedAt = 1)
+            catalogue.database.jobs().insert(job)
+            assertTrue(catalogue.notes.setStartedAt(row.id, start))
+            assertNull("canonical source stays untouched while job exists", CassiniDocument.read(stored).meetingTime)
+
+            val output = folder.newFile("started-$state.zip")
+            graph.transfers.export(listOf(row.id), output.toUri())
+            assertEquals(1, finished().exported)
+            ZipFile(output).use { zip ->
+                val bytes = zip.getInputStream(zip.entries().toList().single()).readBytes()
+                val exported = folder.newFile("exported-$state.opus").apply { writeBytes(bytes) }
+                val document = CassiniDocument.read(exported)
+                assertEquals(DocumentState.OK, document.documentState)
+                assertEquals(MeetingTime(MeetingTime.STARTED, start), document.meetingTime)
+            }
+            assertArrayEquals(originalBytes, stored.readBytes())
+            assertNoStaging()
+            catalogue.database.jobs().delete(row.id)
         }
     }
 

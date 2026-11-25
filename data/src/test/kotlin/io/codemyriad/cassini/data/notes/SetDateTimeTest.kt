@@ -132,6 +132,33 @@ class SetDateTimeTest {
         assertEquals(MeetingTime(MeetingTime.STARTED, start), CassiniDocument.read(copy).meetingTime)
     }
 
+    @Test fun exportCopyWithAPendingJobWritesTheStartToTheCopyWithoutChangingTheSource() = runTest {
+        for (state in listOf(JobState.PAUSED, JobState.QUEUED, JobState.RUNNING)) {
+            val id = "job-${state.name.lowercase()}"
+            h.documentNote(id, words)
+            h.notes.refreshIfStale(id)
+            insertJob(id, state)
+
+            assertTrue(h.notes.setStartedAt(id, start))
+            h.awaitBackground()
+            val source = h.document(id)
+            val originalBytes = source.readBytes()
+            assertNull("the job's canonical source stays untouched", h.readFile(id).meetingTime)
+            assertTrue(h.row(id).startNotInDocument())
+
+            val copy = File(folder.newFolder("export-$id"), "copy.opus")
+            assertTrue(h.documents.exportCopy(id, Uri.fromFile(copy)) is ExportOutcome.Saved)
+
+            val exported = CassiniDocument.read(copy)
+            assertEquals(DocumentState.OK, exported.documentState)
+            assertEquals(MeetingTime(MeetingTime.STARTED, start), exported.meetingTime)
+            assertArrayEquals(originalBytes, source.readBytes())
+            assertNull("canonical source still has no start", h.readFile(id).meetingTime)
+            assertTrue("pending start remains for adopt", h.row(id).startNotInDocument())
+            assertFalse("staging directory is cleaned up", h.paths.exports.exists())
+        }
+    }
+
     @Test fun aStartSetWhileAJobRunsIsWrittenByTheAdopt() = runTest {
         h.documentNote("a", words)
         h.notes.refreshIfStale("a")
