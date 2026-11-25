@@ -1,0 +1,51 @@
+{
+  "cases": [
+    {
+      "name": "mixed",
+      "title": "“Budget” review — Q3 été übersicht … extra",
+      "durationMs": 7400,
+      "speakers": [
+        {"label": "Paola Rossi", "rgb": "#3366cc"},
+        {"label": "", "rgb": null},
+        {"label": "Élodie de la Fontaine-Müller", "rgb": "#000000"}
+      ],
+      "words": [
+        {"startMs": 120, "endMs": 480, "speakerIndex": 0, "text": "  Hello’s ", "turnStart": true, "lowConfidence": false},
+        {"startMs": 500, "endMs": 900, "speakerIndex": 0, "text": "world…", "turnStart": false, "lowConfidence": false},
+        {"startMs": 950, "endMs": 940, "speakerIndex": 0, "text": "a\tb\n\u0001c", "turnStart": false, "lowConfidence": true},
+        {"startMs": 1000, "endMs": 1100, "speakerIndex": 0, "text": " \u0002 ", "turnStart": false, "lowConfidence": false},
+        {"startMs": 1300, "endMs": 2100, "speakerIndex": 1, "text": "ЗдравствуйтеЗдравствуйтеЗдрав", "turnStart": false, "lowConfidence": false},
+        {"startMs": 1200, "endMs": 2600, "speakerIndex": 1, "text": "overlap", "turnStart": true, "lowConfidence": false},
+        {"startMs": -50, "endMs": 3100, "speakerIndex": 7, "text": "unknown speaker", "turnStart": false, "lowConfidence": false},
+        {"startMs": 5200, "endMs": 5600, "speakerIndex": 2, "text": "«fin» – „‚−”", "turnStart": false, "lowConfidence": true},
+        {"startMs": 5700, "endMs": 6100, "speakerIndex": -1, "text": "again", "turnStart": false, "lowConfidence": false}
+      ]
+    },
+    {
+      "name": "empty",
+      "title": "",
+      "durationMs": 0,
+      "speakers": [],
+      "words": []
+    },
+    {
+      "name": "overrun",
+      "title": "Short",
+      "durationMs": 1500,
+      "speakers": [
+        {"label": "S1", "rgb": null}, {"label": "S2", "rgb": null}, {"label": "S3", "rgb": null},
+        {"label": "S4", "rgb": null}, {"label": "S5", "rgb": null}, {"label": "S6", "rgb": null},
+        {"label": "S7", "rgb": null}, {"label": "S8", "rgb": null}, {"label": "S9", "rgb": null},
+        {"label": "S10", "rgb": null}, {"label": "S11", "rgb": null}, {"label": "S12", "rgb": null},
+        {"label": "S13", "rgb": null}, {"label": "S14", "rgb": null}, {"label": "S15", "rgb": "#ff0000"},
+        {"label": "S16", "rgb": "#00ff00"}, {"label": "S17", "rgb": "#0000ff"}
+      ],
+      "words": [
+        {"startMs": 0, "endMs": 300, "speakerIndex": 14, "text": "fifteenth", "turnStart": false, "lowConfidence": false},
+        {"startMs": 300, "endMs": 600, "speakerIndex": 15, "text": "sixteenth", "turnStart": false, "lowConfidence": false},
+        {"startMs": 600, "endMs": 4200, "speakerIndex": 16, "text": "seventeenth", "turnStart": false, "lowConfidence": false},
+        {"startMs": 4300, "endMs": 4400, "speakerIndex": 0, "text": "😀 emoji", "turnStart": false, "lowConfidence": false}
+      ]
+    }
+  ]
+}
