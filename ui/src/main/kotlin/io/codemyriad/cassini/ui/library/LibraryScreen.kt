@@ -80,7 +80,8 @@ private val BarTopPadding = LibraryActionBarMetrics.topPadding
  * Search filters scroll with results; at rest the All / Starred row (L-34) takes their place. Snippets belong only
  * to search. Recording and import notices remain,
  * while transcription is represented by its own row. The process-owned transfer dialogs stay in LibraryRoute.
- * Import/Record and the snackbar float above the measured list bottom inset. Empty search also handles Back.
+ * Import/Record and the snackbar float above the measured list bottom inset; Import/Record hide while searching (QA
+ * 25 Nov). Empty search also handles Back.
  */
 @Composable
 fun LibraryScreen(
@@ -92,10 +93,10 @@ fun LibraryScreen(
     var barPx by remember { mutableIntStateOf(0) }
     var noticePx by remember { mutableIntStateOf(0) }
     val showBackup = state.backupCard && state.snackbar == null
-    val bar: Dp = max(
-        with(density) { barPx.toDp() },
-        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BottomBarHeight,
-    )
+    // QA 25 Nov: Import audio and Record hide while searching; the results use the room.
+    val searching = state.query.isNotEmpty() || state.results != null
+    val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bar: Dp = if (searching) navigationBar else max(with(density) { barPx.toDp() }, navigationBar + BottomBarHeight)
     // The keyboard covers the bottom bar: the results end above whichever is taller (ui.md section 9).
     val noticeHeight = if (showBackup) with(density) { noticePx.toDp() } + 8.dp else 0.dp
     val listBottom = max(bar + noticeHeight, WindowInsets.ime.asPaddingValues().calculateBottomPadding())
@@ -107,7 +108,7 @@ fun LibraryScreen(
             .screenContentWidth(),
     ) {
         LibraryList(state, onEvent, listBottom)
-        LibraryActions(state, onEvent) { barPx = it }
+        if (!searching) LibraryActions(state, onEvent) { barPx = it }
         if (showBackup) {
             BackupCard(
                 onEvent,
@@ -121,7 +122,7 @@ fun LibraryScreen(
             onTimeout = { onEvent(LibraryEvent.SnackbarTimeout(it.id)) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = bar - BarTopPadding),
+                .padding(bottom = if (searching) bar else bar - BarTopPadding),
             onUndo = { onEvent(LibraryEvent.Undo) },
         )
     }

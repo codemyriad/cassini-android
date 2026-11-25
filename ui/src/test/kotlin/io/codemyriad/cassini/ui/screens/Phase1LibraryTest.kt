@@ -203,6 +203,18 @@ class Phase1LibraryTest {
         assertEquals(bar, rule.onNodeWithTag("library-search-bar").getBoundsInRoot())
     }
 
+    /** QA 25 Nov: Import audio and Record hide while searching; they come back when the search ends. */
+    @Test fun importAndRecordHideWhileSearching() {
+        var state by mutableStateOf(BoardFixtures.library)
+        themed { LibraryScreen(state, onEvent = {}) }
+        rule.onNodeWithContentDescription("Record a new meeting").assertIsDisplayed()
+        rule.runOnIdle { state = state.copy(query = "budget", results = persistentListOf(BoardFixtures.supplier)) }
+        rule.onNodeWithContentDescription("Record a new meeting").assertDoesNotExist()
+        rule.onNodeWithText("Import audio").assertDoesNotExist()
+        rule.runOnIdle { state = state.copy(query = "", results = null) }
+        rule.onNodeWithContentDescription("Record a new meeting").assertIsDisplayed()
+    }
+
     @Test fun finishedRowsUseCountPillsAndKeepOnlySearchSnippets() {
         var row by mutableStateOf(
             BoardFixtures.supplier.copy(
