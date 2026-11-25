@@ -63,6 +63,8 @@ class XrecClientScriptedTest {
     private companion object {
         const val PONG = "+XREC:PONG,openfw_v5,v5,bound=1,auth=1,pair=0\r\n"
         const val RESYNC = "\r+XREC:PING\r"
+
+        fun stopGets(size: Int, name: String = "a.wav") = "\r+XREC:GETS,$size,1,1,$name$RESYNC"
     }
 
     /** The end of a download that recovered: the drain ends in silence, then the PONG of the resync. */
@@ -127,7 +129,7 @@ class XrecClientScriptedTest {
         val sink = ByteArrayOutputStream()
         assertEquals(1000L, client.download("a.wav", 1000, sink))
         assertArrayEquals(data, sink.toByteArray())
-        assertEquals("+XREC:GETS,0,1000,640,a.wav\r+XREC:GETS,640,360,640,a.wav\r$RESYNC", sent.toString())
+        assertEquals("+XREC:GETS,0,1000,640,a.wav\r+XREC:GETS,640,360,640,a.wav\r${stopGets(1000)}", sent.toString())
     }
 
     @Test fun framesOfTheFailedWindowAfterTheNewGetsAreSkipped() {
@@ -147,7 +149,7 @@ class XrecClientScriptedTest {
         assertArrayEquals(data, sink.toByteArray())
         // Each skipped frame repeats the offset: a heartbeat for the stall watchdog.
         assertEquals(listOf(640L, 640L, 640L, 1280L, 1920L, 2560L, 3000L), progress)
-        assertEquals("+XREC:GETS,0,3000,640,a.wav\r+XREC:GETS,640,2360,640,a.wav\r$RESYNC", sent.toString())
+        assertEquals("+XREC:GETS,0,3000,640,a.wav\r+XREC:GETS,640,2360,640,a.wav\r${stopGets(3000)}", sent.toString())
         assertEquals(1, client.lastDownload!!.retries)
     }
 
@@ -163,7 +165,7 @@ class XrecClientScriptedTest {
         val sink = ByteArrayOutputStream()
         assertEquals(2_000L, client.download("a.wav", 2_000, sink))
         assertArrayEquals(data, sink.toByteArray())
-        assertEquals(2, sent.toString().split("GETS").size - 1)
+        assertEquals(2, client.lastDownload!!.requests)
     }
 
     @Test fun aGapInAHealthyWindowIsAnErrorNotASkip() {
@@ -176,7 +178,7 @@ class XrecClientScriptedTest {
         val sink = ByteArrayOutputStream()
         client.download("a.wav", 2_000, sink)
         assertArrayEquals(data, sink.toByteArray())
-        assertEquals("+XREC:GETS,0,2000,640,a.wav\r+XREC:GETS,640,1360,640,a.wav\r$RESYNC", sent.toString())
+        assertEquals("+XREC:GETS,0,2000,640,a.wav\r+XREC:GETS,640,1360,640,a.wav\r${stopGets(2000)}", sent.toString())
     }
 
     @Test fun repeatedFailuresFallBackToTheStockWindow() {
@@ -194,7 +196,7 @@ class XrecClientScriptedTest {
         assertArrayEquals(data, sink.toByteArray())
         assertEquals(
             "+XREC:GETS,0,5000,640,a.wav\r+XREC:GETS,0,5000,640,a.wav\r" +
-                "+XREC:GETS,0,3840,640,a.wav\r+XREC:GETS,3840,1160,640,a.wav\r$RESYNC",
+                "+XREC:GETS,0,3840,640,a.wav\r+XREC:GETS,3840,1160,640,a.wav\r${stopGets(5000)}",
             sent.toString(),
         )
         assertEquals(XrecLimits.STOCK_GETS_WINDOW, client.getsWindow)
@@ -277,6 +279,7 @@ class XrecClientScriptedTest {
             steps.add(Step.Bytes(ByteArray(0).let { (0..budget).fold(it) { all, _ -> all + old } }))
             steps.add(Step.Silence) // drain
         }
+        receive(PONG)
         try {
             client.download("a.wav", 1_280, ByteArrayOutputStream())
             fail("Expected INTEGRITY")
@@ -284,7 +287,7 @@ class XrecClientScriptedTest {
             assertEquals(XrecFailure.INTEGRITY, e.failure)
             assertEquals("Frame at 0, expected 640", e.cause?.message)
         }
-        assertEquals(3, sent.toString().split("GETS").size - 1)
+        assertEquals(true, sent.toString().endsWith(stopGets(1_280)))
     }
 
     @Test fun oldFramesThatCarryAFallbackWindowToItsEndDoNotEndTheRecovery() {
@@ -316,6 +319,148 @@ class XrecClientScriptedTest {
         assertEquals(2 + (size + small - 1) / small, stats.requests)
         // The frames of the last windows came after every old frame: the recovery ended, no resync was needed.
         assertEquals(false, sent.toString().endsWith(RESYNC))
+    }
+
+    @Test fun aRecoveredDownloadCancelsAnActiveOpenFwGetsStreamBeforeResyncing() {
+        // On open_fw (xrec_proto.c + bt_xrec_bluedroid.c), PING does not clear gets_active: if drain() ends on a link
+        // pause while the retried GETS window still has frames left, PONG comes back ahead of the remaining frames.
+        val a = ByteArray(20_000) // silent PCM: no '\n', so leftover frames overflow STAT's 4096-byte line buffer
+        val b = ByteArray(640) { 9 }
+        val device = OpenFwGetsDevice(mapOf("a.wav" to a, "b.wav" to b))
+        var clock = 0L
+        val client = XrecClient(device.input { clock += it }, device.output, timeouts, clock = { clock }, maxRetries = 2)
+
+        // Window 1 (0..20000) stalls after frame 0, then delivers the rest late just as window 2 (640..20000) starts;
+        // window 2 pauses after 2 frames so drain() ends while ~18 KiB of window 2 still wait in gets_rem.
+        device.pauseFirstWindowAt = 640L
+        device.pauseSecondWindowAfterFrames = 2
+        val sink = ByteArrayOutputStream()
+        assertEquals(20_000L, client.download("a.wav", 20_000, sink))
+        assertArrayEquals(a, sink.toByteArray())
+
+        assertEquals(87, client.stat().batteryPercent)
+        val next = ByteArrayOutputStream()
+        assertEquals(640L, client.download("b.wav", 640, next))
+        assertArrayEquals(b, next.toByteArray())
+    }
+
+    @Test fun aFailedDownloadStopsGetsAndResyncsSoTheNextFileIsNotCorrupted() {
+        val a = ByteArray(10_000) { 1 }
+        val b = ByteArray(640) { 2 }
+        fun frameOf(bytes: ByteArray, offset: Int, len: Int = 640) =
+            frame(offset.toLong(), bytes.copyOfRange(offset, minOf(offset + len, bytes.size)))
+
+        // All 3 GETS attempts on a.wav time out and their drains end in silence; late frames of a.wav arrive right
+        // after the drain of the last attempt, when RecorderSync moves on to b.wav (or the next suspect) on the link.
+        repeat(3) {
+            steps.add(Step.Silence) // frame wait
+            steps.add(Step.Silence) // drain
+        }
+        steps.add(Step.Bytes(frameOf(a, 0)))
+        receive(PONG)
+        expect(XrecFailure.INTEGRITY) { client.download("a.wav", 10_000, ByteArrayOutputStream()) }
+
+        steps.add(Step.Bytes(frameOf(b, 0)))
+        val next = ByteArrayOutputStream()
+        assertEquals(640L, client.download("b.wav", 640, next))
+        assertArrayEquals(b, next.toByteArray())
+    }
+
+    /**
+     * Minimal model of `open_fw`'s `xrec_proto.c` + `bt_xrec_bluedroid.c` ordering: `PING` and `STAT` leave
+     * `gets_active` untouched, and `drain_events` queues command replies ahead of `xrec_poll`'s remaining GETS frames.
+     */
+    private inner class OpenFwGetsDevice(private val files: Map<String, ByteArray>) {
+        var pauseFirstWindowAt: Long? = null
+        var pauseSecondWindowAfterFrames: Int? = null
+        private val rxLine = ByteArrayOutputStream()
+        private val wire = ArrayDeque<ByteArray>()
+        private var delayedWindow: List<ByteArray>? = null
+        private var getsFile: ByteArray? = null
+        private var getsOffset = 0L
+        private var getsRem = 0L
+        private var getsChunk = 640
+        private var getsCount = 0
+        private var framesSentInCurrentGets = 0
+
+        val output = object : java.io.OutputStream() {
+            override fun write(b: Int) {
+                if (b == '\n'.code) return
+                if (b == '\r'.code) {
+                    val line = rxLine.toString(Charsets.UTF_8)
+                    rxLine.reset()
+                    if (line.isNotEmpty()) onCommand(line)
+                } else {
+                    rxLine.write(b)
+                }
+            }
+        }
+
+        private fun onCommand(line: String) {
+            if (!line.startsWith("+XREC:")) return
+            val cmd = line.removePrefix("+XREC:")
+            when {
+                cmd == "PING" -> wire.addLast(PONG.toByteArray())
+                cmd == "STAT" -> wire.addLast("+XREC:STAT,87,3990,0,0,16,0,1,2\r\n".toByteArray())
+                cmd.startsWith("GETS,") -> {
+                    val parts = cmd.removePrefix("GETS,").split(',', limit = 4)
+                    getsOffset = parts[0].toLong()
+                    getsRem = parts[1].toLong()
+                    getsChunk = parts[2].toInt()
+                    getsFile = files.getValue(parts[3])
+                    getsCount++
+                    framesSentInCurrentGets = 0
+                    delayedWindow?.forEach(wire::addLast)
+                    delayedWindow = null
+                    pumpOneGetsFrame() // xrec_proto.c:806 calls xrec_poll(ctx) at the end of handle_get_common
+                }
+            }
+        }
+
+        fun input(advanceClock: (Long) -> Unit) = XrecInput { buffer, offset, length, timeout ->
+            if (wire.isEmpty()) pumpOneGetsFrame()
+            val next = wire.pollFirst()
+            if (next == null) {
+                advanceClock(timeout)
+                0
+            } else {
+                val n = minOf(length, next.size)
+                next.copyInto(buffer, offset, 0, n)
+                if (n < next.size) wire.addFirst(next.copyOfRange(n, next.size))
+                n
+            }
+        }
+
+        private fun pumpOneGetsFrame() {
+            val data = getsFile ?: return
+            if (getsRem <= 0) return
+            if (getsCount == 1 && pauseFirstWindowAt == getsOffset) {
+                pauseFirstWindowAt = null
+                val rest = mutableListOf<ByteArray>()
+                var at = getsOffset.toInt()
+                while (at < data.size && getsRem > 0) {
+                    val n = minOf(getsChunk, data.size - at, getsRem.toInt())
+                    rest += frame(at.toLong(), data.copyOfRange(at, at + n))
+                    at += n
+                    getsRem -= n
+                }
+                delayedWindow = rest
+                getsFile = null
+                return
+            }
+            if (getsCount == 2 && pauseSecondWindowAfterFrames == framesSentInCurrentGets) {
+                pauseSecondWindowAfterFrames = null
+                return
+            }
+            val want = minOf(getsRem, getsChunk.toLong()).toInt()
+            val got = if (getsOffset >= data.size) 0 else minOf(want.toLong(), data.size - getsOffset).toInt()
+            val from = getsOffset.toInt().coerceAtMost(data.size)
+            wire.addLast(frame(getsOffset, data.copyOfRange(from, from + got)))
+            getsOffset += got
+            getsRem -= got
+            framesSentInCurrentGets++
+            if (got < want || getsRem == 0L) getsFile = null
+        }
     }
 
     private fun frame(offset: Long, payload: ByteArray): ByteArray {

@@ -186,6 +186,7 @@ class XrecClient(
                 // The rest of the window still streams: the link is quiet again before a retry or the next command.
                 drain(drainLimit(transfer.lastWindow), heartbeat)
                 if (failures > maxRetries) {
+                    if (transfer.requests > 0) stopGets(name, size)
                     val message = "Download of $name failed at ${transfer.offset}"
                     throw XrecException(XrecFailure.INTEGRITY, message, cause = e)
                 }
@@ -198,7 +199,7 @@ class XrecClient(
         if (transfer.recovering) {
             // Late frames of an old window can complete the file while the repeat of a window still streams.
             drain(drainLimit(transfer.lastWindow), heartbeat)
-            resync()
+            stopGets(name, size)
         }
         lastDownload = XrecDownloadStats(
             bytes = transfer.offset - resumeOffset,
@@ -250,6 +251,16 @@ class XrecClient(
             }
         }
         commit(name, bytes.size)
+    }
+
+    /**
+     * Ends any GETS window that still streams on the recorder (`PING` and `STAT` do not clear `gets_active`), then
+     * discards its last buffered frames and its empty EOF frame up to a fresh `PONG`.
+     */
+    private fun stopGets(name: String, size: Long) {
+        val eof = minOf(size, XrecLimits.MAX_OFFSET)
+        writeBytes("\r${XrecCommands.gets(eof, 1, 1, name)}".toByteArray(Charsets.UTF_8))
+        resync()
     }
 
     /**
