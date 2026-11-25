@@ -22,6 +22,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -406,6 +407,33 @@ class AppShellTest {
         waitGone(FIND_BUTTON)
         rule.onNodeWithContentDescription("Settings").assertExists()
         rule.onNodeWithText(TITLE).assertExists()
+    }
+
+    /**
+     * QA 25 Nov, unfolded (a foldable's inner screen): the Library stays on the left and what it opens shows in the
+     * right pane: the meeting (also while it transcribes: Transcribing is a mode of the same screen), then Settings in
+     * its place. Back from Settings leaves the Library alone, not the meeting under it.
+     */
+    @Config(qualifiers = "w841dp-h701dp-xhdpi")
+    @Test
+    fun aWideWindowShowsTheLibraryBesideWhatItOpens() {
+        importDocument()
+        rule.onNodeWithText(TITLE).performClick()
+        waitFor(FIND_BUTTON)
+        rule.onNodeWithTag("list-pane").assertExists()
+        rule.onNodeWithTag("detail-pane").assertExists()
+        rule.onNodeWithTag("meeting-title").assertExists()
+        // The Library is still there, placed and usable, beside the meeting.
+        rule.onNodeWithContentDescription("Record a new meeting").assertExists()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        waitGone(FIND_BUTTON)
+        waitFor(hasText("Export all meetings"))
+        rule.onNodeWithContentDescription("Record a new meeting").assertExists()
+
+        Espresso.pressBack()
+        waitGone(hasText("Export all meetings"))
+        rule.onNodeWithTag("meeting-title").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Record a new meeting").assertExists()
     }
 
     @Test fun closingANoteMovesTheLibraryBackInsteadOfComposingItAgain() {
