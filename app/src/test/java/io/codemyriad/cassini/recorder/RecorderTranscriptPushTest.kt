@@ -257,6 +257,7 @@ class RecorderTranscriptPushTest {
 
     @Test fun aTranscriptThatWaitsForTheRecordingIsTriedEveryTwoMinutesWithoutAFailure() = runBlocking {
         start()
+        store.update { it.copy(syncWhileRecording = true) }
         // The recorder records now, with the firmware that takes no card write until the recording ends.
         radio.device.syncsWhileRecording = true
         radio.device.recording = true
@@ -276,9 +277,25 @@ class RecorderTranscriptPushTest {
         assertEquals(2, waits.size)
     }
 
+    @Test fun withSyncWhileRecordingOffATranscriptThatWaitsForTheRecordingIsNotPolled() = runBlocking {
+        start()
+        assertFalse(store.read().syncWhileRecording)
+        radio.device.syncsWhileRecording = true
+        radio.device.recording = true
+        val opens = radio.opens
+        transcriptReady()
+        withTimeout(TIMEOUT_MS) { while (radio.opens == opens) delay(10) }
+        delay(SETTLE_MS)
+        // One upload-only sync, held without a failure; then no 2-minute poll calls the recorder while it records.
+        assertEquals(opens + 1, radio.opens)
+        assertTrue(waits.isEmpty())
+        assertFalse(uploaded())
+        assertEquals(null, store.read().current!!.recordings.single().failure)
+    }
+
     @Test fun withAutoSyncOnATranscriptThatWaitsForTheRecordingIsLeftToItsSyncs() = runBlocking {
         start()
-        store.update { it.copy(autoSync = true) }
+        store.update { it.copy(autoSync = true, syncWhileRecording = true) }
         radio.device.syncsWhileRecording = true
         radio.device.recording = true
         val opens = radio.opens

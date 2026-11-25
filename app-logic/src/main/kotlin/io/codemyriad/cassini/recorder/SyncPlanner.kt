@@ -42,8 +42,8 @@ enum class SkipReason {
     RECORDING,
 
     /**
-     * The file that the recorder records now (STAT `rec_idx`), or a newer one: it grows. The finished recordings go
-     * during the recording.
+     * The file that the recorder records now (STAT `rec_idx`): it grows. The finished recordings go during the
+     * recording.
      */
     ACTIVE,
 
@@ -89,8 +89,11 @@ data class SyncPlan(
  *
  * - Download each `.wav` larger than its header that the state does not have with the same name and size. While the
  *   recorder records (STAT media 33), no download starts, unless [syncWhileRecording][plan] is on and the recorder
- *   names the file it records (STAT `rec_idx`, docs/XREC_PROTOCOL.md 5.5) with a usable pace: then only that file and
- *   any newer `REC_NNNN.wav` wait. A stopped download of the same name and size resumes.
+ *   names the file it records (STAT `rec_idx`, docs/XREC_PROTOCOL.md 5.5) with a usable pace: then only that file
+ *   waits. Only that one: the firmware numbers a new recording after the highest number, but after `REC_9999.wav` it
+ *   starts again from the lowest free one, so finished recordings can have higher numbers. The caller lists between two
+ *   STATs that show the same recording (a split or a stop during LS changes it), so no other file of the listing grows.
+ *   A stopped download of the same name and size resumes.
  * - Upload the transcript of each imported recording that is still on the recorder, when the note has a transcript and
  *   the recorder has no sidecar for it or an older one, unless the recorder refused that version for good. Uploads
  *   also run while the recorder records: they go to a temporary file that PUTEND commits.
@@ -170,8 +173,8 @@ object SyncPlanner {
             else -> null
         }
 
-    /** The file of the recording [index], or a newer one (the numbering grows): it can still grow. */
-    private fun isActive(name: String, index: Long): Boolean = recordingNumber(name)?.let { it >= index } == true
+    /** The file of the recording [index]: it can still grow. */
+    private fun isActive(name: String, index: Long): Boolean = recordingNumber(name) == index
 
     private fun download(entry: XrecReply.Entry, state: RecorderSyncState): PlannedDownload {
         val partial = state.partial?.takeIf { it.name == entry.name && it.size == entry.size }

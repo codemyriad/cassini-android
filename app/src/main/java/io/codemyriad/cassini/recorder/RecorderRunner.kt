@@ -129,9 +129,11 @@ class RecorderAutoSync(
  * attempt runs again after the waits of [TranscriptPushBackoff], while a transcript waits and the process lives, up to
  * [TranscriptPushBackoff.MAX_FAILURES] failures in a row; [TranscriptPushBackoff.MAX_SYNC_FAILURES] failed syncs in a
  * row end them sooner. A transcript that the recorder takes only after its recording
- * ([SyncOutcome.Done.deferredUploads]) is no failure either: the push tries again after [RecordingPoll.INTERVAL_MS], at
- * most [RecordingPoll.MAX_POLLS] times in a row, unless "Auto sync" is on (its full syncs send it, without a second
- * loop). A running sync or binding ([SyncOutcome.Busy]) is no failure: the push waits for its end and tries again at
+ * ([SyncOutcome.Done.deferredUploads]) is no failure either. With "Sync while the recorder records" on, the push tries
+ * again after [RecordingPoll.INTERVAL_MS], at most [RecordingPoll.MAX_POLLS] times in a row, unless "Auto sync" is on
+ * (its full syncs send it, without a second loop). With that setting off (the default), no sync calls the recorder
+ * while it records: the push ends, and the transcript goes with the next sync or the next transcript after the
+ * recording. A running sync or binding ([SyncOutcome.Busy]) is no failure: the push waits for its end and tries again at
  * once (a full sync sends the transcripts that finished during its downloads, so usually nothing is
  * left). A sync that connected ends the retries: what it did not send cannot go now (the recording went, or the
  * recorder refused it), and the next sync tries again. A sync that cannot connect before the user acts (no permission,
@@ -178,7 +180,8 @@ class RecorderTranscriptPush(
     }
 
     /** Upload-only attempts while a transcript waits and the last one ended in a way that can pass by itself. */
-    @Suppress("ReturnCount") // the push ends after a failure that cannot pass, or when "Auto sync" takes over
+    // The push ends after a failure that cannot pass, when "Auto sync" takes over, or when the recording holds it.
+    @Suppress("ReturnCount")
     private suspend fun push() {
         var failures = 0
         var syncFailures = 0
@@ -189,8 +192,13 @@ class RecorderTranscriptPush(
                 // Another sync or a binding has the recorder: no failure, and no wait after it ends.
                 runner.awaitIdle()
             } else if (outcome is SyncOutcome.Done && outcome.deferredUploads > 0) {
-                // The recorder records and takes the transcript after: no failure. "Auto sync" sends it if it is on.
-                if (settings.first().autoSync || ++deferrals > RecordingPoll.MAX_POLLS) return
+                // The recorder records and takes the transcript after: no failure. The 2-minute poll during a recording
+                // belongs to "Sync while the recorder records"; "Auto sync" sends it if it is on.
+                val now = settings.first()
+                if (!now.syncWhileRecording || now.autoSync || ++deferrals > RecordingPoll.MAX_POLLS) {
+                    Log.i(TAG, "The transcript waits for a sync after the recording")
+                    return
+                }
                 failures = 0
                 syncFailures = 0
                 Log.i(TAG, "The transcript waits for the end of the recording; try $deferrals")

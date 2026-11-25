@@ -403,12 +403,21 @@ class XrecClientEndToEndTest {
         val fake = recordingDevice()
         val pauses = mutableListOf<Long>()
         val input = StreamXrecInput(fake.clientInput).also { closeables += it }
-        val client = XrecClient(input, fake.clientOutput, timeouts, sleep = { pauses += it })
+        // A clock that a pause advances without sleeping: the fake streams a window in a few milliseconds.
+        var skipped = 0L
+        val clock = { System.nanoTime() / 1_000_000L + skipped }
+        val sleep = { millis: Long ->
+            pauses += millis
+            skipped += millis
+        }
+        val client = XrecClient(input, fake.clientOutput, timeouts, clock = clock, sleep = sleep)
         client.authenticate(key)
         val stat = client.stat()
         assertEquals(3L, stat.recordingIndex)
         assertEquals(342L, stat.paceMillis)
         expect(XrecFailure.BUSY) { client.download("REC_0003.wav", 5_000, ByteArrayOutputStream()) }
+        // Unpaced from here: the windows come in a few milliseconds, so the client waits the rest of the pace.
+        fake.recordingRate = 0
         val sink = ByteArrayOutputStream()
         client.download("REC_0001.wav", 40_000, sink, window = XrecLimits.RECORDING_GETS_WINDOW, pauseMillis = 342)
         assertArrayEquals(fake.files["REC_0001.wav"], sink.toByteArray())
@@ -420,8 +429,10 @@ class XrecClientEndToEndTest {
             ),
             gets(fake).drop(1),
         )
-        // A pause between two windows, none before the first.
-        assertEquals(listOf(342L, 342L), pauses)
+        // A window starts at most every pace_ms, none waits before the first: the fast windows of the fake wait the
+        // rest of the 342 ms.
+        assertEquals(2, pauses.size)
+        assertTrue(pauses.toString(), pauses.all { it in 1L..342L })
         // The window never grows past the session's: the stock firmware keeps its 3840.
         assertEquals(XrecLimits.RECORDING_GETS_WINDOW, client.lastDownload!!.window)
         // Writers wait for the end of the recording; the clock set is acknowledged and not applied.
@@ -438,6 +449,24 @@ class XrecClientEndToEndTest {
         // The refused PUT payload was eaten unparsed: the link is in step.
         assertEquals(87, client.stat().batteryPercent)
         assertFalse(fake.files.containsKey("REC_0001.cwx"))
+    }
+
+    @Test fun aWindowThatTookThePaceIsFollowedAtOnce() {
+        val fake = recordingDevice().apply { recordingRate = 0 }
+        val pauses = mutableListOf<Long>()
+        val input = StreamXrecInput(fake.clientInput).also { closeables += it }
+        // Each frame takes 50 ms on this clock: a 16 KiB window of 640-byte frames takes far longer than 342 ms.
+        var elapsed = 0L
+        val clock = { System.nanoTime() / 1_000_000L + elapsed }
+        val client = XrecClient(input, fake.clientOutput, timeouts, clock = clock, sleep = { pauses += it })
+        client.authenticate(key)
+        val sink = ByteArrayOutputStream()
+        val window = XrecLimits.RECORDING_GETS_WINDOW
+        client.download("REC_0001.wav", 40_000, sink, window = window, pauseMillis = 342) { elapsed += 50 }
+        assertArrayEquals(fake.files["REC_0001.wav"], sink.toByteArray())
+        assertEquals(3, gets(fake).size)
+        // The device paced the windows: no pause after one.
+        assertEquals(emptyList<Long>(), pauses)
     }
 
     @Test fun aLaterInPlaceOfAFrameKeepsTheBytesSoFarAndTheDownloadContinues() {

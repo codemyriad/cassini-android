@@ -271,11 +271,9 @@ class RecorderSyncTest {
 
     // Sync while the recorder records (docs/BT_SYNC_SPEED_AND_RECORDING.md S4). ----------------------------------------
 
-    private val laterWaits: MutableList<Long> = java.util.Collections.synchronizedList(mutableListOf())
-
-    /** A sync whose LATER waits are recorded, not waited, with "Sync while the recorder records" [on]. */
+    /** A sync with "Sync while the recorder records" [on]. */
     private suspend fun recordingSync(on: Boolean = true, clock: () -> Long = { NOW }) =
-        recorderSync(root, radio, library, clock, wait = { laterWaits += it }).also { (_, store) ->
+        recorderSync(root, radio, library, clock).also { (_, store) ->
             store.bound(key)
             store.update { it.copy(syncWhileRecording = on) }
         }
@@ -308,9 +306,8 @@ class RecorderSyncTest {
             listOf("+XREC:GETS,0,16384,640,REC_0001.wav", "+XREC:GETS,16384,3616,640,REC_0001.wav"),
             commands.filter { it.startsWith("+XREC:GETS") && "REC_0001" in it },
         )
-        // LS comes before STAT, the STAT of each file is not needed, and no clock is read or set.
-        assertTrue(commands.indexOf("+XREC:LS") < commands.indexOf("+XREC:STAT"))
-        assertEquals(1, commands.count { it == "+XREC:STAT" })
+        // LS comes between two STATs, the STAT of each file is not needed, and no clock is read or set.
+        assertEquals(listOf("+XREC:STAT", "+XREC:LS", "+XREC:STAT"), commands.filter { it in LIST_COMMANDS })
         assertFalse(commands.any { it.startsWith("+XREC:RTC") })
         val names = store.read().current!!.recordings.map { it.recording.name }
         assertEquals(listOf("REC_0001.wav", "REC_0002.wav"), names)
@@ -320,6 +317,47 @@ class RecorderSyncTest {
         assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
         assertEquals("REC_0003.wav", library.titles.getValue("note-3"))
         assertTrue(radio.device.commands.any { it.startsWith("+XREC:RTC,") })
+    }
+
+    @Test fun aRecordingThatStopsDuringLsIsListedAgainAndDownloadedWhole() = runBlocking {
+        recorder.recording = true
+        recorder.files["REC_0001.wav"] = recording(2_000, seed = 1)
+        recorder.files["REC_0002.wav"] = recording(3_000, seed = 2)
+        val whole = recording(8_000, seed = 3)
+        recorder.files["REC_0003.wav"] = whole.copyOf(5_000)
+        // The recording stops after LS: its file grows to its final size and the next STAT is idle.
+        recorder.afterList = {
+            recorder.afterList = null
+            recorder.files["REC_0003.wav"] = whole
+            recorder.recording = false
+        }
+        val (sync, store) = sync()
+        store.bound(key)
+
+        assertDone(SyncOutcome.Done(3, 0, 0, false), sync.sync())
+        // The listing of the recording is not trusted: LS runs again, and the whole file comes once (then the STAT
+        // before each download after the first).
+        val commands = recorder.commands.filter { it in LIST_COMMANDS }.take(5)
+        assertEquals(listOf("+XREC:STAT", "+XREC:LS", "+XREC:STAT", "+XREC:LS", "+XREC:STAT"), commands)
+        assertEquals(2, recorder.commands.count { it == "+XREC:LS" })
+        assertArrayEquals(whole, library.imported.getValue("note-3"))
+        assertEquals("REC_0003.wav", library.titles.getValue("note-3"))
+    }
+
+    @Test fun anActiveFileThatSplitsDuringLsIsNotDownloaded() = runBlocking {
+        recordingWithFinishedFiles()
+        // At 2 GiB the firmware closes REC_0003.wav and goes on in REC_0004.wav after LS.
+        recorder.afterList = {
+            recorder.afterList = null
+            recorder.files["REC_0004.wav"] = recording(1_000, seed = 4)
+        }
+        val (sync, _) = recordingSync()
+
+        val outcome = sync.sync() as SyncOutcome.Done
+        // Listed again with the new active file: REC_0003.wav is finished now and goes whole; REC_0004.wav waits.
+        assertEquals(3, outcome.downloaded)
+        assertEquals(2, recorder.commands.count { it == "+XREC:LS" })
+        assertFalse(recorder.commands.any { it.startsWith("+XREC:GETS") && "REC_0004" in it })
     }
 
     @Test fun anOlderFirmwareWithoutTheRecordingIndexStillSkipsEverythingWhileItRecords() = runBlocking {
@@ -350,31 +388,35 @@ class RecorderSyncTest {
         assertEquals(1, library.imported.size)
     }
 
-    @Test fun aLaterWaitsOnTheLinkAndTheDownloadContinuesWhereItStopped() = runBlocking {
+    @Test fun aLaterEndsTheSyncAtOnceAndTheNextSyncContinuesWhereItStopped() = runBlocking {
         recordingWithFinishedFiles()
-        // The recorder answers LATER in place of the third frame of the first file.
+        // The recorder answers LATER in place of the third frame of the first file (a stereo recording started).
         recorder.laterAtFrame = 1_280L
-        val (sync, _) = recordingSync()
+        val (sync, store) = recordingSync()
+
+        // No wait on the open link: the sync ends and disconnects.
+        assertDone(SyncOutcome.Done(0, 0, 3, true, recordingPoll = true), sync.sync())
+        assertEquals(1, recorder.commands.count { it.startsWith("+XREC:GETS") })
+        assertEquals(PartialDownload("REC_0001.wav", 20_000, 1_280), store.read().current!!.partial)
+        assertEquals(1, radio.opens)
 
         val outcome = sync.sync() as SyncOutcome.Done
         assertEquals(2, outcome.downloaded)
         assertEquals(0, outcome.failed)
-        assertEquals(listOf(FakeRecorder.LATER_MS), laterWaits.toList())
-        val gets = recorder.commands.filter { it.startsWith("+XREC:GETS") && "REC_0001" in it }
-        assertEquals("+XREC:GETS,1280,16384,640,REC_0001.wav", gets[1])
+        val gets = radio.device.commands.first { it.startsWith("+XREC:GETS") && "REC_0001" in it }
+        assertEquals("+XREC:GETS,1280,16384,640,REC_0001.wav", gets)
         assertArrayEquals(recorder.files["REC_0001.wav"], library.imported.getValue("note-1"))
     }
 
-    @Test fun aRecorderThatKeepsAnsweringLaterDefersTheDownloadsToTheNextSync() = runBlocking {
+    @Test fun aStereoRecordingThatStartsDuringTheSyncDefersTheDownloadsToTheNextSync() = runBlocking {
         recordingWithFinishedFiles()
         // A stereo recording starts after STAT: each GETS answers LATER.
         recorder.beforeGets = { recorder.stereo = true }
         val (sync, store) = recordingSync()
 
         assertDone(SyncOutcome.Done(0, 0, 3, true, recordingPoll = true), sync.sync())
-        // Four waits of 30 s (2 minutes), then the file waits for the next sync; the other one too.
-        assertEquals(List(4) { FakeRecorder.LATER_MS }, laterWaits.toList())
-        assertEquals(5, recorder.commands.count { it.startsWith("+XREC:GETS") })
+        // The first LATER defers this file and the others: one GETS, no wait on the link.
+        assertEquals(1, recorder.commands.count { it.startsWith("+XREC:GETS") })
         assertTrue(library.imported.isEmpty())
         assertEquals(PartialDownload("REC_0001.wav", 20_000, 0), store.read().current!!.partial)
         assertEquals(RecorderSync.OUTCOME_OK, store.read().current!!.lastSync!!.outcome)
@@ -702,6 +744,9 @@ class RecorderSyncTest {
     }
 
     private companion object {
+        /** The commands that read the recorder's state and its listing. */
+        val LIST_COMMANDS = setOf("+XREC:STAT", "+XREC:LS")
+
         const val TIMEOUT_MS = 10_000L
 
         /** Shorter than the reply timeout of [TEST_TIMEOUTS]: a hook that blocks the fake recorder longer fails the link. */

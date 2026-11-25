@@ -30,8 +30,8 @@ import java.util.Collections
  * [dropPutAcks] (the reply of a written PUT chunk, once), [corruptPutChunks] (a received PUT chunk, once),
  * [disconnectAtFrame] (the link closes instead of sending that GETS frame, once), [dropPutEndAck] (the reply of a
  * committed PUTEND, once), [unreadable] (GETS of these names gives `ERR,SDIO`), [refusedNames] (a `REC` header with
- * one of these names gives `ERR,NAME`), and the hooks [beforeGets], [beforePut] and [beforePutEnd]. [reconnect] opens
- * a new link to the same device.
+ * one of these names gives `ERR,NAME`), and the hooks [beforeGets], [beforePut], [beforePutEnd] and [afterList].
+ * [reconnect] opens a new link to the same device.
  *
  * [syncsWhileRecording] true is the firmware of branch feat/bt-sync-rec-hardening (docs/XREC_PROTOCOL.md 5.5) while it
  * [recording]s: the newest `.wav` is the file being recorded. STAT has the fields `rec_idx` (its number) and `pace_ms`;
@@ -82,6 +82,9 @@ class FakeRecorder(
 
     /** Runs on the device thread before a received PUT chunk is handled, with its offset. */
     @Volatile var beforePut: ((Long) -> Unit)? = null
+
+    /** Runs on the device thread after an LS listing was sent (a recording can stop or split then). */
+    @Volatile var afterList: (() -> Unit)? = null
 
     /** Runs on the device thread before PUTEND is handled. */
     @Volatile var beforePutEnd: (() -> Unit)? = null
@@ -160,6 +163,7 @@ class FakeRecorder(
         next.laterAtFrame = laterAtFrame
         next.beforePut = beforePut
         next.beforePutEnd = beforePutEnd
+        next.afterList = afterList
         return next
     }
 
@@ -241,6 +245,7 @@ class FakeRecorder(
             cmd == "LS" -> {
                 synchronized(files) { files.forEach { (name, data) -> reply("+XREC:F,${data.size},$name") } }
                 reply("+XREC:END")
+                afterList?.invoke()
             }
             cmd.startsWith("GETS,") -> gets(cmd.removePrefix("GETS,"))
             cmd.startsWith("DEL,") -> delete(cmd.removePrefix("DEL,"))

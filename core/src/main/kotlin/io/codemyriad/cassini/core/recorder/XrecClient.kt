@@ -58,7 +58,7 @@ class XrecClient(
     private val clock: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
     private val maxRetries: Int = DEFAULT_RETRIES,
     getsWindow: Int = XrecLimits.GETS_WINDOW,
-    /** Waits between two GETS windows of a paced download; interruptible. */
+    /** Waits before a GETS window that would start sooner than the pace of a paced download; interruptible. */
     private val sleep: (Long) -> Unit = Thread::sleep,
 ) {
     private val buffer = ByteArray(BUFFER_BYTES)
@@ -141,7 +141,9 @@ class XrecClient(
      * starts on a quiet link. [lastDownload] holds the measurements when the download ends.
      *
      * While the recorder records, [window] lowers the GETS window ([XrecLimits.RECORDING_GETS_WINDOW]) and
-     * [pauseMillis] (STAT `pace_ms`) waits between two windows. `ERR,LATER,<ms>` in place of a frame fails with
+     * [pauseMillis] (STAT `pace_ms`) is the shortest interval between the starts of two windows: the device paces the
+     * frames itself, so a window that took that long is followed at once, and no pause is added after a window (the
+     * device's burst allowance is small: a pause after each window would halve the rate). `ERR,LATER,<ms>` in place of a frame fails with
      * [XrecFailure.LATER]: the bytes up to [XrecException]'s offset are in [sink], and a new download continues there.
      */
     // The file, the sink, the resume point and the pacing of one download; one loop with its recovery.
@@ -162,12 +164,18 @@ class XrecClient(
         val heartbeat = { progress(transfer.offset) }
         getsWindow = window?.let { minOf(it, baseWindow) } ?: baseWindow
         var failures = 0
+        var windowStart = 0L
         while (transfer.offset < size) {
             val before = transfer.offset
             if (pauseMillis > 0 && transfer.requests > 0) {
-                sleep(pauseMillis)
-                heartbeat()
+                // pace_ms is the shortest interval between window starts: a window that took that long goes on at once.
+                val rest = pauseMillis - (clock() - windowStart)
+                if (rest > 0) {
+                    sleep(rest)
+                    heartbeat()
+                }
             }
+            windowStart = clock()
             try {
                 burst(name, size, transfer, sink, progress)
             } catch (e: XrecException) {

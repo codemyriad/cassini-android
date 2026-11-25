@@ -66,15 +66,23 @@ class SyncPlannerTest {
         file("talk.wav", 2_000),
     )
 
-    @Test fun whileTheRecorderRecordsOnlyTheActiveFileAndNewerOnesWait() {
+    @Test fun whileTheRecorderRecordsOnlyTheActiveFileWaits() {
         val plan = SyncPlanner.plan(recordingListing, namedRecording, RecorderSyncState(), emptyMap(), true)
         assertEquals(listOf("REC_0001.wav", "REC_0002.wav", "talk.wav"), plan.downloads.map { it.name })
         assertEquals(
-            listOf(SkippedFile("REC_0003.wav", SkipReason.ACTIVE), SkippedFile("REC_0004.wav", SkipReason.ACTIVE)),
+            listOf(SkippedFile("REC_0003.wav", SkipReason.ACTIVE), SkippedFile("REC_0004.wav", SkipReason.EMPTY)),
             plan.skipped,
         )
         assertTrue(plan.deviceRecording)
         assertTrue(plan.whileRecording)
+    }
+
+    @Test fun afterTheNumberingWrapsTheFinishedRecordingsWithHigherNumbersGoToo() {
+        // The card held REC_9999.wav: the firmware records REC_0003.wav, the lowest free number.
+        val listing = listOf(file("REC_0002.wav", 900), file("REC_0003.wav", 700), file("REC_9999.wav", 1_000))
+        val plan = SyncPlanner.plan(listing, namedRecording, RecorderSyncState(), emptyMap(), true)
+        assertEquals(listOf("REC_0002.wav", "REC_9999.wav"), plan.downloads.map { it.name })
+        assertEquals(listOf(SkippedFile("REC_0003.wav", SkipReason.ACTIVE)), plan.skipped)
     }
 
     @Test fun theActiveFileIsMatchedByItsNumberInAnyCase() {

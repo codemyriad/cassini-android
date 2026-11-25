@@ -142,14 +142,12 @@ internal class FakeLibrary : RecorderLibrary {
 }
 
 /** A sync over [radio] with a store in [root]. */
-@Suppress("LongParameterList") // the seams a test changes
 internal fun recorderSync(
     root: File,
     radio: FakeRadio,
     library: FakeLibrary,
     clock: () -> Long = { NOW },
     stallMillis: Long = RecorderSync.DEFAULT_STALL_MS,
-    wait: suspend (Long) -> Unit = {},
 ): Pair<RecorderSync, RecorderStore> {
     val store = RecorderStore(File(root, "recorder.json"), Dispatchers.IO)
     val sync = RecorderSync(
@@ -164,7 +162,6 @@ internal fun recorderSync(
             zone = { java.time.ZoneOffset.UTC },
             timeouts = TEST_TIMEOUTS,
             stallMillis = stallMillis,
-            wait = wait,
         ),
     )
     return sync to store

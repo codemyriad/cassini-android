@@ -60,8 +60,10 @@ One sync runs at a time (a `Mutex`). A sync does these steps:
 
 1. Connect, then `CHAL` and `AUTH` with the stored key. If the recorder replies `ERR,AUTH` or `ERR,UNBOUND` (for
    example, a different phone bound it), the app shows "Bind again" and stops all syncs until the user binds again.
-2. `LS`, then `STAT` (in this order: a recording that starts after `STAT` is not in the listing, so its growing file
-   is never planned). While the recorder records (media 33), no download starts, unless "Sync while the recorder
+2. `STAT`, `LS`, `STAT`. A recording that starts during `LS` is in the second `STAT`, so its growing file is never
+   planned. A recording that stops or splits during `LS` (the two `STAT`s differ: it ran at the first and not at the
+   second, or with another `rec_idx`) can leave its file in the listing with a size that is not its final one: the app
+   lists again (at most 3 times; a recording that still keeps changing is planned as if the setting were off). While the recorder records (media 33), no download starts, unless "Sync while the recorder
    records" is on and the firmware can do it (see "While the recorder records" below). Before each download after the
    first, the app sends `STAT` again, and stops the downloads if a recording started; it does not when the setting is
    on and the firmware names its active file.
@@ -133,24 +135,29 @@ records. The recording always wins: the firmware paces the transfers and refuses
   (`RecorderSettings.syncWhileRecording`). Off: the old rule (no download while the recorder records). On: the
   firmware decides whether it can.
 - **Downloads.** With the setting on, a recording in progress (`media` 33), `rec_idx` > 0 and `pace_ms` up to 10 s,
-  `SyncPlanner` downloads the finished recordings and skips only `REC_<rec_idx>.wav` and any `REC_NNNN.wav` with a
-  higher number (`SkipReason.ACTIVE`). A stereo recording (`pace_ms` 30000) allows no transfer (mono only, decision 5
+  `SyncPlanner` downloads the finished recordings and skips only `REC_<rec_idx>.wav` (`SkipReason.ACTIVE`). Only that
+  file: the listing lies between two `STAT`s with the same `rec_idx`, so no other listed file grows, and after
+  `REC_9999.wav` the firmware numbers a new recording from the lowest free number, so finished recordings can have
+  higher numbers. A stereo recording (`pace_ms` 30000) allows no transfer (mono only, decision 5
   of the design): all downloads wait, as before. While the recorder records, each `GETS` asks for 16 KiB
-  (`XrecLimits.RECORDING_GETS_WINDOW`) and the client waits `pace_ms` between two windows. The firmware caps the rate
-  (about 48 KB/s) on its side too.
+  (`XrecLimits.RECORDING_GETS_WINDOW`), and `pace_ms` is the shortest interval between the starts of two windows: the
+  firmware paces the frames itself (about 48 KB/s), so the client sends the next `GETS` as soon as a window is complete
+  when it took that long, and adds no pause after a window (the firmware's burst allowance is only 2 KiB: a pause after
+  each window would halve the rate, below the 32 KB/s that a mono recording makes).
 - **`ERR,BUSY`.** The firmware refuses the file it records. A download that gets `BUSY` (a recording started after
   `STAT`) is skipped for this sync; its `.part` file goes, and the next sync lists it again.
-- **`ERR,LATER,<ms>`** in place of a `GETS` frame (a stereo recording started during the stream): the bytes so far stay
-  in the `.part` file. The app waits `min(<ms>, 30 s)` on the open link and continues from the same offset, without
-  counting a failure. After 2 minutes of such waits for one file, the file and the rest of the downloads wait for the
-  next sync (`skipped`, not `failed`); the stopped download resumes then.
+- **`ERR,LATER,<ms>`** to a `GETS` or in place of a frame means a stereo recording, which allows no transfer until it
+  ends: the bytes so far stay in the `.part` file, and the file and the rest of the downloads wait for a later sync
+  (`skipped`, not `failed`) at once. The app does not wait on the open link: a connected link polls the radio all the
+  time, next to the recording microphone. The stopped download resumes from the `.part` file.
 - **Transcripts.** The firmware takes no card write while it records: `PUT` and `PUTEND` answer `ERR,LATER` (the
   payload of a refused chunk is discarded, not read as commands). When `STAT` shows a recording and names its file, the
   app does not try: the transcripts wait (`SyncOutcome.Done.deferredUploads`). A `LATER` during an upload (a recording
   that started meanwhile) ends the uploads of this sync the same way. A waiting transcript is not a failure: its record
-  keeps no failure, and the transcript push tries again after 2 minutes, at most 60 times in a row (about 2 hours),
-  unless "Auto sync" is on: then its syncs send the transcript, and the push stops, so that no second loop calls the
-  recorder.
+  keeps no failure. With "Sync while the recorder records" on, the transcript push tries again after 2 minutes, at most
+  60 times in a row (about 2 hours), unless "Auto sync" is on: then its syncs send the transcript, and the push stops,
+  so that no second loop calls the recorder. With the setting off, the push ends: no sync calls the recorder while it
+  records for a transcript, which goes with the next sync or the next transcript.
 - **Poll.** With "Auto sync" on, a sync that ran during a recording with the setting on and ended with files waiting
   for it (the active file, a deferred download or transcript) sets `SyncOutcome.Done.recordingPoll`. The next attempt
   then comes after a fixed 2 minutes (`RecordingPoll`), without the idle doubling, for at most 60 attempts in a row
@@ -233,12 +240,13 @@ device chooser are optional features (`android:required="false"`).
   before the transcription request; a reused name and size after a card format; a stalled link; a store that cannot
   be written; binding with a wrong PIN; a stale bond; a transcript that finishes during the downloads; a full sync
   that waits for an upload-only one; while the recorder records: the finished recordings go in 16 KiB windows and the
-  active file waits, with LS before STAT and no clock; an older firmware and the setting off keep skipping everything;
-  a `LATER` waits and the download continues; repeated `LATER`s defer the downloads to the next sync; a `BUSY` file
-  is skipped; a transcript refused with `LATER` waits without a failure),
+  active file waits, with LS between two STATs and no clock; a recording that stops or splits during LS is listed
+  again; an older firmware and the setting off keep skipping everything; a `LATER` defers the downloads to the next
+  sync at once, which continues from the `.part` file; a `BUSY` file is skipped; a transcript refused with `LATER`
+  waits without a failure),
   `RecorderAutoSyncTest` (the 2-minute poll while the recorder records, and the usual waits with the setting off),
-  `RecorderTranscriptPushTest` (a transcript held by a recording is tried every 2 minutes and goes after it, or is
-  left to "Auto sync";a new transcript goes at once with "Auto sync" off and without
+  `RecorderTranscriptPushTest` (a transcript held by a recording is tried every 2 minutes with the setting on and goes
+  after it, is not polled with the setting off, or is left to "Auto sync"; a new transcript goes at once with "Auto sync" off and without
   a download; a transcript that waits at the start goes; an unreachable recorder is tried again with growing waits
   until it takes the transcript, and at most 25 times; a sync that fails each time is tried 3 times; a recording that
   left the recorder ends the push after one sync; a busy recorder is no failure and a full sync takes the new

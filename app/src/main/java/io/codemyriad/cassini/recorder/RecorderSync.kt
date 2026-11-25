@@ -35,6 +35,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.Flushable
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.security.GeneralSecurityException
@@ -172,8 +173,9 @@ sealed interface BindOutcome {
  *
  * While the recorder records, a firmware that names the file it records (STAT `rec_idx`) lets the finished recordings
  * go at its pace when "Sync while the recorder records" is on ([SyncPlanner]); it answers `ERR,LATER,<ms>` to what
- * must wait for the end of the recording: a download waits and continues within [LATER_BUDGET_MS] per file, then waits
- * for the next sync, and transcripts wait for the end of the recording ([SyncOutcome.Done.deferredUploads]).
+ * must wait for the end of the recording: a download (a stereo recording) keeps its `.part` file and waits for a later
+ * sync at once, without holding the link, and transcripts wait for the end of the recording
+ * ([SyncOutcome.Done.deferredUploads]).
  *
  * A link failure or a timeout ends the sync quietly: the recorder's radio is on only while it is in Bluetooth phone
  * mode. A file that fails for another reason is skipped, and the sync goes on. A refused key marks the recorder
@@ -201,8 +203,6 @@ class RecorderSync(private val parts: Parts) {
          * write does not, and ignores interrupts.
          */
         val stallMillis: Long = DEFAULT_STALL_MS,
-        /** The wait after an `ERR,LATER` of a download, on the open link. */
-        val wait: suspend (Long) -> Unit = { delay(it) },
     )
 
     private val store = parts.store
@@ -379,13 +379,12 @@ class RecorderSync(private val parts: Parts) {
         val pong = session.call { ping() }
         session.call { authenticate(key) }
         current.value = RecorderActivity.Syncing(SyncStep.CHECKING)
-        // LS before STAT: a recording that starts after STAT is not in the listing, so its growing file is never planned.
-        val listing = session.call { list() }
-        val status = session.call { stat() }
+        val (listing, status, steady) = steadyListing(session)
         // The recorder does not set its clock while it records (open_fw answers OK,RTC,LATER): the next sync sets it.
         if (!status.recording) setClock(session)
         markAbsent(address, listing)
-        val syncWhileRecording = store.read().syncWhileRecording
+        // A recording that kept changing during LS: its sizes can be stale, so no download runs while it records.
+        val syncWhileRecording = store.read().syncWhileRecording && steady
         val noteIds = deviceState(address).recordings.mapNotNull { it.recording.noteId }
         val transcripts = encode(parts.library.transcripts(noteIds))
         val versions = transcripts.mapValues { it.value.version }
@@ -454,6 +453,34 @@ class RecorderSync(private val parts: Parts) {
             recordingPoll = plan.whileRecording && waiting > 0,
         )
     }
+
+    /** The LS [listing] of a sync, the [status] it is planned with, and whether the recording stayed the same during LS. */
+    private data class Listing(val listing: List<XrecReply.Entry>, val status: XrecReply.Status, val steady: Boolean)
+
+    /**
+     * STAT, LS, STAT. A recording that starts before the second STAT is in that STAT; one that stops or splits during LS
+     * can leave its file in the listing with a size that is no longer its size (the firmware rewrites the header at the
+     * end), so LS runs again (at most [MAX_LISTINGS] times) until both STATs show the same recording. Still changing:
+     * the recording STAT is used, and the sync plans as if the setting were off (not [Listing.steady]).
+     */
+    private suspend fun steadyListing(session: Session): Listing {
+        var before = session.call { stat() }
+        var listings = 0
+        while (true) {
+            val listing = session.call { list() }
+            val after = session.call { stat() }
+            val steady = sameRecording(before, after)
+            if (steady || ++listings >= MAX_LISTINGS) {
+                return Listing(listing, if (steady || after.recording) after else before, steady)
+            }
+            Log.i(TAG, "The recording changed during LS; listing again")
+            before = after
+        }
+    }
+
+    /** True when no recording ran across [before] and [after], or the same one ran at both and its file is the same. */
+    private fun sameRecording(before: XrecReply.Status, after: XrecReply.Status): Boolean =
+        !before.recording || (after.recording && before.recordingIndex == after.recordingIndex)
 
     /** The GETS [window] (null: the session's) and the [pauseMillis] between two windows of the downloads of a sync. */
     private class Pace(val window: Int?, val pauseMillis: Long)
@@ -532,15 +559,16 @@ class RecorderSync(private val parts: Parts) {
         }
     }
 
-    /** DEFERRED: the recorder answered `ERR,LATER` for longer than [LATER_BUDGET_MS]; the next sync continues. */
+    /** DEFERRED: the recorder answered `ERR,LATER` (a stereo recording runs); the next sync continues. */
     private enum class FileResult { DONE, CHANGED, FAILED, DEFERRED }
 
     /**
      * Downloads, imports and records one recording; [measured] gets the measurements of a complete download. An
-     * `ERR,LATER,<ms>` waits on the open link (at most [MAX_LATER_WAIT_MS] at a time) and continues from the same
-     * offset, without counting a failure, for at most [LATER_BUDGET_MS]; then the download waits for the next sync.
+     * `ERR,LATER,<ms>` to a GETS means a stereo recording, which allows no transfer until it ends: the bytes so far
+     * stay in the `.part` file and the download waits for a later sync, without a failure. The link is not held open
+     * meanwhile: a connected link polls the radio all the time, next to the recording microphone.
      */
-    @Suppress("ReturnCount") // a failure, a download that waits for the next sync, or an import
+    @Suppress("ReturnCount") // a failure, a download that waits for a later sync, or an import
     private suspend fun download(
         session: Session,
         address: String,
@@ -554,26 +582,14 @@ class RecorderSync(private val parts: Parts) {
         withContext(parts.io) { prepare(part, resume) }
         store.updateDevice(address) { it.copy(partial = PartialDownload(planned.name, planned.size, resume)) }
         progress(SyncStep.DOWNLOADING, planned.name, resume, planned.size)
-        var waited = 0L
-        var stats: XrecDownloadStats? = null
-        var complete = false
-        while (!complete) {
-            try {
-                stats = fetch(session, planned, part, pace)
-                complete = true
-            } catch (error: XrecException) {
-                if (error.failure != XrecFailure.LATER) return downloadFailed(address, planned, part, error)
-                val bytes = withContext(parts.io) { part.length() }
-                store.updateDevice(address) { it.copy(partial = it.partial?.copy(bytes = bytes)) }
-                val wait = (error.retryAfterMillis ?: MAX_LATER_WAIT_MS).coerceIn(MIN_LATER_WAIT_MS, MAX_LATER_WAIT_MS)
-                if (waited + wait > LATER_BUDGET_MS) {
-                    Log.i(TAG, "${planned.name} waits for the end of the recording, at $bytes bytes")
-                    return FileResult.DEFERRED
-                }
-                Log.i(TAG, "The recorder asks to wait $wait ms for ${planned.name}, at $bytes bytes")
-                parts.wait(wait)
-                waited += wait
-            }
+        val stats = try {
+            fetch(session, planned, part, pace)
+        } catch (error: XrecException) {
+            if (error.failure != XrecFailure.LATER) return downloadFailed(address, planned, part, error)
+            val bytes = withContext(parts.io) { part.length() }
+            store.updateDevice(address) { it.copy(partial = it.partial?.copy(bytes = bytes)) }
+            Log.i(TAG, "${planned.name} waits for the end of the recording, at $bytes bytes")
+            return FileResult.DEFERRED
         }
         stats?.let {
             measured(it)
@@ -588,20 +604,19 @@ class RecorderSync(private val parts: Parts) {
 
     /**
      * One download into [part] from its length, through a buffer of [PART_BUFFER_BYTES]: the bytes that came stay in
-     * the file also when the download fails, and a complete file is synced to the disk.
+     * the file also when the download fails, and a complete file is synced to the disk. A flush that fails after a
+     * failed download does not hide the download's failure (a LATER or a lost link): it is added as suppressed.
      */
     private suspend fun fetch(session: Session, planned: PlannedDownload, part: File, pace: Pace): XrecDownloadStats? {
         val offset = withContext(parts.io) { part.length() }
         return session.call {
             FileOutputStream(part, true).use { out ->
                 val buffered = BufferedOutputStream(out, PART_BUFFER_BYTES)
-                try {
+                thenFlushing(buffered) {
                     download(planned.name, planned.size, buffered, offset, pace.window, pace.pauseMillis) { done ->
                         session.touch()
                         progress(SyncStep.DOWNLOADING, planned.name, done, planned.size)
                     }
-                } finally {
-                    buffered.flush()
                 }
                 out.fd.sync()
             }
@@ -1015,15 +1030,12 @@ class RecorderSync(private val parts: Parts) {
         /** The skipped files that wait for the end of a recording. */
         private val WAITING_REASONS = setOf(SkipReason.ACTIVE, SkipReason.RECORDING)
 
+        /** The LS runs of one sync while a recording keeps stopping, starting or splitting during them. */
+        private const val MAX_LISTINGS = 3
+
         /** The buffer of a `.part` file (docs/BT_SYNC_SPEED_AND_RECORDING.md A7). */
         private const val PART_BUFFER_BYTES = 64 * 1024
 
-        /** The longest wait after one `ERR,LATER`, and the shortest (a LATER of 0 ms does not spin). */
-        const val MAX_LATER_WAIT_MS = 30_000L
-        private const val MIN_LATER_WAIT_MS = 1_000L
-
-        /** The `ERR,LATER` waits of one download in one sync, after which it waits for the next sync. */
-        const val LATER_BUDGET_MS = 2 * 60_000L
         private const val HEAD_BYTES = 4096
         private const val VERSION_DIGEST_CHARS = 16
         private const val PERCENT = 100L
@@ -1071,4 +1083,20 @@ class RecorderSync(private val parts: Parts) {
         /** The library could not take the file now (no space, a save error): the next sync imports it again. */
         private val TEMPORARY_IMPORT_FAILURES = setOf("SPACE", "SAVE")
     }
+}
+
+/**
+ * Runs [block], then flushes [out] also when [block] failed: the bytes that came stay for the next sync. A failed flush
+ * after a failed [block] does not replace its failure (a LATER, a lost link), it is added to it as suppressed; after a
+ * [block] that succeeded it is thrown.
+ */
+internal inline fun <T> thenFlushing(out: Flushable, block: () -> T): T {
+    val result = runCatching(block)
+    val flushed = runCatching { out.flush() }
+    result.exceptionOrNull()?.let { error ->
+        flushed.exceptionOrNull()?.let(error::addSuppressed)
+        throw error
+    }
+    flushed.getOrThrow()
+    return result.getOrThrow()
 }
