@@ -2,6 +2,7 @@ package io.codemyriad.cassini.recorder
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.companion.AssociationInfo
 import android.companion.AssociationRequest
 import android.companion.BluetoothDeviceFilter
@@ -61,13 +62,16 @@ object RecorderCompanion {
     /** The recorder of the chooser's result, or null when the user picked nothing. */
     fun deviceOf(context: Context, result: Intent?): RecorderDevice? {
         val associated = if (result != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            associationDevice(result)
+            associationDevice(context, result)
         } else {
             null
         }
-        return associated ?: result?.let { extraDevice(it) }?.let { RecorderDevice(it.address, nameOf(context, it)) }
+        return associated ?: result?.let { extraDevice(it) }?.let {
+            RecorderDevice(it.address, bluetoothName(context, it) ?: DEFAULT_NAME)
+        }
     }
 
+    @Suppress("DEPRECATION") // CompanionDeviceManager still populates EXTRA_DEVICE for classic Bluetooth results
     private fun extraDevice(result: Intent): BluetoothDevice? =
         IntentCompat.getParcelableExtra(result, CompanionDeviceManager.EXTRA_DEVICE, BluetoothDevice::class.java)
 
@@ -88,26 +92,43 @@ object RecorderCompanion {
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    private fun associationDevice(result: Intent): RecorderDevice? {
+    private fun associationDevice(context: Context, result: Intent): RecorderDevice? {
         val info = IntentCompat.getParcelableExtra(
             result,
             CompanionDeviceManager.EXTRA_ASSOCIATION,
             AssociationInfo::class.java,
         )
         val address = info?.deviceMacAddress?.toString()?.uppercase() ?: return null
-        return RecorderDevice(address, info.displayName?.toString() ?: DEFAULT_NAME)
+        val associated = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            info.associatedDevice?.bluetoothDevice
+        } else {
+            null
+        }
+        val name = info.displayName?.toString()?.takeIf { it.isNotBlank() }
+            ?: associated?.let { bluetoothName(context, it) }
+            ?: extraDevice(result)?.let { bluetoothName(context, it) }
+            ?: remoteDevice(context, address)?.let { bluetoothName(context, it) }
+            ?: DEFAULT_NAME
+        return RecorderDevice(address, name)
+    }
+
+    private fun remoteDevice(context: Context, address: String): BluetoothDevice? = try {
+        context.getSystemService(BluetoothManager::class.java)?.adapter?.getRemoteDevice(address)
+    } catch (_: IllegalArgumentException) {
+        null
     }
 
     @SuppressLint("MissingPermission") // RecorderPermissions.granted checks BLUETOOTH_CONNECT first
-    private fun nameOf(context: Context, device: BluetoothDevice): String = if (RecorderPermissions.granted(context)) {
-        try {
-            device.name ?: DEFAULT_NAME
-        } catch (_: SecurityException) {
-            DEFAULT_NAME
+    private fun bluetoothName(context: Context, device: BluetoothDevice): String? =
+        if (RecorderPermissions.granted(context)) {
+            try {
+                device.name?.takeIf { it.isNotBlank() }
+            } catch (_: SecurityException) {
+                null
+            }
+        } else {
+            null
         }
-    } else {
-        DEFAULT_NAME
-    }
 
     private const val DEFAULT_NAME = "Cassini"
 }

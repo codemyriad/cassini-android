@@ -105,7 +105,7 @@ class BluetoothRecorderRadio(context: Context, private val io: CoroutineDispatch
         val filter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
         ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
         val state = device.bondState
-        if (state != BluetoothDevice.BOND_BONDING && !device.createBond()) trySend(NOT_STARTED) else trySend(state)
+        if (state == BluetoothDevice.BOND_NONE && !device.createBond()) trySend(NOT_STARTED) else trySend(state)
         launch {
             delay(START_GRACE_MS)
             if (device.bondState == BluetoothDevice.BOND_NONE) trySend(NOT_STARTED)
