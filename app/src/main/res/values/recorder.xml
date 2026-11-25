@@ -38,8 +38,8 @@
     <string name="recorder_status_transcribing">Transcribing</string>
     <string name="recorder_status_transcription_failed">Transcription failed</string>
     <string name="recorder_status_imported">Imported</string>
-    <string name="recorder_status_transcribed">Transcribed. The transcript goes to the recorder at the next sync.</string>
-    <string name="recorder_status_uploaded">Transcript on the recorder</string>
+    <string name="recorder_status_transcribed">Transcribed. Waiting for the recorder: put it in Bluetooth phone mode.</string>
+    <string name="recorder_status_uploaded">Transcript sent to the recorder</string>
     <string name="recorder_status_upload_failed">Transcript not sent (%1$s)</string>
     <string name="recorder_bind_instructions">On the recorder, open the Bluetooth screen (Home, BT, ENTER; choose Phone if it asks). Press ENTER: the recorder shows a PIN for 60 seconds. Then tap Find recorder.</string>
     <string name="recorder_bind_find">Find recorder</string>

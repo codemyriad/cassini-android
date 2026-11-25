@@ -61,6 +61,18 @@ enum class SyncStep { CHECKING, DOWNLOADING, IMPORTING, UPLOADING }
 
 enum class BindStep { BONDING, CONNECTING, PIN, PAIRING }
 
+/** What one sync moves. */
+enum class SyncMode {
+    /** Downloads the new recordings, then sends the transcripts. */
+    FULL,
+
+    /**
+     * Only sends the transcripts (a new transcript is ready): no download, so a waiting transcript does not wait behind
+     * a long download. The new recordings stay for the next full sync.
+     */
+    UPLOADS,
+}
+
 /** How one sync ended. */
 sealed interface SyncOutcome {
     /**
@@ -170,10 +182,10 @@ class RecorderSync(private val parts: Parts) {
     val activity: StateFlow<RecorderActivity> = current.asStateFlow()
 
     /** Syncs with the bound recorder; [SyncOutcome.Busy] at once when a sync or a binding runs already. */
-    suspend fun sync(): SyncOutcome {
+    suspend fun sync(mode: SyncMode = SyncMode.FULL): SyncOutcome {
         if (!lock.tryLock()) return SyncOutcome.Busy
         return try {
-            syncLocked()
+            syncLocked(mode)
         } finally {
             current.value = RecorderActivity.Idle
             lock.unlock()
@@ -185,6 +197,24 @@ class RecorderSync(private val parts: Parts) {
         val settings = store.read()
         return settings.binding != null && settings.current?.rebindNeeded != true &&
             parts.radio.readiness() == RadioReadiness.READY
+    }
+
+    /**
+     * The notes of the bound recorder's imported recordings whose finished transcript the recorder does not have yet
+     * (not sent in this version, and not refused for good). Read without the recorder: the sync itself checks with
+     * `LS` that the recording is still there. Empty when no recorder is bound or it needs a new binding.
+     */
+    suspend fun pendingUploads(): Set<String> {
+        val settings = store.read()
+        val state = settings.binding?.let { settings.devices[it.device.address] }?.takeUnless { it.rebindNeeded }
+        val recordings = state?.recordings.orEmpty().map { it.recording }.filter { it.noteId != null }
+        val transcripts = parts.library.transcripts(recordings.mapNotNull { it.noteId })
+        val versions = encode(transcripts).mapValues { it.value.version }
+        return recordings.filter { recording ->
+            val version = versions[recording.noteId]
+            version != null && version != recording.transcriptUploadedVersion &&
+                version != recording.transcriptRefusedVersion
+        }.mapNotNull { it.noteId }.toSet()
     }
 
     /**
@@ -222,12 +252,12 @@ class RecorderSync(private val parts: Parts) {
     // Sync. ---------------------------------------------------------------------------------------------------------
 
     @Suppress("ReturnCount", "TooGenericExceptionCaught") // not bound, waiting for a new binding, or a sync
-    private suspend fun syncLocked(): SyncOutcome {
+    private suspend fun syncLocked(mode: SyncMode): SyncOutcome {
         val settings = store.read()
         val binding = settings.binding ?: return SyncOutcome.NotBound
         if (settings.current?.rebindNeeded == true) return SyncOutcome.RebindNeeded
         val outcome = try {
-            connectAndSync(binding)
+            connectAndSync(binding, mode)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -241,7 +271,7 @@ class RecorderSync(private val parts: Parts) {
     }
 
     @Suppress("ReturnCount") // each early end of a sync is its own outcome
-    private suspend fun connectAndSync(binding: RecorderBinding): SyncOutcome {
+    private suspend fun connectAndSync(binding: RecorderBinding, mode: SyncMode): SyncOutcome {
         val readiness = parts.radio.readiness()
         if (readiness != RadioReadiness.READY) return SyncOutcome.Unavailable(readiness)
         val key = try {
@@ -258,7 +288,7 @@ class RecorderSync(private val parts: Parts) {
             return SyncOutcome.Unreachable
         }
         return try {
-            session(link) { syncWith(it, binding.device.address, key) }
+            session(link) { syncWith(it, binding.device.address, key, mode) }
         } catch (error: XrecException) {
             when (error.failure) {
                 XrecFailure.AUTH, XrecFailure.UNBOUND -> SyncOutcome.RebindNeeded
@@ -272,7 +302,7 @@ class RecorderSync(private val parts: Parts) {
         }
     }
 
-    private suspend fun syncWith(session: Session, address: String, key: ByteArray): SyncOutcome {
+    private suspend fun syncWith(session: Session, address: String, key: ByteArray, mode: SyncMode): SyncOutcome {
         val pong = session.call { ping() }
         session.call { authenticate(key) }
         current.value = RecorderActivity.Syncing(SyncStep.CHECKING)
@@ -284,6 +314,10 @@ class RecorderSync(private val parts: Parts) {
         val versions = transcripts.mapValues { it.value.version }
         verifySuspects(session, address, SyncPlanner.suspects(listing, deviceState(address).syncState(), versions))
         val plan = SyncPlanner.plan(listing, status, deviceState(address).syncState(), versions)
+        if (mode == SyncMode.UPLOADS) {
+            val uploaded = upload(session, address, pong, plan.uploads, transcripts)
+            return SyncOutcome.Done(0, uploaded, plan.skipped.size + plan.downloads.size, plan.deviceRecording)
+        }
         var downloaded = 0
         var failed = 0
         var recording = plan.deviceRecording

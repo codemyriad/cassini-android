@@ -13,12 +13,12 @@ The user interface is plain for now. Its strings are in English only (`app/src/m
 |---|---|---|
 | `:core` | `core.recorder` | The XREC protocol: CRC, HMAC authentication, the line codec, the blocking `XrecClient`, `StreamXrecInput` and the CWX1 encoder. |
 | `:core` | `src/testFixtures` | `FakeRecorder` (the recorder's XREC state machine behind pipes) and `CwxReader` (the checks of the recorder's CWX reader). The `:core` and `:app` tests use them. |
-| `:app-logic` | `recorder/SyncPlanner.kt`, `recorder/RecorderPolicies.kt` | What a sync downloads and uploads, the clock tolerance and the "Auto sync" waits. |
+| `:app-logic` | `recorder/SyncPlanner.kt`, `recorder/RecorderPolicies.kt` | What a sync downloads and uploads, the clock tolerance, the "Auto sync" waits and the waits of a transcript that goes at once. |
 | `:data` | `data.recorder.RecorderStore` | The binding and the sync state, in `recorder/recorder.json` under the app root. |
-| `:app` | `recorder/` | `RecorderSync` (the engine), its ports, the Bluetooth, Keystore and library adapters, `RecorderRunner`, `RecorderAutoSync`, `RecorderSyncService`, and the Recorder screen. |
+| `:app` | `recorder/` | `RecorderSync` (the engine), its ports, the Bluetooth, Keystore and library adapters, `RecorderRunner`, `RecorderAutoSync`, `RecorderTranscriptPush`, `RecorderSyncService`, and the Recorder screen. |
 
-`AppGraph.recorder` makes the parts. The app makes it when it is visible for the first time, and "Auto sync" starts
-then.
+`AppGraph.recorder` makes the parts. The app makes it when it is visible for the first time, and "Auto sync" and the
+transcript push start then.
 
 ## The recorder
 
@@ -115,8 +115,26 @@ The app does not delete recordings from the recorder (`TODO(recorder-sync)` in `
 - "Auto sync": while it is on, a recorder is bound and the process lives, an attempt runs at once and then after a
   wait. The wait is 3 minutes after a sync that copied or sent a file. After a sync with nothing to do, it doubles up
   to 15 minutes. After failed attempts, it is 1 minute and doubles up to 15 minutes. An attempt starts the service
-  only when the sync has files to move, so failed attempts and checks that find nothing show no notification. A new
-  finished transcript of a copied recording starts an attempt at once. A failure of an attempt never stops the loop.
+  only when the sync has files to move, so failed attempts and checks that find nothing show no notification. A
+  failure of an attempt never stops the loop.
+- A new transcript goes to the recorder at once, also when "Auto sync" is off (`RecorderTranscriptPush`). When the
+  note of a copied recording gets its finished transcript, an upload-only sync (`SyncMode.UPLOADS`) starts: it
+  connects, authenticates, reads `STAT` and `LS`, and sends the sidecars that the recorder does not have. It does not
+  download, so a transcript does not wait behind a long download. The next full sync copies the new recordings. The
+  same check runs once when the push starts (the first time the app is visible, or after a binding), so a transcript
+  that waited before the process ended goes too.
+  - A transcript waits when the app has not sent its version and the recorder did not refuse it
+    (`RecorderSync.pendingUploads`, read without the recorder).
+  - If the recorder does not answer (it is not in Bluetooth phone mode), a sync runs, Bluetooth is off, or the sync
+    stopped, the app tries again after 30 seconds. The wait doubles after each failure, up to 5 minutes
+    (`TranscriptPushBackoff`). The tries continue while a transcript waits and the process lives.
+  - The tries stop when no transcript waits, when a sync connected (what it did not send cannot go now: the recording
+    went, or the recorder refused it), or when only the user can make the sync possible (no permission, no Bluetooth,
+    a refused key).
+  - The Recorder screen shows "Transcribed. Waiting for the recorder: put it in Bluetooth phone mode." for a transcript
+    that waits, and "Transcript sent to the recorder" after the upload.
+  - A new variant or a renamed speaker of a note that has a transcript already does not start a push; the next sync
+    sends it.
 - Android 12 and later refuse a foreground service start from the background. An app with a companion device (and
   `REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND`) is exempt. Without the exemption, the sync continues
   without the service while the process lives. The app does not use WorkManager.
@@ -147,7 +165,9 @@ device chooser are optional features (`android:required="false"`).
   an unreadable recording; a recording removed after `LS`; an import refused for lack of space; a sync that stopped
   before the transcription request; a reused name and size after a card format; a stalled link; a store that cannot
   be written; binding with a wrong PIN; a stale bond),
-  `RecorderAutoSyncTest`, `RecorderTranscriptsTest`, `GraphRecorderLibraryTest` and `RecorderViewModelTest`.
+  `RecorderAutoSyncTest`, `RecorderTranscriptPushTest` (a new transcript goes at once with "Auto sync" off and without
+  a download; an unreachable recorder is tried again with growing waits until it takes the transcript; no attempt when
+  no transcript waits), `RecorderTranscriptsTest`, `GraphRecorderLibraryTest` and `RecorderViewModelTest`.
 
 ## Limits
 

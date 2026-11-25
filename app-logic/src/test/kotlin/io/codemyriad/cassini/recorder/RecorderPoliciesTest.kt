@@ -37,6 +37,15 @@ class RecorderPoliciesTest {
         assertEquals(60_000L, AutoSyncBackoff.delayMs(1, idle = 3))
     }
 
+    @Test fun aWaitingTranscriptIsTriedAgainSoonThenEveryFiveMinutes() {
+        assertEquals(30_000L, TranscriptPushBackoff.delayMs(1))
+        assertEquals(60_000L, TranscriptPushBackoff.delayMs(2))
+        assertEquals(120_000L, TranscriptPushBackoff.delayMs(3))
+        assertEquals(240_000L, TranscriptPushBackoff.delayMs(4))
+        assertEquals(TranscriptPushBackoff.MAX_MS, TranscriptPushBackoff.delayMs(5))
+        assertEquals(TranscriptPushBackoff.MAX_MS, TranscriptPushBackoff.delayMs(Int.MAX_VALUE))
+    }
+
     @Test fun aFirmwareThatRefusedTranscriptsIsAskedAgainDailyOrAfterAChange() {
         val day = TranscriptUploadProbe.RETRY_MS
         assertTrue(TranscriptUploadProbe.mayUpload(null, null, "openfw_v5", 0))

@@ -46,6 +46,23 @@ object AutoSyncBackoff {
 }
 
 /**
+ * The waits between the attempts to send a new transcript to the recorder at once (whatever "Auto sync" is): 30 s
+ * after the first failed attempt, doubled after each failure in a row, up to [MAX_MS]. The recorder answers only in its
+ * Bluetooth phone mode, so a transcript usually waits for the user to turn that mode on; the short first waits let it
+ * go soon after.
+ */
+object TranscriptPushBackoff {
+    const val FIRST_RETRY_MS = 30_000L
+    const val MAX_MS = 5 * 60_000L
+
+    private const val MAX_DOUBLINGS = 10
+
+    /** The wait after [failures] failed attempts in a row (1 or more). */
+    fun delayMs(failures: Int): Long =
+        (FIRST_RETRY_MS shl (failures - 1).coerceIn(0, MAX_DOUBLINGS)).coerceAtMost(MAX_MS)
+}
+
+/**
  * When the app offers a transcript to a recorder whose firmware refused the `REC` target. The firmware name in `PING`
  * does not change when the recorder gets the firmware that takes transcripts, so the app asks again once a day, and at
  * once when the firmware name changes.

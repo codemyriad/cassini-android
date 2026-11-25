@@ -16,7 +16,7 @@ import java.io.File
 
 /**
  * The recorder sync of the process (docs/recorder-sync.md), made by [AppGraph.recorder]: the store, the sync, its
- * runner and "Auto sync". Auto sync starts with the feature, which the graph creates at the first ON_START.
+ * runner, "Auto sync" and the transcript push. Both start with the feature, which the graph creates at the first ON_START.
  */
 class RecorderFeature(
     context: Context,
@@ -56,14 +56,20 @@ class RecorderFeature(
         )
     }
 
-    private val autoSync = RecorderAutoSync(
+    private val autoSync = RecorderAutoSync(graph.appScope, store.settings, runner)
+
+    private val push = RecorderTranscriptPush(
         graph.appScope,
         store.settings,
         runner,
         notes.map { notes -> notes.filterValues { it.transcribed }.keys },
+        sync::pendingUploads,
     )
 
-    fun start() = autoSync.start()
+    fun start() {
+        autoSync.start()
+        push.start()
+    }
 }
 
 /** [RecorderScreenPorts] over the graph's [RecorderFeature]. */

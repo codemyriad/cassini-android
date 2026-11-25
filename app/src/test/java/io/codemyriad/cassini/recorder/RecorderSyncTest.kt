@@ -91,6 +91,30 @@ class RecorderSyncTest {
         assertEquals(listOf("Ada Lovelace", "Speaker 2"), renamed.speakers.map { it.label })
     }
 
+    @Test fun anUploadOnlySyncSendsTheWaitingTranscriptAndDownloadsNothing() = runBlocking {
+        recorder.files["REC_0001.wav"] = recording(10_000)
+        val (sync, store) = sync()
+        store.bound(key)
+        sync.sync()
+        assertEquals(emptySet<String>(), sync.pendingUploads())
+
+        library.ready["note-1"] = RecorderTranscript("v1", transcript("Standup"))
+        assertEquals(setOf("note-1"), sync.pendingUploads())
+        radio.device.files["REC_0002.wav"] = recording(10_000, seed = 2)
+        assertEquals(SyncOutcome.Done(0, 1, 1, false), sync.sync(SyncMode.UPLOADS))
+        assertTrue(radio.device.files.containsKey("REC_0001.cwx"))
+        assertEquals(listOf("note-1"), library.imported.keys.toList())
+        // Only the first 4 KiB of REC_0001.wav, the check before its first sidecar: REC_0002.wav is not downloaded.
+        assertFalse(radio.device.commands.any { it.startsWith("+XREC:GETS") && "REC_0002" in it })
+        assertEquals(emptySet<String>(), sync.pendingUploads())
+
+        // A new version waits again; the next full sync downloads the new recording.
+        library.ready["note-1"] = RecorderTranscript("v2", transcript("Standup"))
+        assertEquals(setOf("note-1"), sync.pendingUploads())
+        assertEquals(SyncOutcome.Done(1, 1, 0, false), sync.sync())
+        assertEquals(emptySet<String>(), sync.pendingUploads())
+    }
+
     @Test fun aDownloadThatLosesTheLinkResumesAtTheNextSync() = runBlocking {
         val audio = recording(10_000, seed = 7)
         recorder.files["REC_0001.wav"] = audio
