@@ -55,6 +55,62 @@ class SyncPlannerTest {
         assertEquals(setOf(SkipReason.RECORDING), plan.skipped.map { it.reason }.toSet())
     }
 
+    /** A recorder that names the file it records (STAT `rec_idx` 3) and paces a mono recording. */
+    private val namedRecording = recording.copy(recordingIndex = 3, paceMillis = 342)
+
+    private val recordingListing = listOf(
+        file("REC_0001.wav", 1_000),
+        file("REC_0002.wav", 900),
+        file("REC_0003.wav", 700),
+        file("REC_0004.wav", 44),
+        file("talk.wav", 2_000),
+    )
+
+    @Test fun whileTheRecorderRecordsOnlyTheActiveFileAndNewerOnesWait() {
+        val plan = SyncPlanner.plan(recordingListing, namedRecording, RecorderSyncState(), emptyMap(), true)
+        assertEquals(listOf("REC_0001.wav", "REC_0002.wav", "talk.wav"), plan.downloads.map { it.name })
+        assertEquals(
+            listOf(SkippedFile("REC_0003.wav", SkipReason.ACTIVE), SkippedFile("REC_0004.wav", SkipReason.ACTIVE)),
+            plan.skipped,
+        )
+        assertTrue(plan.deviceRecording)
+        assertTrue(plan.whileRecording)
+    }
+
+    @Test fun theActiveFileIsMatchedByItsNumberInAnyCase() {
+        val listing = listOf(file("rec_3.WAV", 1_000), file("REC_00002.wav", 1_000))
+        val plan = SyncPlanner.plan(listing, namedRecording, RecorderSyncState(), emptyMap(), true)
+        assertEquals(listOf("REC_00002.wav"), plan.downloads.map { it.name })
+        assertEquals(listOf(SkippedFile("rec_3.WAV", SkipReason.ACTIVE)), plan.skipped)
+    }
+
+    @Test fun withTheSettingOffEverythingWaitsForTheRecordingAsBefore() {
+        val plan = SyncPlanner.plan(recordingListing, namedRecording, RecorderSyncState(), emptyMap(), false)
+        assertTrue(plan.downloads.isEmpty())
+        assertFalse(plan.whileRecording)
+        assertEquals(setOf(SkipReason.RECORDING, SkipReason.EMPTY), plan.skipped.map { it.reason }.toSet())
+    }
+
+    @Test fun olderFirmwareWithoutTheRecordingIndexKeepsSkippingEverything() {
+        val plan = SyncPlanner.plan(recordingListing, recording, RecorderSyncState(), emptyMap(), true)
+        assertTrue(plan.downloads.isEmpty())
+        assertFalse(plan.whileRecording)
+    }
+
+    @Test fun aStereoRecordingOrAnUnnamedOneAllowsNoDownload() {
+        val stereo = namedRecording.copy(paceMillis = 30_000)
+        val none = RecorderSyncState()
+        assertTrue(SyncPlanner.plan(recordingListing, stereo, none, emptyMap(), true).downloads.isEmpty())
+        val unnamed = namedRecording.copy(recordingIndex = 0)
+        assertTrue(SyncPlanner.plan(recordingListing, unnamed, none, emptyMap(), true).downloads.isEmpty())
+        assertFalse(SyncPlanner.downloadsWhileRecording(namedRecording.copy(paceMillis = null)))
+        // Not recording: the fields change nothing.
+        val notRecording = idle.copy(recordingIndex = 0, paceMillis = 0)
+        val plan = SyncPlanner.plan(recordingListing, notRecording, RecorderSyncState(), emptyMap(), true)
+        assertEquals(4, plan.downloads.size)
+        assertFalse(plan.whileRecording)
+    }
+
     @Test fun resumesAStoppedDownloadOfTheSameFile() {
         val partial = PartialDownload("REC_0001.wav", 1_000, 640)
         val state = RecorderSyncState(partial = partial)

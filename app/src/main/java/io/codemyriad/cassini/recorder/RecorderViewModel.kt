@@ -38,6 +38,8 @@ interface RecorderScreenPorts {
 
     suspend fun setAutoSync(enabled: Boolean)
 
+    suspend fun setSyncWhileRecording(enabled: Boolean)
+
     suspend fun bind(device: RecorderDevice, pin: suspend (wrong: Boolean) -> String?): BindOutcome
 
     suspend fun forget(device: RecorderDevice)
@@ -109,6 +111,7 @@ data class RecorderUiState(
     val device: RecorderDevice? = null,
     val rebindNeeded: Boolean = false,
     val autoSync: Boolean = false,
+    val syncWhileRecording: Boolean = false,
     val activity: RecorderActivity = RecorderActivity.Idle,
     val lastSync: LastSync? = null,
     val transcriptsUnsupported: Boolean = false,
@@ -135,6 +138,8 @@ sealed interface RecorderEvent {
     data object SyncNow : RecorderEvent
 
     data class AutoSync(val enabled: Boolean) : RecorderEvent
+
+    data class SyncWhileRecording(val enabled: Boolean) : RecorderEvent
 
     data object Forget : RecorderEvent
 
@@ -172,6 +177,7 @@ class RecorderViewModel(private val ports: RecorderScreenPorts) : ViewModel() {
             device = settings.binding?.device,
             rebindNeeded = current?.rebindNeeded == true,
             autoSync = settings.autoSync,
+            syncWhileRecording = settings.syncWhileRecording,
             activity = activity,
             lastSync = current?.lastSync,
             transcriptsUnsupported = current?.transcriptsUnsupportedFirmware != null,
@@ -180,6 +186,7 @@ class RecorderViewModel(private val ports: RecorderScreenPorts) : ViewModel() {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), RecorderUiState())
 
+    @Suppress("CyclomaticComplexMethod") // one branch per event
     fun onEvent(event: RecorderEvent) {
         when (event) {
             RecorderEvent.StartBind -> bind.value = BindUi.Instructions
@@ -190,6 +197,7 @@ class RecorderViewModel(private val ports: RecorderScreenPorts) : ViewModel() {
             RecorderEvent.CancelBind -> cancelBinding()
             RecorderEvent.SyncNow -> ports.syncNow()
             is RecorderEvent.AutoSync -> viewModelScope.launch { ports.setAutoSync(event.enabled) }
+            is RecorderEvent.SyncWhileRecording -> viewModelScope.launch { ports.setSyncWhileRecording(event.enabled) }
             RecorderEvent.Forget -> state.value.device?.let { device -> viewModelScope.launch { ports.forget(device) } }
             RecorderEvent.Refresh -> readiness.value = ports.readiness()
             is RecorderEvent.OpenNote -> effectChannel.trySend(RecorderEffect.OpenNote(event.noteId))

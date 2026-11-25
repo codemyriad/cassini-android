@@ -62,4 +62,14 @@ class RecorderPoliciesTest {
         // A recorder that advertises the target (rec=1 in PONG) is used at once, even after an older refusal.
         assertTrue(TranscriptUploadProbe.mayUpload("openfw_v5", 1_000, "openfw_v5", 1_001, advertised = true))
     }
+
+    @Test fun whileTheRecorderRecordsAutoSyncPollsEveryTwoMinutesForAboutTwoHours() {
+        assertEquals(120_000L, RecordingPoll.delayMs(failures = 0, idle = 5, polls = 1))
+        assertEquals(120_000L, RecordingPoll.delayMs(failures = 0, idle = 9, polls = RecordingPoll.MAX_POLLS))
+        assertEquals(2 * 60 * 60_000L, RecordingPoll.INTERVAL_MS * RecordingPoll.MAX_POLLS)
+        // After about 2 h, or with no poll, the usual waits apply; a failed attempt keeps the failure waits.
+        assertEquals(AutoSyncBackoff.delayMs(0, 9), RecordingPoll.delayMs(0, 9, RecordingPoll.MAX_POLLS + 1))
+        assertEquals(AutoSyncBackoff.delayMs(0, 2), RecordingPoll.delayMs(0, 2, 0))
+        assertEquals(AutoSyncBackoff.delayMs(3, 0), RecordingPoll.delayMs(3, 0, 4))
+    }
 }

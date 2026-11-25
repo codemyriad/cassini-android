@@ -192,6 +192,16 @@ private fun DeviceSection(state: RecorderUiState, actions: RecorderActions) {
         }
         Switch(checked = state.autoSync, onCheckedChange = { actions.onEvent(RecorderEvent.AutoSync(it)) })
     }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Title(stringResource(R.string.recorder_sync_while_recording))
+            Body(stringResource(R.string.recorder_sync_while_recording_hint))
+        }
+        Switch(
+            checked = state.syncWhileRecording,
+            onCheckedChange = { actions.onEvent(RecorderEvent.SyncWhileRecording(it)) },
+        )
+    }
     OutlinedButton(onClick = { actions.onEvent(RecorderEvent.Forget) }, enabled = !state.busy) {
         Text(stringResource(R.string.recorder_forget))
     }

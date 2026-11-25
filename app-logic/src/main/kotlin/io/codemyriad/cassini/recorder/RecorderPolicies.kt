@@ -91,3 +91,24 @@ object TranscriptUploadProbe {
     ): Boolean =
         advertised || refusedFirmware != firmware || refusedAt == null || now - refusedAt !in 0 until RETRY_MS
 }
+
+/**
+ * "Sync while the recorder records" (docs/BT_SYNC_SPEED_AND_RECORDING.md A6): while the recorder records and a sync
+ * ended with files that wait for the recording (its active file, a download or a transcript the recorder takes only
+ * after it), the next attempt comes after a fixed [INTERVAL_MS], without the idle doubling of [AutoSyncBackoff], for at
+ * most [MAX_POLLS] attempts in a row (about 2 h). Then the waits of [AutoSyncBackoff] apply again. A failed attempt
+ * keeps the failure waits.
+ */
+object RecordingPoll {
+    const val INTERVAL_MS = 2 * 60_000L
+
+    /** The polls in a row after which the usual waits apply: 60 of 2 min, about 2 h. */
+    const val MAX_POLLS = 60
+
+    /**
+     * The wait of "Auto sync" after [failures] failed attempts in a row, [idle] idle syncs in a row and [polls] syncs in
+     * a row that ended with files waiting for the recording.
+     */
+    fun delayMs(failures: Int, idle: Int, polls: Int): Long =
+        if (failures == 0 && polls in 1..MAX_POLLS) INTERVAL_MS else AutoSyncBackoff.delayMs(failures, idle)
+}

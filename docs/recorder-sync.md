@@ -13,7 +13,7 @@ The user interface is plain for now. Its strings are in English only (`app/src/m
 |---|---|---|
 | `:core` | `core.recorder` | The XREC protocol: CRC, HMAC authentication, the line codec, the blocking `XrecClient`, `StreamXrecInput` and the CWX1 encoder. |
 | `:core` | `src/testFixtures` | `FakeRecorder` (the recorder's XREC state machine behind pipes) and `CwxReader` (the checks of the recorder's CWX reader). The `:core` and `:app` tests use them. |
-| `:app-logic` | `recorder/SyncPlanner.kt`, `recorder/RecorderPolicies.kt` | What a sync downloads and uploads, the clock tolerance, the "Auto sync" waits and the waits of a transcript that goes at once. |
+| `:app-logic` | `recorder/SyncPlanner.kt`, `recorder/RecorderPolicies.kt` | What a sync downloads and uploads, the clock tolerance, the "Auto sync" waits, the 2-minute poll while the recorder records, and the waits of a transcript that goes at once. |
 | `:data` | `data.recorder.RecorderStore` | The binding and the sync state, in `recorder/recorder.json` under the app root. |
 | `:app` | `recorder/` | `RecorderSync` (the engine), its ports, the Bluetooth, Keystore and library adapters, `RecorderRunner`, `RecorderAutoSync`, `RecorderTranscriptPush`, `RecorderSyncService`, and the Recorder screen. |
 
@@ -60,10 +60,14 @@ One sync runs at a time (a `Mutex`). A sync does these steps:
 
 1. Connect, then `CHAL` and `AUTH` with the stored key. If the recorder replies `ERR,AUTH` or `ERR,UNBOUND` (for
    example, a different phone bound it), the app shows "Bind again" and stops all syncs until the user binds again.
-2. `STAT`. While the recorder records (media 33), no download starts. Before each download after the first, the app
-   sends `STAT` again, and stops the downloads if a recording started.
-3. `RTC`. If the recorder's clock is more than 5 seconds from the phone's local time, the app sets it.
-4. `LS`, then `SyncPlanner` decides. The sync identity of a recording is its name and size. A recording with the same
+2. `LS`, then `STAT` (in this order: a recording that starts after `STAT` is not in the listing, so its growing file
+   is never planned). While the recorder records (media 33), no download starts, unless "Sync while the recorder
+   records" is on and the firmware can do it (see "While the recorder records" below). Before each download after the
+   first, the app sends `STAT` again, and stops the downloads if a recording started; it does not when the setting is
+   on and the firmware names its active file.
+3. `RTC`. If the recorder's clock is more than 5 seconds from the phone's local time, the app sets it. While the
+   recorder records, the app neither reads nor sets the clock (the firmware would not apply it); the next sync does.
+4. `SyncPlanner` decides. The sync identity of a recording is its name and size. A recording with the same
    name and a different size is a new recording (the recorder numbers from 1 again after a card format). The app also
    keeps the SHA-256 of the first 4 KiB of each recording. When the listing has a copied recording but not its
    sidecar, although the app sent one or has one to send, the app downloads the first 4 KiB again and compares them.
@@ -79,8 +83,9 @@ One sync runs at a time (a `Mutex`). A sync does these steps:
    frames to its MTU); the end is the listed size, and an empty frame at the expected offset means the file is
    shorter than listed. Each finished download logs its bytes, time, KB/s, retries and `GETS` count at INFO with the
    tag `Recorder`; the Recorder screen shows the speed of the last sync ("Downloaded: 2 (102 KB/s)").
-   A download that stops (a lost link, process death) continues from the length of the `.part` file at the next
-   sync. Then the app imports the file (`ImportRepository.import`, title = the file name without `.wav`) and asks
+   The `.part` file is written through a 64 KiB buffer, flushed before `fd.sync()` and before a stopped download
+   stores its length. A download that stops (a lost link, process death) continues from the length of the `.part`
+   file at the next sync. Then the app imports the file (`ImportRepository.import`, title = the file name without `.wav`) and asks
    for a transcription (`ProcessingCoordinator.transcribe`, origin AUTOMATIC). Without model consent, the note waits
    for consent, as a recording does. The app asks for the transcription before it writes the state. If the sync stopped
    between the import and that request, the next import finds the note (same bytes), and the app asks then, when the
@@ -112,6 +117,48 @@ A call to the recorder that makes no progress for 60 seconds closes the link (a 
 themselves, but a blocked socket write does not. A cancelled sync closes the link too.
 
 The app does not delete recordings from the recorder (`TODO(recorder-sync)` in `RecorderSync`).
+
+## While the recorder records
+
+The recorder firmware of branch `feat/bt-sync-rec-hardening` (open_fw, `docs/XREC_PROTOCOL.md` section 5.5 in the
+firmware repository, design `docs/BT_SYNC_SPEED_AND_RECORDING.md` stage S4) can move finished recordings while it
+records. The recording always wins: the firmware paces the transfers and refuses what could disturb it. The app's side:
+
+- **Detection.** Such a firmware appends two numeric fields to `STAT`: `rec_idx` (the `NNNN` of the `REC_NNNN.wav` it
+  records, 0 = none) and `pace_ms` (0 when it does not record; about 342 ms during a mono recording; 30000 during a
+  stereo recording). The app reads the first 8 fields as numbers and fields 9 and 10 when they are numbers
+  (`XrecReply.Status.recordingIndex`, `paceMillis`). Without field 9 (older open_fw), nothing changes: every download
+  waits while `media` is 33.
+- **The setting.** "Sync while the recorder records" on the Recorder screen, **off by default**
+  (`RecorderSettings.syncWhileRecording`). Off: the old rule (no download while the recorder records). On: the
+  firmware decides whether it can.
+- **Downloads.** With the setting on, a recording in progress (`media` 33), `rec_idx` > 0 and `pace_ms` up to 10 s,
+  `SyncPlanner` downloads the finished recordings and skips only `REC_<rec_idx>.wav` and any `REC_NNNN.wav` with a
+  higher number (`SkipReason.ACTIVE`). A stereo recording (`pace_ms` 30000) allows no transfer (mono only, decision 5
+  of the design): all downloads wait, as before. While the recorder records, each `GETS` asks for 16 KiB
+  (`XrecLimits.RECORDING_GETS_WINDOW`) and the client waits `pace_ms` between two windows. The firmware caps the rate
+  (about 48 KB/s) on its side too.
+- **`ERR,BUSY`.** The firmware refuses the file it records. A download that gets `BUSY` (a recording started after
+  `STAT`) is skipped for this sync; its `.part` file goes, and the next sync lists it again.
+- **`ERR,LATER,<ms>`** in place of a `GETS` frame (a stereo recording started during the stream): the bytes so far stay
+  in the `.part` file. The app waits `min(<ms>, 30 s)` on the open link and continues from the same offset, without
+  counting a failure. After 2 minutes of such waits for one file, the file and the rest of the downloads wait for the
+  next sync (`skipped`, not `failed`); the stopped download resumes then.
+- **Transcripts.** The firmware takes no card write while it records: `PUT` and `PUTEND` answer `ERR,LATER` (the
+  payload of a refused chunk is discarded, not read as commands). When `STAT` shows a recording and names its file, the
+  app does not try: the transcripts wait (`SyncOutcome.Done.deferredUploads`). A `LATER` during an upload (a recording
+  that started meanwhile) ends the uploads of this sync the same way. A waiting transcript is not a failure: its record
+  keeps no failure, and the transcript push tries again after 2 minutes, at most 60 times in a row (about 2 hours),
+  unless "Auto sync" is on: then its syncs send the transcript, and the push stops, so that no second loop calls the
+  recorder.
+- **Poll.** With "Auto sync" on, a sync that ran during a recording with the setting on and ended with files waiting
+  for it (the active file, a deferred download or transcript) sets `SyncOutcome.Done.recordingPoll`. The next attempt
+  then comes after a fixed 2 minutes (`RecordingPoll`), without the idle doubling, for at most 60 attempts in a row
+  (about 2 hours); then the usual waits of `AutoSyncBackoff` apply. A failed attempt keeps the failure waits. The sync
+  disconnects when it is done, as always: no link stays open between polls.
+
+Not done here (stage S5 of the design): the recorder's radio still runs only in its Bluetooth phone mode, and the
+companion device presence (the recorder paging the phone after a recording) does not start a sync yet.
 
 ## What runs when
 
@@ -175,14 +222,23 @@ device chooser are optional features (`android:required="false"`).
 - `:core`: `FakeRecorder` models the firmware of branch fix/xrec-cwx-sidecar when `recordTarget` is true (the refused
   payload is discarded, `ERR,NOENT` for a sidecar without its recording, a repeated `PUTEND` is answered again, `DEL`
   of a recording deletes its sidecar, names are case-insensitive), and the older firmware when it is false.
+- `:core`: `FakeRecorder` with `syncsWhileRecording` models the firmware of branch feat/bt-sync-rec-hardening while it
+  records: `STAT` with `rec_idx` and `pace_ms`, `ERR,BUSY` for the newest `.wav` (the active file), `ERR,LATER,30000`
+  for `DEL`, `PUT` and `PUTEND`, `OK,RTC,LATER`, the `GETS` rate cap, a stereo recording that answers `GETS` with
+  `LATER`, and `laterAtFrame` (a `LATER` in place of a frame).
 - `:app`: `RecorderSyncTest` (a new recording to import, transcription and sidecar upload, also after a speaker
   rename; resume after a lost link and after process death; a recording in progress or one that starts during the
   sync; a refused key; old firmware asked again after a day; a sidecar whose recording went; a refused sidecar name;
   an unreadable recording; a recording removed after `LS`; an import refused for lack of space; a sync that stopped
   before the transcription request; a reused name and size after a card format; a stalled link; a store that cannot
   be written; binding with a wrong PIN; a stale bond; a transcript that finishes during the downloads; a full sync
-  that waits for an upload-only one),
-  `RecorderAutoSyncTest`, `RecorderTranscriptPushTest` (a new transcript goes at once with "Auto sync" off and without
+  that waits for an upload-only one; while the recorder records: the finished recordings go in 16 KiB windows and the
+  active file waits, with LS before STAT and no clock; an older firmware and the setting off keep skipping everything;
+  a `LATER` waits and the download continues; repeated `LATER`s defer the downloads to the next sync; a `BUSY` file
+  is skipped; a transcript refused with `LATER` waits without a failure),
+  `RecorderAutoSyncTest` (the 2-minute poll while the recorder records, and the usual waits with the setting off),
+  `RecorderTranscriptPushTest` (a transcript held by a recording is tried every 2 minutes and goes after it, or is
+  left to "Auto sync";a new transcript goes at once with "Auto sync" off and without
   a download; a transcript that waits at the start goes; an unreachable recorder is tried again with growing waits
   until it takes the transcript, and at most 25 times; a sync that fails each time is tried 3 times; a recording that
   left the recorder ends the push after one sync; a busy recorder is no failure and a full sync takes the new
@@ -192,6 +248,9 @@ device chooser are optional features (`android:required="false"`).
 
 - Only one recorder is bound at a time.
 - The app syncs only while the recorder is in Bluetooth phone mode and the app process lives.
+- While the recorder records, only finished recordings of a mono recording move, and only with "Sync while the
+  recorder records" on and a recorder firmware that names its active file; transcripts wait for the end of the
+  recording.
 - The app imports only 16-bit PCM WAV. The importer refuses an IMA-ADPCM WAV; the screen shows "Not imported (WAV)",
   and the app does not download that file again.
 - A note that the user deletes stays in the record of the recorder. The app does not copy that recording again.

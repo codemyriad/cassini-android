@@ -108,6 +108,24 @@ class XrecProtocolTest {
         assertFalse((XrecReplies.parse("+XREC:STAT,87,3990,0,0,16,0,1500,7600") as XrecReply.Status).recording)
         assertTrue(XrecReplies.parse("+XREC:STAT,87,x,0,0,16,0,1500,7600") is XrecReply.Other)
         assertTrue(XrecReplies.parse("+XREC:STAT,87") is XrecReply.Other)
+        assertNull(stat.recordingIndex)
+        assertFalse(stat.namesActiveFile)
+    }
+
+    @Test fun parsesTheStatFieldsOfSyncWhileRecording() {
+        val stat = XrecReplies.parse("+XREC:STAT,87,3990,0,0,33,12,1500,7600,7,342") as XrecReply.Status
+        assertEquals(XrecReply.Status(87, 3990, 0, false, 33, 12, 1500, 7600, 7, 342), stat)
+        assertTrue(stat.namesActiveFile)
+        val idle = XrecReplies.parse("+XREC:STAT,87,3990,0,0,16,0,1500,7600,0,0") as XrecReply.Status
+        assertEquals(0L, idle.recordingIndex)
+        assertTrue(idle.namesActiveFile)
+        // Later fields, and fields that are not numbers after the eighth, do not make the reply unreadable.
+        val extra = XrecReplies.parse("+XREC:STAT,87,3990,0,0,33,12,1500,7600,7,342,future,9") as XrecReply.Status
+        assertEquals(7L, extra.recordingIndex)
+        val odd = XrecReplies.parse("+XREC:STAT,87,3990,0,0,33,12,1500,7600,x") as XrecReply.Status
+        assertNull(odd.recordingIndex)
+        assertNull(odd.paceMillis)
+        assertEquals(7600L, odd.totalMb)
     }
 
     @Test fun parsesRtc() {
@@ -132,12 +150,18 @@ class XrecProtocolTest {
         val err = XrecReplies.parse("+XREC:ERR,NOENT") as XrecReply.Failed
         assertEquals(XrecFailure.NOT_FOUND, err.failure)
         assertEquals(XrecFailure.OTHER_DEVICE_ERROR, XrecReply.Failed("NEW").failure)
+        val later = XrecReplies.parse("+XREC:ERR,LATER,30000") as XrecReply.Failed
+        assertEquals(XrecFailure.LATER, later.failure)
+        assertEquals(30_000L, later.retryAfterMillis)
+        assertNull(XrecReply.Failed("LATER").retryAfterMillis)
+        assertNull(err.retryAfterMillis)
     }
 
     @Test fun mapsEveryDeviceReason() {
         val reasons = listOf(
             "LOCKED", "AUTH", "UNBOUND", "NOCHAL", "PAIRCLOSED", "PIN", "BADKEY", "SAVE", "NOENT", "NOSD", "NAME",
             "BUSY", "DEL", "CRC", "OFF", "ARG", "ARGS", "UNSUP", "SDIO", "CMD", "LINE", "RTCRNG", "RTC", "NOPUT",
+            "LATER",
         )
         reasons.forEach { assertEquals(it, XrecFailure.ofReason(it).reason) }
     }

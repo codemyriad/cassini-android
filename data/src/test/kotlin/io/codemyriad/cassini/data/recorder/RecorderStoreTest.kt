@@ -55,6 +55,7 @@ class RecorderStoreTest {
         val settings = RecorderSettings(
             binding = RecorderBinding(device, "wrapped-key"),
             autoSync = true,
+            syncWhileRecording = true,
             devices = mapOf(device.address to state, "AA:BB:CC:DD:EE:FF" to RecorderDeviceState()),
         )
         RecorderStore(file, Dispatchers.IO).update { settings }

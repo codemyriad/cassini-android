@@ -1,5 +1,5 @@
 // A test double that mirrors the firmware's C handlers, early returns and compound checks included.
-@file:Suppress("ReturnCount", "ComplexCondition", "CyclomaticComplexMethod", "TooManyFunctions")
+@file:Suppress("ReturnCount", "ComplexCondition", "CyclomaticComplexMethod", "TooManyFunctions", "LongParameterList")
 
 package io.codemyriad.cassini.core.recorder
 
@@ -32,6 +32,15 @@ import java.util.Collections
  * committed PUTEND, once), [unreadable] (GETS of these names gives `ERR,SDIO`), [refusedNames] (a `REC` header with
  * one of these names gives `ERR,NAME`), and the hooks [beforeGets], [beforePut] and [beforePutEnd]. [reconnect] opens
  * a new link to the same device.
+ *
+ * [syncsWhileRecording] true is the firmware of branch feat/bt-sync-rec-hardening (docs/XREC_PROTOCOL.md 5.5) while it
+ * [recording]s: the newest `.wav` is the file being recorded. STAT has the fields `rec_idx` (its number) and `pace_ms`;
+ * GETS of the active file and DEL of it answer `ERR,BUSY`; DEL of another file, a `REC` / `CAS` PUT header or chunk
+ * and PUTEND of a staged upload answer `ERR,LATER,30000` (the payload is eaten, the staged upload stays); a clock set
+ * answers `OK,RTC,LATER`; GETS payload is capped at [recordingRate] bytes per second; a [stereo] recording answers
+ * GETS with `ERR,LATER,30000`. [laterAtFrame] sends `ERR,LATER,30000` in place of the GETS frame at that offset and
+ * ends the window (once), as when a stereo recording starts during a stream. [laterReplies] counts the LATER replies.
+ * False is the older open_fw: STAT has 8 fields and nothing waits for the end of a recording.
  */
 class FakeRecorder(
     @Volatile var key: ByteArray? = null,
@@ -41,6 +50,10 @@ class FakeRecorder(
     @Volatile var recordTarget: Boolean = true,
     /** The firmware field of PONG; the stock firmware names `pen133`. */
     @Volatile var firmware: String = "openfw_v5",
+    @Volatile var syncsWhileRecording: Boolean = false,
+    @Volatile var stereo: Boolean = false,
+    /** The GETS payload cap while a mono recording runs, in bytes per second; 0 for none. */
+    @Volatile var recordingRate: Int = RECORDING_RATE,
 ) : Closeable {
     val files: MutableMap<String, ByteArray> = Collections.synchronizedMap(LinkedHashMap())
     val cassini: MutableMap<String, ByteArray> = Collections.synchronizedMap(LinkedHashMap())
@@ -53,6 +66,13 @@ class FakeRecorder(
 
     /** The device closes the link instead of sending the GETS frame at this offset (once). */
     @Volatile var disconnectAtFrame: Long? = null
+
+    /** The device answers `ERR,LATER,30000` instead of the GETS frame at this offset, and ends the window (once). */
+    @Volatile var laterAtFrame: Long? = null
+
+    /** The `ERR,LATER` and `OK,RTC,LATER` replies the device sent. */
+    @Volatile var laterReplies = 0
+        private set
 
     /** The device commits the next PUTEND and sends no reply (once). */
     @Volatile var dropPutEndAck = false
@@ -115,7 +135,17 @@ class FakeRecorder(
      */
     fun reconnect(): FakeRecorder {
         close()
-        val next = FakeRecorder(key, pairingPin, mtu, recording, recordTarget, firmware)
+        val next = FakeRecorder(
+            key,
+            pairingPin,
+            mtu,
+            recording,
+            recordTarget,
+            firmware,
+            syncsWhileRecording,
+            stereo,
+            recordingRate,
+        )
         synchronized(files) { next.files.putAll(files) }
         synchronized(cassini) { next.cassini.putAll(cassini) }
         next.dropFrames += dropFrames
@@ -127,6 +157,7 @@ class FakeRecorder(
         next.beforeGets = beforeGets
         next.disconnectAtFrame = disconnectAtFrame
         next.dropPutEndAck = dropPutEndAck
+        next.laterAtFrame = laterAtFrame
         next.beforePut = beforePut
         next.beforePutEnd = beforePutEnd
         return next
@@ -203,8 +234,9 @@ class FakeRecorder(
             }
             cmd.startsWith("AUTH,") -> auth(cmd.removePrefix("AUTH,"))
             !authenticated -> err("LOCKED")
-            cmd == "STAT" -> reply("+XREC:STAT,87,3990,0,0,${if (recording) "33,12" else "16,0"},1500,7600")
+            cmd == "STAT" -> stat()
             cmd == "RTC" -> reply("+XREC:RTC,2026-11-25 10:11:12,2")
+            cmd.startsWith("RTC,") && waitsForRecording() -> later("+XREC:OK,RTC,LATER")
             cmd.startsWith("RTC,") -> reply("+XREC:OK,RTC")
             cmd == "LS" -> {
                 synchronized(files) { files.forEach { (name, data) -> reply("+XREC:F,${data.size},$name") } }
@@ -215,6 +247,30 @@ class FakeRecorder(
             cmd == "PUTEND" -> putEnd()
             else -> err("CMD")
         }
+    }
+
+    private fun stat() {
+        val base = "+XREC:STAT,87,3990,0,0,${if (recording) "33,12" else "16,0"},1500,7600"
+        if (!syncsWhileRecording) return reply(base)
+        val index = activeFile()?.let { REC_NAME.matchEntire(it)?.groupValues?.get(1)?.toLong() } ?: 0L
+        val pace = when {
+            !recording -> 0L
+            stereo || recordingRate <= 0 -> LATER_MS
+            else -> (XrecLimits.RECORDING_GETS_WINDOW * 1000L + recordingRate - 1) / recordingRate
+        }
+        reply("$base,$index,$pace")
+    }
+
+    /** The firmware that syncs while it records, and records now. */
+    private fun waitsForRecording() = syncsWhileRecording && recording
+
+    /** The file being recorded: the newest `.wav`. */
+    private fun activeFile(): String? =
+        if (waitsForRecording()) synchronized(files) { files.keys.lastOrNull { XrecNames.isWav(it) } } else null
+
+    private fun later(text: String = "+XREC:ERR,LATER,$LATER_MS") {
+        laterReplies++
+        reply(text)
     }
 
     private fun pong() {
@@ -258,7 +314,13 @@ class FakeRecorder(
         beforeGets?.invoke(name)
         if (!XrecNames.isSafe(name)) return err("NAME")
         if (name in unreadable) return err("SDIO")
-        val data = find(name)?.let(files::get) ?: return err("NOENT")
+        val found = find(name)
+        if (found != null && found == activeFile()) return err("BUSY")
+        if (waitsForRecording() && stereo) return later()
+        val data = found?.let(files::get) ?: return err("NOENT")
+        val paced = waitsForRecording() && recordingRate > 0
+        val started = System.nanoTime()
+        var sent = 0L
         var at = offset
         var remaining = total
         while (remaining > 0) {
@@ -266,6 +328,17 @@ class FakeRecorder(
             val got = if (at >= data.size) 0 else minOf(want.toLong(), data.size - at).toInt()
             val from = at.toInt().coerceAtMost(data.size)
             val payload = data.copyOfRange(from, from + got)
+            if (laterAtFrame == at) {
+                laterAtFrame = null
+                return later()
+            }
+            if (paced) {
+                // The token bucket of the firmware, without its burst: the payload leaves at the capped rate.
+                val due = started + sent * NANOS_PER_SECOND / recordingRate
+                val wait = due - System.nanoTime()
+                if (wait > 0) Thread.sleep(wait / NANOS_PER_MILLI, (wait % NANOS_PER_MILLI).toInt())
+                sent += got
+            }
             sendFrame(at, payload)
             at += got
             remaining -= got
@@ -298,6 +371,7 @@ class FakeRecorder(
         if (!XrecNames.isSafe(name)) return err("NAME")
         val found = find(name)
         if (recording && found != null && found == files.keys.lastOrNull()) return err("BUSY")
+        if (waitsForRecording()) return later()
         if (found == null || files.remove(found) == null) return err("DEL")
         if (recordTarget && XrecNames.isWav(found)) XrecNames.sidecarFor(found)?.let(::find)?.let(files::remove)
         reply("+XREC:OK,DEL")
@@ -330,6 +404,10 @@ class FakeRecorder(
             }
             else -> return refuse(length, "ARG")
         }
+        if (waitsForRecording()) {
+            laterReplies++
+            return refuse(length, "LATER,$LATER_MS")
+        }
         commands += "+XREC:PUT,$offset,$length,$crc,${header.target},${header.name}:"
         putBuffer.reset()
         put = header
@@ -351,6 +429,7 @@ class FakeRecorder(
     private fun putComplete(header: PutHeader, received: ByteArray) {
         beforePut?.invoke(header.offset)
         if (!authenticated) return err("LOCKED")
+        if (waitsForRecording()) return later()
         val payload = received.copyOf()
         if (corruptPutChunks.remove(header.offset)) payload[0] = (payload[0].toInt() xor 0x5A).toByte()
         if (Crc16CcittFalse.compute(payload) != header.crc) return err("CRC")
@@ -385,6 +464,7 @@ class FakeRecorder(
 
     private fun putEnd() {
         beforePutEnd?.invoke()
+        if (waitsForRecording() && staged != null) return later()
         val current = staged
         if (current == null) {
             val total = committed ?: return err("NOPUT")
@@ -421,14 +501,22 @@ class FakeRecorder(
         fromDevice.flush()
     }
 
-    private companion object {
-        const val PIPE_BYTES = 256 * 1024
-        const val JOIN_MILLIS = 2_000L
-        const val CR = '\r'.code
-        const val LF = '\n'.code
-        const val COLON = ':'.code
-        const val PUT_MIN = 14
-        const val MAX_PAIR_FAILS = 5
-        const val SIDECAR_EXTENSION = 4
+    companion object {
+        /** The firmware's GETS cap while a mono recording runs (`XREC_REC_GETS_RATE_BPS`). */
+        const val RECORDING_RATE = 48_000
+
+        /** The `<ms>` of the firmware's `ERR,LATER` (`XREC_LATER_MS`). */
+        const val LATER_MS = 30_000L
+        private val REC_NAME = Regex("REC_([0-9]+)\\.wav", RegexOption.IGNORE_CASE)
+        private const val NANOS_PER_SECOND = 1_000_000_000L
+        private const val NANOS_PER_MILLI = 1_000_000L
+        private const val PIPE_BYTES = 256 * 1024
+        private const val JOIN_MILLIS = 2_000L
+        private const val CR = '\r'.code
+        private const val LF = '\n'.code
+        private const val COLON = ':'.code
+        private const val PUT_MIN = 14
+        private const val MAX_PAIR_FAILS = 5
+        private const val SIDECAR_EXTENSION = 4
     }
 }

@@ -255,6 +255,42 @@ class RecorderTranscriptPushTest {
         assertEquals(1, waits.size)
     }
 
+    @Test fun aTranscriptThatWaitsForTheRecordingIsTriedEveryTwoMinutesWithoutAFailure() = runBlocking {
+        start()
+        // The recorder records now, with the firmware that takes no card write until the recording ends.
+        radio.device.syncsWhileRecording = true
+        radio.device.recording = true
+        transcriptReady()
+        withTimeout(TIMEOUT_MS) { while (waits.size < 1) delay(10) }
+        proceed.send(Unit)
+        withTimeout(TIMEOUT_MS) { while (waits.size < 2) delay(10) }
+        assertEquals(listOf(RecordingPoll.INTERVAL_MS, RecordingPoll.INTERVAL_MS), waits.toList())
+        assertFalse(uploaded())
+        assertEquals(null, store.read().current!!.recordings.single().failure)
+
+        // The recording ends: the next try sends the transcript, and the tries end.
+        radio.device.recording = false
+        proceed.send(Unit)
+        withTimeout(TIMEOUT_MS) { while (!uploaded()) delay(10) }
+        delay(SETTLE_MS)
+        assertEquals(2, waits.size)
+    }
+
+    @Test fun withAutoSyncOnATranscriptThatWaitsForTheRecordingIsLeftToItsSyncs() = runBlocking {
+        start()
+        store.update { it.copy(autoSync = true) }
+        radio.device.syncsWhileRecording = true
+        radio.device.recording = true
+        val opens = radio.opens
+        transcriptReady()
+        withTimeout(TIMEOUT_MS) { while (radio.opens == opens) delay(10) }
+        delay(SETTLE_MS)
+        // One upload-only sync; then "Auto sync" sends the transcript, so the push starts no second loop.
+        assertEquals(opens + 1, radio.opens)
+        assertTrue(waits.isEmpty())
+        assertFalse(uploaded())
+    }
+
     private companion object {
         const val TIMEOUT_MS = 10_000L
         const val SETTLE_MS = 300L

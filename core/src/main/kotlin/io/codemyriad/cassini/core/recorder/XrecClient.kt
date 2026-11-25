@@ -49,7 +49,8 @@ data class XrecDownloadStats(
  * acknowledges an identical resend without writing it twice). [maxRetries] bounds the consecutive failed attempts of
  * one transfer.
  */
-@Suppress("TooManyFunctions", "ThrowsCount") // One protocol session; each failure throws its own typed error.
+// One protocol session; each failure throws its own typed error; the constructor takes the seams of the tests.
+@Suppress("TooManyFunctions", "ThrowsCount", "LongParameterList")
 class XrecClient(
     private val input: XrecInput,
     private val output: OutputStream,
@@ -57,6 +58,8 @@ class XrecClient(
     private val clock: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
     private val maxRetries: Int = DEFAULT_RETRIES,
     getsWindow: Int = XrecLimits.GETS_WINDOW,
+    /** Waits between two GETS windows of a paced download; interruptible. */
+    private val sleep: (Long) -> Unit = Thread::sleep,
 ) {
     private val buffer = ByteArray(BUFFER_BYTES)
     private val scratch = ByteArray(BUFFER_BYTES)
@@ -136,22 +139,35 @@ class XrecClient(
      * that still come after the new GETS are skipped by their offset, within [STALE_BUDGET] bytes. A download that
      * ends while a repeated window can still stream drains the link and resyncs before it returns, so the next command
      * starts on a quiet link. [lastDownload] holds the measurements when the download ends.
+     *
+     * While the recorder records, [window] lowers the GETS window ([XrecLimits.RECORDING_GETS_WINDOW]) and
+     * [pauseMillis] (STAT `pace_ms`) waits between two windows. `ERR,LATER,<ms>` in place of a frame fails with
+     * [XrecFailure.LATER]: the bytes up to [XrecException]'s offset are in [sink], and a new download continues there.
      */
+    // The file, the sink, the resume point and the pacing of one download; one loop with its recovery.
+    @Suppress("LongParameterList", "CyclomaticComplexMethod")
     fun download(
         name: String,
         size: Long,
         sink: OutputStream,
         resumeOffset: Long = 0,
+        window: Int? = null,
+        pauseMillis: Long = 0,
         progress: (Long) -> Unit = {},
     ): Long {
         require(size in 0..XrecLimits.MAX_OFFSET + 1 && resumeOffset in 0..size) { "Bad size or resume offset" }
+        require(window == null || window > 0) { "Bad GETS window" }
         val started = clock()
         val transfer = Transfer(resumeOffset)
         val heartbeat = { progress(transfer.offset) }
-        getsWindow = baseWindow
+        getsWindow = window?.let { minOf(it, baseWindow) } ?: baseWindow
         var failures = 0
         while (transfer.offset < size) {
             val before = transfer.offset
+            if (pauseMillis > 0 && transfer.requests > 0) {
+                sleep(pauseMillis)
+                heartbeat()
+            }
             try {
                 burst(name, size, transfer, sink, progress)
             } catch (e: XrecException) {
@@ -395,7 +411,12 @@ class XrecClient(
     }
 
     private fun unexpected(reply: XrecReply): XrecException = when (reply) {
-        is XrecReply.Failed -> XrecException(reply.failure, "The recorder replied ERR,${reply.reason}", reply.reason)
+        is XrecReply.Failed -> XrecException(
+            reply.failure,
+            "The recorder replied ERR,${reply.reason}",
+            reply.reason,
+            retryAfterMillis = reply.retryAfterMillis,
+        )
         else -> XrecException(XrecFailure.PROTOCOL, "Unexpected reply $reply")
     }
 

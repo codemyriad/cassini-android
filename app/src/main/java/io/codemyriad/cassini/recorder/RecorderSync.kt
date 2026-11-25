@@ -7,6 +7,7 @@ import io.codemyriad.cassini.core.recorder.XrecClient
 import io.codemyriad.cassini.core.recorder.XrecDownloadStats
 import io.codemyriad.cassini.core.recorder.XrecException
 import io.codemyriad.cassini.core.recorder.XrecFailure
+import io.codemyriad.cassini.core.recorder.XrecLimits
 import io.codemyriad.cassini.core.recorder.XrecNames
 import io.codemyriad.cassini.core.recorder.XrecReply
 import io.codemyriad.cassini.core.recorder.XrecTimeouts
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
+import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -91,9 +93,11 @@ data class DownloadSpeed(val bytes: Long, val millis: Long, val retries: Int) {
 /** How one sync ended. */
 sealed interface SyncOutcome {
     /**
-     * The sync ran. [skipped] counts the new files it did not download (none while [deviceRecording]), [failed] the
-     * files it could not download or import this time (the next sync tries them again). [speed] measures the
-     * downloads that completed.
+     * The sync ran. [skipped] counts the new files it did not download (those that wait for a recording included),
+     * [failed] the files it could not download or import this time (the next sync tries them again). [speed] measures
+     * the downloads that completed. [deferredUploads] counts the transcripts that the recorder takes only after its
+     * recording (`ERR,LATER`); [recordingPoll] is true when the recorder records, "Sync while the recorder records" is
+     * on and files wait for the end of the recording: "Auto sync" checks again after [RecordingPoll.INTERVAL_MS].
      */
     data class Done(
         val downloaded: Int,
@@ -102,6 +106,8 @@ sealed interface SyncOutcome {
         val deviceRecording: Boolean,
         val failed: Int = 0,
         val speed: DownloadSpeed? = null,
+        val deferredUploads: Int = 0,
+        val recordingPoll: Boolean = false,
     ) : SyncOutcome {
         /** Nothing moved: "Auto sync" waits longer before the next attempt. */
         val idle: Boolean get() = downloaded == 0 && uploaded == 0
@@ -164,6 +170,11 @@ sealed interface BindOutcome {
  * sends each finished transcript that the recorder does not have as the CWX sidecar `REC,<stem>.cwx`. The state is
  * written after each file, so a sync that stops loses at most the file in progress.
  *
+ * While the recorder records, a firmware that names the file it records (STAT `rec_idx`) lets the finished recordings
+ * go at its pace when "Sync while the recorder records" is on ([SyncPlanner]); it answers `ERR,LATER,<ms>` to what
+ * must wait for the end of the recording: a download waits and continues within [LATER_BUDGET_MS] per file, then waits
+ * for the next sync, and transcripts wait for the end of the recording ([SyncOutcome.Done.deferredUploads]).
+ *
  * A link failure or a timeout ends the sync quietly: the recorder's radio is on only while it is in Bluetooth phone
  * mode. A file that fails for another reason is skipped, and the sync goes on. A refused key marks the recorder
  * "re-bind needed", and no sync runs until it is bound again. No failure escapes [sync] or [bind]: they run in the
@@ -190,6 +201,8 @@ class RecorderSync(private val parts: Parts) {
          * write does not, and ignores interrupts.
          */
         val stallMillis: Long = DEFAULT_STALL_MS,
+        /** The wait after an `ERR,LATER` of a download, on the open link. */
+        val wait: suspend (Long) -> Unit = { delay(it) },
     )
 
     private val store = parts.store
@@ -304,6 +317,10 @@ class RecorderSync(private val parts: Parts) {
         store.update { it.copy(autoSync = enabled) }
     }
 
+    suspend fun setSyncWhileRecording(enabled: Boolean) {
+        store.update { it.copy(syncWhileRecording = enabled) }
+    }
+
     // Sync. ---------------------------------------------------------------------------------------------------------
 
     @Suppress("ReturnCount", "TooGenericExceptionCaught") // not bound, waiting for a new binding, or a sync
@@ -357,24 +374,43 @@ class RecorderSync(private val parts: Parts) {
         }
     }
 
+    @Suppress("LongMethod", "CyclomaticComplexMethod") // the steps of one sync, in order
     private suspend fun syncWith(session: Session, address: String, key: ByteArray, mode: SyncMode): SyncOutcome {
         val pong = session.call { ping() }
         session.call { authenticate(key) }
         current.value = RecorderActivity.Syncing(SyncStep.CHECKING)
-        val status = session.call { stat() }
-        setClock(session)
+        // LS before STAT: a recording that starts after STAT is not in the listing, so its growing file is never planned.
         val listing = session.call { list() }
+        val status = session.call { stat() }
+        // The recorder does not set its clock while it records (open_fw answers OK,RTC,LATER): the next sync sets it.
+        if (!status.recording) setClock(session)
         markAbsent(address, listing)
+        val syncWhileRecording = store.read().syncWhileRecording
         val noteIds = deviceState(address).recordings.mapNotNull { it.recording.noteId }
         val transcripts = encode(parts.library.transcripts(noteIds))
         val versions = transcripts.mapValues { it.value.version }
         val suspects = SyncPlanner.suspects(listing, deviceState(address).syncState(), versions)
         verifySuspects(session, address, suspects)
-        val plan = SyncPlanner.plan(listing, status, deviceState(address).syncState(), versions)
+        val state = deviceState(address).syncState()
+        val plan = SyncPlanner.plan(listing, status, state, versions, syncWhileRecording)
+        // A firmware that names the file it records refuses every card write while it records: transcripts wait.
+        val holdUploads = status.recording && status.namesActiveFile
         if (mode == SyncMode.UPLOADS) {
-            val uploaded = upload(session, address, pong, plan.uploads, transcripts)
-            return SyncOutcome.Done(0, uploaded, plan.skipped.size + plan.downloads.size, plan.deviceRecording)
+            val sent = upload(session, address, pong, plan.uploads, transcripts, holdUploads)
+            return SyncOutcome.Done(
+                0,
+                sent.uploaded,
+                plan.skipped.size + plan.downloads.size,
+                plan.deviceRecording,
+                deferredUploads = sent.deferred,
+            )
         }
+        val pace = Pace(
+            window = XrecLimits.RECORDING_GETS_WINDOW.takeIf { status.recording },
+            pauseMillis = if (plan.whileRecording) status.paceMillis ?: 0L else 0L,
+        )
+        // Today's rule (a recording that starts stops the downloads) holds unless the firmware protects its active file.
+        val statEachFile = !(syncWhileRecording && status.namesActiveFile)
         var downloaded = 0
         var failed = 0
         var recording = plan.deviceRecording
@@ -382,25 +418,45 @@ class RecorderSync(private val parts: Parts) {
         var speed: DownloadSpeed? = null
         for ((index, download) in plan.downloads.withIndex()) {
             // A recording can start after STAT: its file grows, so no download starts while one runs.
-            if (index > 0 && session.call { stat() }.recording) {
-                recording = true
-                deferred = plan.downloads.size - index
-                break
+            val started = index > 0 && statEachFile && session.call { stat() }.recording
+            val result = if (started) {
+                FileResult.DEFERRED
+            } else {
+                download(session, address, download, pace) { stats -> speed = (speed ?: NO_SPEED) + stats }
             }
-            when (download(session, address, download) { stats -> speed = (speed ?: NO_SPEED) + stats }) {
+            when (result) {
                 FileResult.DONE -> downloaded++
                 FileResult.FAILED -> failed++
                 FileResult.CHANGED -> Unit
+                FileResult.DEFERRED -> {
+                    // The recorder takes no transfer until its recording ends: the others wait the same.
+                    recording = true
+                    deferred = plan.downloads.size - index
+                    break
+                }
             }
         }
         // A transcript can have finished during the downloads (a long one, or an existing note): it goes now too.
         val checked = suspects.map { it.name }.toSet() + plan.downloads.map { it.name }
         val (uploads, latest) = latestUploads(session, address, listing, status, checked)
-        val uploaded = upload(session, address, pong, uploads, latest)
+        val sent = upload(session, address, pong, uploads, latest, holdUploads)
         withContext(parts.io) { deleteStrayParts(address) }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
-        return SyncOutcome.Done(downloaded, uploaded, plan.skipped.size + deferred, recording, failed, speed)
+        val waiting = plan.skipped.count { it.reason in WAITING_REASONS } + deferred + sent.deferred
+        return SyncOutcome.Done(
+            downloaded,
+            sent.uploaded,
+            plan.skipped.size + deferred,
+            recording,
+            failed,
+            speed,
+            deferredUploads = sent.deferred,
+            recordingPoll = plan.whileRecording && waiting > 0,
+        )
     }
+
+    /** The GETS [window] (null: the session's) and the [pauseMillis] between two windows of the downloads of a sync. */
+    private class Pace(val window: Int?, val pauseMillis: Long)
 
     /** Marks each record whose recording [listing] does not have (deleted, or the card was wiped), and the others not. */
     private suspend fun markAbsent(address: String, listing: List<XrecReply.Entry>) {
@@ -476,13 +532,20 @@ class RecorderSync(private val parts: Parts) {
         }
     }
 
-    private enum class FileResult { DONE, CHANGED, FAILED }
+    /** DEFERRED: the recorder answered `ERR,LATER` for longer than [LATER_BUDGET_MS]; the next sync continues. */
+    private enum class FileResult { DONE, CHANGED, FAILED, DEFERRED }
 
-    /** Downloads, imports and records one recording; [measured] gets the measurements of a complete download. */
+    /**
+     * Downloads, imports and records one recording; [measured] gets the measurements of a complete download. An
+     * `ERR,LATER,<ms>` waits on the open link (at most [MAX_LATER_WAIT_MS] at a time) and continues from the same
+     * offset, without counting a failure, for at most [LATER_BUDGET_MS]; then the download waits for the next sync.
+     */
+    @Suppress("ReturnCount") // a failure, a download that waits for the next sync, or an import
     private suspend fun download(
         session: Session,
         address: String,
         planned: PlannedDownload,
+        pace: Pace,
         measured: (XrecDownloadStats) -> Unit,
     ): FileResult {
         val part = partFile(address, planned.name)
@@ -491,19 +554,26 @@ class RecorderSync(private val parts: Parts) {
         withContext(parts.io) { prepare(part, resume) }
         store.updateDevice(address) { it.copy(partial = PartialDownload(planned.name, planned.size, resume)) }
         progress(SyncStep.DOWNLOADING, planned.name, resume, planned.size)
-        val stats = try {
-            session.call {
-                FileOutputStream(part, true).use { out ->
-                    download(planned.name, planned.size, out, resume) { done ->
-                        session.touch()
-                        progress(SyncStep.DOWNLOADING, planned.name, done, planned.size)
-                    }
-                    out.fd.sync()
+        var waited = 0L
+        var stats: XrecDownloadStats? = null
+        var complete = false
+        while (!complete) {
+            try {
+                stats = fetch(session, planned, part, pace)
+                complete = true
+            } catch (error: XrecException) {
+                if (error.failure != XrecFailure.LATER) return downloadFailed(address, planned, part, error)
+                val bytes = withContext(parts.io) { part.length() }
+                store.updateDevice(address) { it.copy(partial = it.partial?.copy(bytes = bytes)) }
+                val wait = (error.retryAfterMillis ?: MAX_LATER_WAIT_MS).coerceIn(MIN_LATER_WAIT_MS, MAX_LATER_WAIT_MS)
+                if (waited + wait > LATER_BUDGET_MS) {
+                    Log.i(TAG, "${planned.name} waits for the end of the recording, at $bytes bytes")
+                    return FileResult.DEFERRED
                 }
-                lastDownload
+                Log.i(TAG, "The recorder asks to wait $wait ms for ${planned.name}, at $bytes bytes")
+                parts.wait(wait)
+                waited += wait
             }
-        } catch (error: XrecException) {
-            return downloadFailed(address, planned, part, error)
         }
         stats?.let {
             measured(it)
@@ -514,6 +584,29 @@ class RecorderSync(private val parts: Parts) {
             )
         }
         return import(address, planned, part)
+    }
+
+    /**
+     * One download into [part] from its length, through a buffer of [PART_BUFFER_BYTES]: the bytes that came stay in
+     * the file also when the download fails, and a complete file is synced to the disk.
+     */
+    private suspend fun fetch(session: Session, planned: PlannedDownload, part: File, pace: Pace): XrecDownloadStats? {
+        val offset = withContext(parts.io) { part.length() }
+        return session.call {
+            FileOutputStream(part, true).use { out ->
+                val buffered = BufferedOutputStream(out, PART_BUFFER_BYTES)
+                try {
+                    download(planned.name, planned.size, buffered, offset, pace.window, pace.pauseMillis) { done ->
+                        session.touch()
+                        progress(SyncStep.DOWNLOADING, planned.name, done, planned.size)
+                    }
+                } finally {
+                    buffered.flush()
+                }
+                out.fd.sync()
+            }
+            lastDownload
+        }
     }
 
     private suspend fun downloadFailed(
@@ -582,15 +675,23 @@ class RecorderSync(private val parts: Parts) {
         partial = null,
     )
 
-    @Suppress("ReturnCount") // no upload: nothing planned, or this firmware refused before
+    /** The transcripts a sync sent, and those that wait for the end of the recording. */
+    private data class Uploads(val uploaded: Int, val deferred: Int)
+
+    /**
+     * Sends [uploads]. With [hold] (the recorder records and refuses card writes until it stops) none goes: they all
+     * wait for the end of the recording. An `ERR,LATER` (a recording started meanwhile) ends the uploads the same way.
+     */
+    @Suppress("ReturnCount", "LongParameterList") // no upload: nothing planned, held, or this firmware refused before
     private suspend fun upload(
         session: Session,
         address: String,
         pong: XrecReply.Pong,
         uploads: List<PlannedUpload>,
         transcripts: Map<String, EncodedTranscript>,
-    ): Int {
-        if (uploads.isEmpty()) return 0
+        hold: Boolean,
+    ): Uploads {
+        if (uploads.isEmpty()) return NO_UPLOADS
         val firmware = pong.firmware
         val state = deviceState(address)
         val now = parts.clock()
@@ -603,25 +704,36 @@ class RecorderSync(private val parts: Parts) {
             now,
             advertised,
         )
-        if (!allowed) return 0
+        if (!allowed) return NO_UPLOADS
+        if (hold) {
+            Log.i(TAG, "${uploads.size} transcripts wait for the end of the recording")
+            return Uploads(0, uploads.size)
+        }
         var uploaded = 0
-        for (upload in uploads) {
+        for ((index, upload) in uploads.withIndex()) {
             val transcript = upload.recording.noteId?.let(transcripts::get) ?: continue
             val failure = uploadOne(session, upload, transcript)
+            if (failure == XrecFailure.LATER) {
+                Log.i(TAG, "The recorder records: ${uploads.size - index} transcripts wait for its end")
+                return Uploads(uploaded, uploads.size - index)
+            }
             if (failure == XrecFailure.FIRMWARE_TOO_OLD) {
                 Log.w(TAG, "The recorder firmware $firmware does not take transcripts")
                 store.updateDevice(address) {
                     it.copy(transcriptsUnsupportedFirmware = firmware, transcriptsUnsupportedAt = now)
                 }
-                return uploaded
+                return Uploads(uploaded, 0)
             }
             store.updateDevice(address) { it.withUpload(upload, failure) }
             if (failure == null) uploaded++
         }
-        return uploaded
+        return Uploads(uploaded, 0)
     }
 
-    /** Sends one sidecar; returns null when the recorder took it, or why it refused this one file. */
+    /**
+     * Sends one sidecar; returns null when the recorder took it, or why it refused this one file. [XrecFailure.LATER]:
+     * the recorder records and takes it after (the payload of a refused chunk is not read as commands).
+     */
     private suspend fun uploadOne(
         session: Session,
         upload: PlannedUpload,
@@ -638,6 +750,7 @@ class RecorderSync(private val parts: Parts) {
             }
             null
         } catch (error: XrecException) {
+            if (error.failure == XrecFailure.LATER) return XrecFailure.LATER
             if (error.failure !in UPLOAD_FAILURES) throw error
             Log.w(TAG, "The recorder refused ${upload.sidecarName} (${error.failure})")
             error.failure
@@ -897,6 +1010,20 @@ class RecorderSync(private val parts: Parts) {
         private const val METRICS_TAG = "Recorder"
         private const val BYTES_PER_KB = 1_000L
         private val NO_SPEED = DownloadSpeed(0, 0, 0)
+        private val NO_UPLOADS = Uploads(0, 0)
+
+        /** The skipped files that wait for the end of a recording. */
+        private val WAITING_REASONS = setOf(SkipReason.ACTIVE, SkipReason.RECORDING)
+
+        /** The buffer of a `.part` file (docs/BT_SYNC_SPEED_AND_RECORDING.md A7). */
+        private const val PART_BUFFER_BYTES = 64 * 1024
+
+        /** The longest wait after one `ERR,LATER`, and the shortest (a LATER of 0 ms does not spin). */
+        const val MAX_LATER_WAIT_MS = 30_000L
+        private const val MIN_LATER_WAIT_MS = 1_000L
+
+        /** The `ERR,LATER` waits of one download in one sync, after which it waits for the next sync. */
+        const val LATER_BUDGET_MS = 2 * 60_000L
         private const val HEAD_BYTES = 4096
         private const val VERSION_DIGEST_CHARS = 16
         private const val PERCENT = 100L

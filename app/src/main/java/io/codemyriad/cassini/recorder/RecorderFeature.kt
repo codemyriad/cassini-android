@@ -92,6 +92,8 @@ class GraphRecorderScreenPorts(context: Context, private val feature: RecorderFe
 
     override suspend fun setAutoSync(enabled: Boolean) = feature.sync.setAutoSync(enabled)
 
+    override suspend fun setSyncWhileRecording(enabled: Boolean) = feature.sync.setSyncWhileRecording(enabled)
+
     override suspend fun bind(device: RecorderDevice, pin: suspend (Boolean) -> String?): BindOutcome =
         feature.sync.bind(device, pin)
 

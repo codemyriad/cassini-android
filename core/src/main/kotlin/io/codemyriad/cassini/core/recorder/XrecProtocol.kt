@@ -48,8 +48,17 @@ object XrecLimits {
     /** The bytes of a GETS frame header: "XREC", u32le offset, u16le length, u16le CRC. */
     const val FRAME_HEADER = 12
 
-    /** STAT `media` while the device records. Downloads from /record wait while it shows. */
+    /**
+     * STAT `media` while the device records. Without the STAT field `rec_idx` (older open_fw), downloads from /record
+     * wait while it shows.
+     */
     const val MEDIA_RECORDING = 33
+
+    /**
+     * The GETS window while the device records (docs/BT_SYNC_SPEED_AND_RECORDING.md A1): the device caps the GETS rate
+     * then, and STAT `pace_ms` is the time one window of this size takes at that cap.
+     */
+    const val RECORDING_GETS_WINDOW = 16_384
 
     /** A WAV file of this size or smaller holds no audio. */
     const val EMPTY_WAV_BYTES = 44L
@@ -200,7 +209,14 @@ sealed interface XrecReply {
     /** `CHAL,<32 hex>`. */
     data class Challenge(val nonceHex: String) : XrecReply
 
-    /** `STAT,<bat %>,<mV>,<charge 0/1/2>,<vbus 0/1>,<media>,<rec s>,<free MB>,<total MB>`. */
+    /**
+     * `STAT,<bat %>,<mV>,<charge 0/1/2>,<vbus 0/1>,<media>,<rec s>,<free MB>,<total MB>[,<rec_idx>,<pace_ms>]`.
+     *
+     * [recordingIndex] and [paceMillis] are the fields 9 and 10 of the open_fw that syncs while it records (null on
+     * older firmware): the `NNNN` of the `REC_NNNN.wav` being recorded (0: none), and the pause between two GETS
+     * windows of [XrecLimits.RECORDING_GETS_WINDOW] bytes while it records (0: no pacing; 30000 during a stereo
+     * recording, which allows no transfer).
+     */
     data class Status(
         val batteryPercent: Int,
         val millivolts: Int,
@@ -210,8 +226,13 @@ sealed interface XrecReply {
         val recordingSeconds: Long,
         val freeMb: Long,
         val totalMb: Long,
+        val recordingIndex: Long? = null,
+        val paceMillis: Long? = null,
     ) : XrecReply {
         val recording: Boolean get() = media == XrecLimits.MEDIA_RECORDING
+
+        /** The firmware names the file it records ([recordingIndex] present): it can sync while it records. */
+        val namesActiveFile: Boolean get() = recordingIndex != null
     }
 
     /** `RTC,YYYY-MM-DD HH:MM:SS,<weekday 0=Monday>`. [time] is null when the device clock holds no valid date. */
@@ -226,9 +247,14 @@ sealed interface XrecReply {
     /** `OK,<tag>[,<fields>]`. */
     data class Ok(val tag: String, val fields: List<String>) : XrecReply
 
-    /** `ERR,<reason>`. */
+    /** `ERR,<reason>`; [reason] keeps the arguments of `LATER,<ms>`. */
     data class Failed(val reason: String) : XrecReply {
         val failure: XrecFailure get() = XrecFailure.ofReason(reason)
+
+        /** The `<ms>` of `LATER,<ms>`, or null. */
+        val retryAfterMillis: Long?
+            get() = reason.takeIf { failure == XrecFailure.LATER }?.substringAfter(',', "")?.toLongOrNull()
+                ?.takeIf { it >= 0 }
     }
 
     /** Any other `+XREC:` line, or one of the above with fields the app cannot read. */
@@ -290,9 +316,11 @@ object XrecReplies {
         )
     }
 
+    /** The first 8 fields must be numbers; the fields 9 and 10 are read when they are numbers, later ones ignored. */
     private fun status(rest: String): XrecReply.Status? {
-        val values = rest.split(',').map { it.toLongOrNull() ?: return null }
-        if (values.size < 8) return null
+        val fields = rest.split(',')
+        if (fields.size < 8) return null
+        val values = fields.take(8).map { it.toLongOrNull() ?: return null }
         return XrecReply.Status(
             batteryPercent = values[0].toInt(),
             millivolts = values[1].toInt(),
@@ -302,6 +330,8 @@ object XrecReplies {
             recordingSeconds = values[5],
             freeMb = values[6],
             totalMb = values[7],
+            recordingIndex = fields.getOrNull(8)?.toLongOrNull()?.takeIf { it >= 0 },
+            paceMillis = fields.getOrNull(9)?.toLongOrNull()?.takeIf { it >= 0 },
         )
     }
 

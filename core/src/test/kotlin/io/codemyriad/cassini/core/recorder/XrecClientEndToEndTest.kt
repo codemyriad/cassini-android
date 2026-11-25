@@ -390,6 +390,86 @@ class XrecClientEndToEndTest {
         assertEquals("word299", reader.wordsFrom(0).last().text)
     }
 
+    /** The firmware that syncs while it records, recording REC_0003.wav (mono) now. */
+    private fun recordingDevice(): FakeRecorder = device(
+        FakeRecorder(key = key, recording = true, syncsWhileRecording = true),
+    ).also { fake ->
+        fake.files["REC_0001.wav"] = Random(1).nextBytes(40_000)
+        fake.files["REC_0002.wav"] = Random(2).nextBytes(3_000)
+        fake.files["REC_0003.wav"] = ByteArray(5_000)
+    }
+
+    @Test fun whileItRecordsTheRecorderNamesItsFileRefusesItAndPacesTheOthers() {
+        val fake = recordingDevice()
+        val pauses = mutableListOf<Long>()
+        val input = StreamXrecInput(fake.clientInput).also { closeables += it }
+        val client = XrecClient(input, fake.clientOutput, timeouts, sleep = { pauses += it })
+        client.authenticate(key)
+        val stat = client.stat()
+        assertEquals(3L, stat.recordingIndex)
+        assertEquals(342L, stat.paceMillis)
+        expect(XrecFailure.BUSY) { client.download("REC_0003.wav", 5_000, ByteArrayOutputStream()) }
+        val sink = ByteArrayOutputStream()
+        client.download("REC_0001.wav", 40_000, sink, window = XrecLimits.RECORDING_GETS_WINDOW, pauseMillis = 342)
+        assertArrayEquals(fake.files["REC_0001.wav"], sink.toByteArray())
+        assertEquals(
+            listOf(
+                "+XREC:GETS,0,16384,640,REC_0001.wav",
+                "+XREC:GETS,16384,16384,640,REC_0001.wav",
+                "+XREC:GETS,32768,7232,640,REC_0001.wav",
+            ),
+            gets(fake).drop(1),
+        )
+        // A pause between two windows, none before the first.
+        assertEquals(listOf(342L, 342L), pauses)
+        // The window never grows past the session's: the stock firmware keeps its 3840.
+        assertEquals(XrecLimits.RECORDING_GETS_WINDOW, client.lastDownload!!.window)
+        // Writers wait for the end of the recording; the clock set is acknowledged and not applied.
+        expect(XrecFailure.LATER) { client.delete("REC_0001.wav") }
+        expect(XrecFailure.BUSY) { client.delete("REC_0003.wav") }
+        client.setRtc(LocalDateTime.of(2026, 11, 25, 12, 0, 0))
+        try {
+            client.uploadSidecar("REC_0001.cwx", ByteArray(700) { 1 })
+            fail("Expected LATER")
+        } catch (e: XrecException) {
+            assertEquals(XrecFailure.LATER, e.failure)
+            assertEquals(30_000L, e.retryAfterMillis)
+        }
+        // The refused PUT payload was eaten unparsed: the link is in step.
+        assertEquals(87, client.stat().batteryPercent)
+        assertFalse(fake.files.containsKey("REC_0001.cwx"))
+    }
+
+    @Test fun aLaterInPlaceOfAFrameKeepsTheBytesSoFarAndTheDownloadContinues() {
+        val fake = recordingDevice()
+        fake.laterAtFrame = 1_280L
+        val client = authenticated(fake)
+        val sink = ByteArrayOutputStream()
+        try {
+            client.download("REC_0002.wav", 3_000, sink)
+            fail("Expected LATER")
+        } catch (e: XrecException) {
+            assertEquals(XrecFailure.LATER, e.failure)
+            assertEquals(30_000L, e.retryAfterMillis)
+        }
+        assertEquals(1_280, sink.size())
+        assertEquals(3_000L, client.download("REC_0002.wav", 3_000, sink, resumeOffset = 1_280))
+        assertArrayEquals(fake.files["REC_0002.wav"], sink.toByteArray())
+    }
+
+    @Test fun aStereoRecordingAllowsNoTransfer() {
+        val fake = recordingDevice()
+        fake.stereo = true
+        val client = authenticated(fake)
+        assertEquals(30_000L, client.stat().paceMillis)
+        expect(XrecFailure.LATER) { client.download("REC_0002.wav", 3_000, ByteArrayOutputStream()) }
+        fake.recording = false
+        val idle = client.stat()
+        assertEquals(0L, idle.recordingIndex)
+        assertEquals(0L, idle.paceMillis)
+        assertEquals(3_000L, client.download("REC_0002.wav", 3_000, ByteArrayOutputStream()))
+    }
+
     private fun expect(failure: XrecFailure, block: () -> Unit) {
         try {
             block()

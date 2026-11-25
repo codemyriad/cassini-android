@@ -41,6 +41,12 @@ enum class SkipReason {
     /** The recorder records now; its files in /record may grow. */
     RECORDING,
 
+    /**
+     * The file that the recorder records now (STAT `rec_idx`), or a newer one: it grows. The finished recordings go
+     * during the recording.
+     */
+    ACTIVE,
+
     /** The file name cannot be read back with GETS. */
     UNSAFE_NAME,
 }
@@ -67,8 +73,14 @@ data class SyncPlan(
     val downloads: List<PlannedDownload>,
     val uploads: List<PlannedUpload>,
     val skipped: List<SkippedFile>,
-    /** The recorder records now: all downloads wait for the next sync. */
+    /** The recorder records now: all downloads wait for the next sync, unless [whileRecording]. */
     val deviceRecording: Boolean,
+    /**
+     * The recorder records, names the file it records, and allows transfers (a mono recording), and the user turned
+     * "Sync while the recorder records" on: the finished recordings are downloaded now at the recorder's pace, only the
+     * active file ([SkipReason.ACTIVE]) waits.
+     */
+    val whileRecording: Boolean = false,
 )
 
 /**
@@ -76,7 +88,9 @@ data class SyncPlan(
  * remembered [RecorderSyncState], and the transcript version of each note that has a finished transcript.
  *
  * - Download each `.wav` larger than its header that the state does not have with the same name and size. While the
- *   recorder records (STAT media 33), no download starts. A stopped download of the same name and size resumes.
+ *   recorder records (STAT media 33), no download starts, unless [syncWhileRecording][plan] is on and the recorder
+ *   names the file it records (STAT `rec_idx`, docs/XREC_PROTOCOL.md 5.5) with a usable pace: then only that file and
+ *   any newer `REC_NNNN.wav` wait. A stopped download of the same name and size resumes.
  * - Upload the transcript of each imported recording that is still on the recorder, when the note has a transcript and
  *   the recorder has no sidecar for it or an older one, unless the recorder refused that version for good. Uploads
  *   also run while the recorder records: they go to a temporary file that PUTEND commits.
@@ -87,12 +101,14 @@ object SyncPlanner {
         status: XrecReply.Status,
         state: RecorderSyncState,
         transcriptVersions: Map<String, String>,
+        syncWhileRecording: Boolean = false,
     ): SyncPlan {
         val known = state.recordings.map { it.name to it.size }.toSet()
         val downloads = mutableListOf<PlannedDownload>()
         val skipped = mutableListOf<SkippedFile>()
+        val whileRecording = syncWhileRecording && downloadsWhileRecording(status)
         for (entry in listing.filterNot { (it.name to it.size) in known }) {
-            val reason = skipReason(entry, status)
+            val reason = skipReason(entry, status, whileRecording)
             when {
                 reason == null -> downloads += download(entry, state)
                 // The sidecars are the transcripts the app sent: no need to report them.
@@ -100,8 +116,28 @@ object SyncPlanner {
             }
         }
         val uploads = state.recordings.mapNotNull { upload(it, listing, transcriptVersions) }
-        return SyncPlan(downloads, uploads, skipped, status.recording)
+        return SyncPlan(downloads, uploads, skipped, status.recording, whileRecording)
     }
+
+    /**
+     * The longest STAT `pace_ms` at which the app downloads during a recording. A stereo recording reports 30000: it
+     * allows no transfer (decision 5 of docs/BT_SYNC_SPEED_AND_RECORDING.md), so its downloads wait for its end.
+     */
+    const val MAX_PACE_MS = 10_000L
+
+    /**
+     * True when [status] lets finished recordings go while the recorder records: it records, names the active file
+     * (`rec_idx` > 0) and gives a pace up to [MAX_PACE_MS]. Older firmware without the field: never.
+     */
+    fun downloadsWhileRecording(status: XrecReply.Status): Boolean =
+        status.recording && (status.recordingIndex ?: 0) > 0 && status.paceMillis?.let { it in 0..MAX_PACE_MS } == true
+
+    /** The number of a recorder's `REC_NNNN.wav`, or null for another name. */
+    fun recordingNumber(name: String): Long? =
+        REC_NAME.matchEntire(name)?.groupValues?.get(1)?.takeIf { it.length <= MAX_DIGITS }?.toLong()
+
+    private val REC_NAME = Regex("REC_([0-9]+)\\.wav", RegexOption.IGNORE_CASE)
+    private const val MAX_DIGITS = 9
 
     /**
      * The imported recordings to compare by their first 4 KiB before the sync trusts (name, size): the listing has the
@@ -123,13 +159,19 @@ object SyncPlanner {
 
     private fun List<XrecReply.Entry>.has(name: String, size: Long) = any { it.name == name && it.size == size }
 
-    private fun skipReason(entry: XrecReply.Entry, status: XrecReply.Status): SkipReason? = when {
-        !XrecNames.isWav(entry.name) -> SkipReason.NOT_WAV
-        entry.size <= XrecLimits.EMPTY_WAV_BYTES -> SkipReason.EMPTY
-        !XrecNames.isSafe(entry.name) -> SkipReason.UNSAFE_NAME
-        status.recording -> SkipReason.RECORDING
-        else -> null
-    }
+    private fun skipReason(entry: XrecReply.Entry, status: XrecReply.Status, whileRecording: Boolean): SkipReason? =
+        when {
+            !XrecNames.isWav(entry.name) -> SkipReason.NOT_WAV
+            // The active file can still be a bare header when the recording has just started.
+            whileRecording && isActive(entry.name, checkNotNull(status.recordingIndex)) -> SkipReason.ACTIVE
+            entry.size <= XrecLimits.EMPTY_WAV_BYTES -> SkipReason.EMPTY
+            !XrecNames.isSafe(entry.name) -> SkipReason.UNSAFE_NAME
+            status.recording && !whileRecording -> SkipReason.RECORDING
+            else -> null
+        }
+
+    /** The file of the recording [index], or a newer one (the numbering grows): it can still grow. */
+    private fun isActive(name: String, index: Long): Boolean = recordingNumber(name)?.let { it >= index } == true
 
     private fun download(entry: XrecReply.Entry, state: RecorderSyncState): PlannedDownload {
         val partial = state.partial?.takeIf { it.name == entry.name && it.size == entry.size }

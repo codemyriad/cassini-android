@@ -68,8 +68,10 @@ class RecorderRunner(
  * "Auto sync" (docs/recorder-sync.md): while it is on and a recorder is bound (and not waiting to be bound again), an
  * attempt runs at once and then after each wait of [AutoSyncBackoff]. A failed connection is normal (the recorder's
  * radio is on only in its Bluetooth phone mode), so the waits grow quietly; a sync with nothing to move makes them grow
- * too. A new finished transcript goes at once through [RecorderTranscriptPush], with or without "Auto sync". Nothing
- * runs after the process ends: the app does not use WorkManager
+ * too. While the recorder records and "Sync while the recorder records" is on, a sync that ends with files waiting for
+ * the recording ([SyncOutcome.Done.recordingPoll]) is followed by another after the fixed wait of [RecordingPoll], for
+ * about 2 h at most. A new finished transcript goes at once through [RecorderTranscriptPush], with or without "Auto
+ * sync". Nothing runs after the process ends: the app does not use WorkManager
  * (docs/architecture.md section 11). The loop survives any failure of an attempt: it runs in the application scope,
  * where an exception would end the process.
  */
@@ -91,6 +93,7 @@ class RecorderAutoSync(
     private suspend fun loop() {
         var failures = 0
         var idle = 0
+        var polls = 0
         while (true) {
             val outcome = try {
                 runner.attempt().await()
@@ -104,11 +107,12 @@ class RecorderAutoSync(
                 is SyncOutcome.Done -> {
                     failures = 0
                     idle = if (outcome.idle) idle + 1 else 0
+                    polls = if (outcome.recordingPoll) polls + 1 else 0
                 }
                 SyncOutcome.Busy -> Unit
                 else -> failures++
             }
-            wait(AutoSyncBackoff.delayMs(failures, idle))
+            wait(RecordingPoll.delayMs(failures, idle, polls))
         }
     }
 
@@ -124,8 +128,11 @@ class RecorderAutoSync(
  * ([SyncMode.UPLOADS]) runs. While the recorder does not answer (its radio is on only in its Bluetooth phone mode), the
  * attempt runs again after the waits of [TranscriptPushBackoff], while a transcript waits and the process lives, up to
  * [TranscriptPushBackoff.MAX_FAILURES] failures in a row; [TranscriptPushBackoff.MAX_SYNC_FAILURES] failed syncs in a
- * row end them sooner. A running sync or binding ([SyncOutcome.Busy]) is no failure: the push waits for its end and
- * tries again at once (a full sync sends the transcripts that finished during its downloads, so usually nothing is
+ * row end them sooner. A transcript that the recorder takes only after its recording
+ * ([SyncOutcome.Done.deferredUploads]) is no failure either: the push tries again after [RecordingPoll.INTERVAL_MS], at
+ * most [RecordingPoll.MAX_POLLS] times in a row, unless "Auto sync" is on (its full syncs send it, without a second
+ * loop). A running sync or binding ([SyncOutcome.Busy]) is no failure: the push waits for its end and tries again at
+ * once (a full sync sends the transcripts that finished during its downloads, so usually nothing is
  * left). A sync that connected ends the retries: what it did not send cannot go now (the recording went, or the
  * recorder refused it), and the next sync tries again. A sync that cannot connect before the user acts (no permission,
  * no Bluetooth, a refused key) ends them too. [RecorderSync.pendingUploads] leaves out what no sync can send, so a new
@@ -171,14 +178,23 @@ class RecorderTranscriptPush(
     }
 
     /** Upload-only attempts while a transcript waits and the last one ended in a way that can pass by itself. */
+    @Suppress("ReturnCount") // the push ends after a failure that cannot pass, or when "Auto sync" takes over
     private suspend fun push() {
         var failures = 0
         var syncFailures = 0
+        var deferrals = 0
         var outcome = attempt()
         while (outcome != null) {
             if (outcome == SyncOutcome.Busy) {
                 // Another sync or a binding has the recorder: no failure, and no wait after it ends.
                 runner.awaitIdle()
+            } else if (outcome is SyncOutcome.Done && outcome.deferredUploads > 0) {
+                // The recorder records and takes the transcript after: no failure. "Auto sync" sends it if it is on.
+                if (settings.first().autoSync || ++deferrals > RecordingPoll.MAX_POLLS) return
+                failures = 0
+                syncFailures = 0
+                Log.i(TAG, "The transcript waits for the end of the recording; try $deferrals")
+                wait(RecordingPoll.INTERVAL_MS)
             } else {
                 failures++
                 syncFailures = if (outcome is SyncOutcome.Failed) syncFailures + 1 else 0

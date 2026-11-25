@@ -130,6 +130,10 @@ class RecorderViewModelTest {
             assertEquals(RadioReadiness.READY, awaitItem().readiness)
             viewModel.onEvent(RecorderEvent.AutoSync(true))
             assertEquals(true, awaitItem().autoSync)
+            // "Sync while the recorder records" is off until the user turns it on.
+            assertEquals(false, viewModel.state.value.syncWhileRecording)
+            viewModel.onEvent(RecorderEvent.SyncWhileRecording(true))
+            assertEquals(true, awaitItem().syncWhileRecording)
             viewModel.onEvent(RecorderEvent.ListBonded)
             assertEquals(BindUi.Choose(listOf(DEVICE)), awaitItem().bind)
         }
@@ -167,6 +171,9 @@ class RecorderViewModelTest {
         }
 
         override suspend fun setAutoSync(enabled: Boolean) = settings.update { it.copy(autoSync = enabled) }
+
+        override suspend fun setSyncWhileRecording(enabled: Boolean) =
+            settings.update { it.copy(syncWhileRecording = enabled) }
 
         override suspend fun bind(device: RecorderDevice, pin: suspend (Boolean) -> String?): BindOutcome {
             if (askPin) pin(false)?.let(pins::add)

@@ -74,12 +74,15 @@ data class RecorderDeviceState(
 }
 
 /**
- * Everything about recorders: the bound one ([binding]), the "Auto sync" switch and the sync state of each recorder
- * by address. The sync state stays after "Forget recorder", so a recorder bound again does not import its files again.
+ * Everything about recorders: the bound one ([binding]), the "Auto sync" switch, the "Sync while the recorder records"
+ * switch ([syncWhileRecording], off by default; the recorder's firmware decides whether it can) and the sync state of
+ * each recorder by address. The sync state stays after "Forget recorder", so a recorder bound again does not import its
+ * files again.
  */
 data class RecorderSettings(
     val binding: RecorderBinding? = null,
     val autoSync: Boolean = false,
+    val syncWhileRecording: Boolean = false,
     val devices: Map<String, RecorderDeviceState> = emptyMap(),
 ) {
     /** The state of the bound recorder; null when no recorder is bound. */
@@ -183,7 +186,8 @@ internal object RecorderJson {
     fun encode(settings: RecorderSettings): JSONObject {
         val devices = JSONObject()
         settings.devices.forEach { (address, state) -> devices.put(address, encode(state)) }
-        val json = JSONObject().put("version", VERSION).put("autoSync", settings.autoSync).put("devices", devices)
+        val json = JSONObject().put("version", VERSION).put("autoSync", settings.autoSync)
+            .put("syncWhileRecording", settings.syncWhileRecording).put("devices", devices)
         settings.binding?.let { binding ->
             json.put(
                 "binding",
@@ -203,6 +207,7 @@ internal object RecorderJson {
         return RecorderSettings(
             binding = binding,
             autoSync = json.optBoolean("autoSync", false),
+            syncWhileRecording = json.optBoolean("syncWhileRecording", false),
             devices = devices.keys().asSequence().associateWith { decodeDevice(devices.getJSONObject(it)) },
         )
     }
