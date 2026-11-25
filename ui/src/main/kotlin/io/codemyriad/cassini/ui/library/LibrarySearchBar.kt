@@ -5,10 +5,12 @@ package io.codemyriad.cassini.ui.library
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -142,6 +144,21 @@ internal fun LibrarySearchBar(
                 )
             },
         )
+    }
+}
+
+/**
+ * The top of the empty Library before the first meeting (QA 25 Nov): no search field and no Trash, only Settings at the
+ * top right, in the collapsed search bar's 56 dp height so the hero below does not move when the first meeting arrives.
+ */
+@Composable
+internal fun FirstRunTopBar(onSettings: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("first-run-top-bar"),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SearchIcon(Glyph.Settings, stringResource(R.string.ui_library_settings), onSettings)
     }
 }
 

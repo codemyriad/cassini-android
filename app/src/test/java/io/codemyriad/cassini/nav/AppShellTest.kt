@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -224,9 +225,9 @@ class AppShellTest {
         val dispatcher = rule.activity.onBackPressedDispatcher
         // The root takes no back, so the system animates back to home.
         rule.runOnIdle { assertFalse(dispatcher.hasEnabledCallbacks()) }
-        // Navigation3 entering the Library must not focus Search or hide its two navigation actions.
-        rule.onNode(hasSetTextAction()).assertIsNotFocused()
-        rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
+        // Navigation3 entering the Library must not focus Search (the empty Library has none once it has loaded, QA
+        // 25 Nov) or hide Settings.
+        rule.onAllNodes(hasSetTextAction() and isFocused()).assertCountEquals(0)
         rule.onNodeWithContentDescription("Settings").assertIsDisplayed().performClick()
         rule.onNode(hasText("Language", ignoreCase = true)).assertExists()
         rule.runOnIdle { assertTrue("NavDisplay takes back above the root", dispatcher.hasEnabledCallbacks()) }

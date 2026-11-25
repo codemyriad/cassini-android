@@ -56,6 +56,7 @@ import io.codemyriad.cassini.recording.RecordingViewModel
 import io.codemyriad.cassini.settings.GraphSettingsPorts
 import io.codemyriad.cassini.settings.SettingsRoute
 import io.codemyriad.cassini.settings.SettingsViewModel
+import io.codemyriad.cassini.transfer.TransferResultHost
 import io.codemyriad.cassini.trash.GraphTrashPorts
 import io.codemyriad.cassini.trash.TrashRoute
 import io.codemyriad.cassini.trash.TrashViewModel
@@ -138,6 +139,7 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
                 screenEntries(graph, backStack, context)
             },
         )
+        TransferResultHost(graph.transfers)
     }
 }
 
@@ -298,7 +300,8 @@ internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.pop(): ContentTran
 }
 
 /** Recording comes up from the bottom and goes down again, also on a predictive back. */
-private val recordingTransitions: Map<String, Any> = LibraryNoteScenes.fullScreen() +
-    NavDisplay.transitionSpec { slideInVertically { it } togetherWith fadeOut() } +
+private val recordingTransitions: Map<String, Any> =
+    LibraryNoteScenes.fullScreen() +
+        NavDisplay.transitionSpec { slideInVertically { it } togetherWith fadeOut() } +
         NavDisplay.popTransitionSpec { fadeIn() togetherWith slideOutVertically { it } } +
         NavDisplay.predictivePopTransitionSpec { _ -> fadeIn() togetherWith slideOutVertically { it } }
