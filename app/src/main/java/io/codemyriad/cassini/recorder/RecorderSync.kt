@@ -4,6 +4,7 @@ import android.util.Log
 import io.codemyriad.cassini.core.recorder.CwxEncoder
 import io.codemyriad.cassini.core.recorder.XrecAuth
 import io.codemyriad.cassini.core.recorder.XrecClient
+import io.codemyriad.cassini.core.recorder.XrecDownloadStats
 import io.codemyriad.cassini.core.recorder.XrecException
 import io.codemyriad.cassini.core.recorder.XrecFailure
 import io.codemyriad.cassini.core.recorder.XrecNames
@@ -75,11 +76,24 @@ enum class SyncMode {
     UPLOADS,
 }
 
+/**
+ * The download speed of one sync: [bytes] of recordings moved in [millis] (resumed bytes not counted), with [retries]
+ * failed GETS windows. Null in [SyncOutcome.Done] when nothing was downloaded.
+ */
+data class DownloadSpeed(val bytes: Long, val millis: Long, val retries: Int) {
+    /** Kilobytes (1000 bytes) per second; 0 when no time was measured. */
+    val kilobytesPerSecond: Long get() = if (millis > 0) bytes / millis else 0
+
+    operator fun plus(stats: XrecDownloadStats) =
+        DownloadSpeed(bytes + stats.bytes, millis + stats.millis, retries + stats.retries)
+}
+
 /** How one sync ended. */
 sealed interface SyncOutcome {
     /**
      * The sync ran. [skipped] counts the new files it did not download (none while [deviceRecording]), [failed] the
-     * files it could not download or import this time (the next sync tries them again).
+     * files it could not download or import this time (the next sync tries them again). [speed] measures the
+     * downloads that completed.
      */
     data class Done(
         val downloaded: Int,
@@ -87,6 +101,7 @@ sealed interface SyncOutcome {
         val skipped: Int,
         val deviceRecording: Boolean,
         val failed: Int = 0,
+        val speed: DownloadSpeed? = null,
     ) : SyncOutcome {
         /** Nothing moved: "Auto sync" waits longer before the next attempt. */
         val idle: Boolean get() = downloaded == 0 && uploaded == 0
@@ -364,6 +379,7 @@ class RecorderSync(private val parts: Parts) {
         var failed = 0
         var recording = plan.deviceRecording
         var deferred = 0
+        var speed: DownloadSpeed? = null
         for ((index, download) in plan.downloads.withIndex()) {
             // A recording can start after STAT: its file grows, so no download starts while one runs.
             if (index > 0 && session.call { stat() }.recording) {
@@ -371,7 +387,7 @@ class RecorderSync(private val parts: Parts) {
                 deferred = plan.downloads.size - index
                 break
             }
-            when (download(session, address, download)) {
+            when (download(session, address, download) { stats -> speed = (speed ?: NO_SPEED) + stats }) {
                 FileResult.DONE -> downloaded++
                 FileResult.FAILED -> failed++
                 FileResult.CHANGED -> Unit
@@ -383,7 +399,7 @@ class RecorderSync(private val parts: Parts) {
         val uploaded = upload(session, address, pong, uploads, latest)
         withContext(parts.io) { deleteStrayParts(address) }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
-        return SyncOutcome.Done(downloaded, uploaded, plan.skipped.size + deferred, recording, failed)
+        return SyncOutcome.Done(downloaded, uploaded, plan.skipped.size + deferred, recording, failed, speed)
     }
 
     /** Marks each record whose recording [listing] does not have (deleted, or the card was wiped), and the others not. */
@@ -462,15 +478,20 @@ class RecorderSync(private val parts: Parts) {
 
     private enum class FileResult { DONE, CHANGED, FAILED }
 
-    /** Downloads, imports and records one recording. */
-    private suspend fun download(session: Session, address: String, planned: PlannedDownload): FileResult {
+    /** Downloads, imports and records one recording; [measured] gets the measurements of a complete download. */
+    private suspend fun download(
+        session: Session,
+        address: String,
+        planned: PlannedDownload,
+        measured: (XrecDownloadStats) -> Unit,
+    ): FileResult {
         val part = partFile(address, planned.name)
         // The file length is the truth: after process death the stored offset can be behind it.
         val resume = if (planned.resume != null && part.isFile) part.length().coerceAtMost(planned.size) else 0L
         withContext(parts.io) { prepare(part, resume) }
         store.updateDevice(address) { it.copy(partial = PartialDownload(planned.name, planned.size, resume)) }
         progress(SyncStep.DOWNLOADING, planned.name, resume, planned.size)
-        try {
+        val stats = try {
             session.call {
                 FileOutputStream(part, true).use { out ->
                     download(planned.name, planned.size, out, resume) { done ->
@@ -479,9 +500,18 @@ class RecorderSync(private val parts: Parts) {
                     }
                     out.fd.sync()
                 }
+                lastDownload
             }
         } catch (error: XrecException) {
             return downloadFailed(address, planned, part, error)
+        }
+        stats?.let {
+            measured(it)
+            Log.i(
+                METRICS_TAG,
+                "${planned.name}: ${it.bytes} bytes in ${it.millis} ms, ${it.bytesPerSecond / BYTES_PER_KB} KB/s, " +
+                    "${it.retries} retries, ${it.requests} GETS of ${it.window} bytes",
+            )
         }
         return import(address, planned, part)
     }
@@ -641,7 +671,15 @@ class RecorderSync(private val parts: Parts) {
     private suspend fun record(address: String, outcome: SyncOutcome) {
         val now = parts.clock()
         val last = when (outcome) {
-            is SyncOutcome.Done -> LastSync(now, OUTCOME_OK, null, outcome.downloaded, outcome.uploaded)
+            is SyncOutcome.Done -> LastSync(
+                now,
+                OUTCOME_OK,
+                null,
+                outcome.downloaded,
+                outcome.uploaded,
+                downloadedBytes = outcome.speed?.bytes ?: 0,
+                downloadMillis = outcome.speed?.millis ?: 0,
+            )
             SyncOutcome.Unreachable -> LastSync(now, OUTCOME_UNREACHABLE)
             SyncOutcome.RebindNeeded -> LastSync(now, OUTCOME_REBIND)
             is SyncOutcome.Unavailable -> LastSync(now, outcome.readiness.name)
@@ -849,6 +887,11 @@ class RecorderSync(private val parts: Parts) {
 
     companion object {
         private const val TAG = "RecorderSync"
+
+        /** The tag of the per-file download measurements (`adb logcat -s Recorder:I`). */
+        private const val METRICS_TAG = "Recorder"
+        private const val BYTES_PER_KB = 1_000L
+        private val NO_SPEED = DownloadSpeed(0, 0, 0)
         private const val HEAD_BYTES = 4096
         private const val VERSION_DIGEST_CHARS = 16
         private const val PERCENT = 100L

@@ -67,29 +67,82 @@ class XrecClientEndToEndTest {
         assertEquals(listOf(XrecReply.Entry(10, "REC_0001.wav"), XrecReply.Entry(3, "odd, name.wav")), client.list())
     }
 
-    @Test fun downloadsAcrossSeveralBursts() {
+    private fun gets(fake: FakeRecorder) = fake.commands.filter { it.startsWith("+XREC:GETS") }
+
+    @Test fun downloadsAcrossSeveral64KiBWindows() {
         val fake = device()
-        val data = Random(1).nextBytes(10_000)
+        val data = Random(1).nextBytes(200_000)
         fake.files["REC_0001.wav"] = data
         val client = authenticated(fake)
         val progress = mutableListOf<Long>()
         val sink = ByteArrayOutputStream()
-        assertEquals(10_000L, client.download("REC_0001.wav", 10_000, sink) { progress += it })
+        assertEquals(200_000L, client.download("REC_0001.wav", 200_000, sink) { progress += it })
         assertArrayEquals(data, sink.toByteArray())
-        assertEquals(10_000L, progress.last())
-        assertEquals(3, fake.commands.count { it.startsWith("+XREC:GETS,") })
+        // Progress for each frame, so the stall watchdog sees a long window move.
+        assertEquals(200_000L, progress.last())
+        assertTrue((listOf(0L) + progress).zipWithNext().all { (a, b) -> b - a in 1..640 })
+        assertEquals(3 * 103 + 6, progress.size) // 102 frames of 640 and one of 256 for each full window
+        assertEquals(
+            listOf(
+                "+XREC:GETS,0,65536,640,REC_0001.wav",
+                "+XREC:GETS,65536,65536,640,REC_0001.wav",
+                "+XREC:GETS,131072,65536,640,REC_0001.wav",
+                "+XREC:GETS,196608,3392,640,REC_0001.wav",
+            ),
+            gets(fake),
+        )
+        assertEquals(XrecDownloadStats(200_000, client.lastDownload!!.millis, 0, 4, 65_536), client.lastDownload)
+    }
+
+    @Test fun theStockFirmwareKeepsTheSmallWindow() {
+        val fake = device(FakeRecorder(key = key, firmware = "pen133_v2"))
+        val data = Random(11).nextBytes(10_000)
+        fake.files["a.wav"] = data
+        val client = connect(fake)
+        assertEquals(XrecLimits.GETS_WINDOW, client.getsWindow)
+        client.ping()
+        assertEquals(XrecLimits.STOCK_GETS_WINDOW, client.getsWindow)
+        client.authenticate(key)
+        val sink = ByteArrayOutputStream()
+        client.download("a.wav", 10_000, sink)
+        assertArrayEquals(data, sink.toByteArray())
+        assertEquals(
+            listOf("+XREC:GETS,0,3840,640,a.wav", "+XREC:GETS,3840,3840,640,a.wav", "+XREC:GETS,7680,2320,640,a.wav"),
+            gets(fake),
+        )
+    }
+
+    @Test fun openFwKeepsTheLargeWindowAfterPing() {
+        val fake = device()
+        fake.files["a.wav"] = Random(12).nextBytes(10_000)
+        val client = connect(fake)
+        client.ping()
+        client.authenticate(key)
+        client.download("a.wav", 10_000, ByteArrayOutputStream())
+        assertEquals(listOf("+XREC:GETS,0,10000,640,a.wav"), gets(fake))
     }
 
     @Test fun shortFramesFromASmallMtuAreNotTheEnd() {
         val fake = device(FakeRecorder(key = key, mtu = 300))
-        val data = Random(2).nextBytes(5_000)
+        val data = Random(2).nextBytes(150_000)
         fake.files["a.wav"] = data
         val client = authenticated(fake)
         val sink = ByteArrayOutputStream()
         val progress = mutableListOf<Long>()
-        client.download("a.wav", 5_000, sink) { progress += it }
+        client.download("a.wav", 150_000, sink) { progress += it }
         assertArrayEquals(data, sink.toByteArray())
+        // Frames of 288 bytes inside each 64 KiB window: the end comes from the size, not from a short frame.
         assertEquals(288L, progress.first())
+        assertTrue(progress.zipWithNext().all { (a, b) -> b - a in 1..288 })
+        assertEquals(
+            listOf(
+                "+XREC:GETS,0,65536,640,a.wav",
+                "+XREC:GETS,65536,65536,640,a.wav",
+                "+XREC:GETS,131072,18928,640,a.wav",
+            ),
+            gets(fake),
+        )
+        assertEquals(0, client.lastDownload!!.retries)
     }
 
     @Test fun resumesFromAnOffset() {
@@ -102,39 +155,98 @@ class XrecClientEndToEndTest {
         assertEquals("+XREC:GETS,1234,2766,640,a.wav", fake.commands.first { it.startsWith("+XREC:GETS") })
     }
 
-    @Test fun aDroppedFrameIsFetchedAgainFromTheLastGoodOffset() {
+    @Test fun aDroppedFrameMidWindowIsFetchedAgainFromTheLastGoodOffset() {
         val fake = device()
-        val data = Random(4).nextBytes(8_000)
+        val data = Random(4).nextBytes(100_000)
         fake.files["a.wav"] = data
-        fake.dropFrames += 1_280L // in the middle of the first burst: the next frame has the wrong offset
+        fake.dropFrames += 32_000L // in the middle of the first window: the next frame has the wrong offset
         val sink = ByteArrayOutputStream()
-        authenticated(fake).download("a.wav", 8_000, sink)
+        val progress = mutableListOf<Long>()
+        val client = authenticated(fake)
+        client.download("a.wav", 100_000, sink) { progress += it }
         assertArrayEquals(data, sink.toByteArray())
-        val gets = fake.commands.filter { it.startsWith("+XREC:GETS") }
-        assertEquals("+XREC:GETS,1280,3840,640,a.wav", gets[1])
+        // The rest of the first window drained; the second asks from the dropped frame, without a gap or a repeat.
+        assertEquals(
+            listOf(
+                "+XREC:GETS,0,65536,640,a.wav",
+                "+XREC:GETS,32000,65536,640,a.wav",
+                "+XREC:GETS,97536,2464,640,a.wav",
+            ),
+            gets(fake),
+        )
+        assertEquals(progress.distinct(), progress)
+        assertTrue(progress.zipWithNext().all { (a, b) -> b - a in 1..640 })
+        assertEquals(1, client.lastDownload!!.retries)
+        // The link is quiet again: the next command gets its own reply.
+        assertEquals(87, client.stat().batteryPercent)
     }
 
-    @Test fun aDroppedLastFrameOfABurstTimesOutAndIsFetchedAgain() {
+    @Test fun aDroppedLastFrameOfAWindowTimesOutAndIsFetchedAgain() {
         val fake = device()
-        val data = Random(10).nextBytes(5_000)
+        val data = Random(10).nextBytes(70_000)
         fake.files["a.wav"] = data
-        fake.dropFrames += 3_200L // only the frame wait shows it
+        fake.dropFrames += 65_280L // the short last frame of the first window: only the frame wait shows it
         val sink = ByteArrayOutputStream()
-        authenticated(fake).download("a.wav", 5_000, sink)
+        val client = authenticated(fake)
+        client.download("a.wav", 70_000, sink)
         assertArrayEquals(data, sink.toByteArray())
-        val gets = fake.commands.filter { it.startsWith("+XREC:GETS") }
-        assertEquals(listOf("+XREC:GETS,0,3840,640,a.wav", "+XREC:GETS,3200,1800,640,a.wav"), gets)
+        assertEquals(listOf("+XREC:GETS,0,65536,640,a.wav", "+XREC:GETS,65280,4720,640,a.wav"), gets(fake))
+        assertEquals(1, client.lastDownload!!.retries)
     }
 
-    @Test fun aCrcErrorIsRetried() {
+    @Test fun aCrcErrorMidWindowResumesWithoutDuplicatesOrGaps() {
         val fake = device()
-        val data = Random(5).nextBytes(2_000)
+        val data = Random(5).nextBytes(100_000)
         fake.files["a.wav"] = data
-        fake.corruptFrames += 640L
+        fake.corruptFrames += 32_000L
         val sink = ByteArrayOutputStream()
-        authenticated(fake).download("a.wav", 2_000, sink)
+        val progress = mutableListOf<Long>()
+        val client = authenticated(fake)
+        client.download("a.wav", 100_000, sink) { progress += it }
         assertArrayEquals(data, sink.toByteArray())
-        assertTrue(fake.commands.contains("+XREC:GETS,640,1360,640,a.wav"))
+        assertEquals(
+            listOf(
+                "+XREC:GETS,0,65536,640,a.wav",
+                "+XREC:GETS,32000,65536,640,a.wav",
+                "+XREC:GETS,97536,2464,640,a.wav",
+            ),
+            gets(fake),
+        )
+        assertEquals(progress.distinct(), progress)
+        assertEquals(32_000L, progress[49])
+        assertEquals(32_640L, progress[50])
+        assertEquals(1, client.lastDownload!!.retries)
+    }
+
+    @Test fun aCrcErrorInAClippedFrameResumesAtItsOffset() {
+        val fake = device(FakeRecorder(key = key, mtu = 300))
+        val data = Random(13).nextBytes(80_000)
+        fake.files["a.wav"] = data
+        fake.corruptFrames += 288L * 100
+        val sink = ByteArrayOutputStream()
+        authenticated(fake).download("a.wav", 80_000, sink)
+        assertArrayEquals(data, sink.toByteArray())
+        assertEquals("+XREC:GETS,28800,51200,640,a.wav", gets(fake)[1])
+    }
+
+    @Test fun aFileShorterThanItsListingEndsWithAnEmptyFrame() {
+        val fake = device()
+        val data = Random(14).nextBytes(70_000)
+        fake.files["a.wav"] = data
+        val sink = ByteArrayOutputStream()
+        val client = authenticated(fake)
+        expect(XrecFailure.SIZE_CHANGED) { client.download("a.wav", 80_000, sink) }
+        // Every byte that exists arrived once: a short frame ended the window, the empty frame at 70 000 the file.
+        assertArrayEquals(data, sink.toByteArray())
+        assertEquals(
+            listOf(
+                "+XREC:GETS,0,65536,640,a.wav",
+                "+XREC:GETS,65536,14464,640,a.wav",
+                "+XREC:GETS,70000,10000,640,a.wav",
+            ),
+            gets(fake),
+        )
+        assertEquals(87, client.stat().batteryPercent)
     }
 
     @Test fun aMissingFileOrAShorterFileFails() {

@@ -12,18 +12,42 @@ data class XrecTimeouts(
     val frameMillis: Long = 5_000,
     /** A resync ends after this much silence. */
     val quietMillis: Long = 300,
-    /** A resync gives up waiting for silence after this long. */
+    /**
+     * A resync gives up waiting for silence after this long. The drain after a failed GETS window waits longer, by the
+     * time the rest of the window takes at a slow link ([XrecClient.DRAIN_BYTES_PER_SECOND]).
+     */
     val drainMillis: Long = 5_000,
 )
+
+/**
+ * The measurements of one [XrecClient.download]: [bytes] moved in [millis], with [retries] failed windows, [requests]
+ * GETS commands and the window of the last request ([window], smaller after a fallback).
+ */
+data class XrecDownloadStats(
+    val bytes: Long,
+    val millis: Long,
+    val retries: Int,
+    val requests: Int,
+    val window: Int,
+) {
+    /** The speed in bytes per second; 0 when no time was measured. */
+    val bytesPerSecond: Long get() = if (millis > 0) bytes * MILLIS_PER_SECOND / millis else 0
+
+    private companion object {
+        const val MILLIS_PER_SECOND = 1_000L
+    }
+}
 
 /**
  * A blocking client for the recorder's XREC protocol (open_fw, Bluetooth SPP). One link carries text lines and the
  * binary frames of GETS; [input] gives its received bytes with timeouts, [output] takes the commands. The client is not
  * thread-safe: one thread runs one operation at a time, and closing the link from another thread cancels it.
  *
- * Downloads verify each frame's offset and CRC and retry from the last good offset; uploads send one PUT chunk at a
- * time and resend a chunk whose acknowledgement did not arrive (the device acknowledges an identical resend without
- * writing it twice). [maxRetries] bounds the consecutive failed attempts of one transfer.
+ * Downloads ask for [getsWindow] bytes per GETS ([XrecLimits.GETS_WINDOW] on open_fw; [ping] lowers it to
+ * [XrecLimits.STOCK_GETS_WINDOW] for the stock firmware), verify each frame's offset and CRC and retry from the last
+ * good offset; uploads send one PUT chunk at a time and resend a chunk whose acknowledgement did not arrive (the device
+ * acknowledges an identical resend without writing it twice). [maxRetries] bounds the consecutive failed attempts of
+ * one transfer.
  */
 @Suppress("TooManyFunctions", "ThrowsCount") // One protocol session; each failure throws its own typed error.
 class XrecClient(
@@ -32,14 +56,34 @@ class XrecClient(
     private val timeouts: XrecTimeouts = XrecTimeouts(),
     private val clock: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
     private val maxRetries: Int = DEFAULT_RETRIES,
+    getsWindow: Int = XrecLimits.GETS_WINDOW,
 ) {
     private val buffer = ByteArray(BUFFER_BYTES)
     private val scratch = ByteArray(BUFFER_BYTES)
     private var start = 0
     private var end = 0
 
-    /** `PING`: works without authentication. */
-    fun ping(): XrecReply.Pong = request(XrecCommands.ping())
+    /**
+     * The bytes one GETS asks for. It drops to [XrecLimits.STOCK_GETS_WINDOW] for the rest of the session when the
+     * PONG names the stock firmware, or after [FALLBACK_FAILURES] failed windows in a row of one download.
+     */
+    var getsWindow: Int = getsWindow
+        private set
+
+    /** The measurements of the last download that finished, or null before the first one. */
+    var lastDownload: XrecDownloadStats? = null
+        private set
+
+    init {
+        require(getsWindow > 0) { "Bad GETS window" }
+    }
+
+    /** `PING`: works without authentication. The stock firmware keeps the small window of its GETS. */
+    fun ping(): XrecReply.Pong = request<XrecReply.Pong>(XrecCommands.ping()).also { pong ->
+        if (XrecLimits.STOCK_FIRMWARE_MARK in pong.firmware) {
+            getsWindow = minOf(getsWindow, XrecLimits.STOCK_GETS_WINDOW)
+        }
+    }
 
     /** `PAIR`: binds [key] with the [pin] that the recorder shows in its pairing window, and authenticates. */
     fun pair(pin: String, key: ByteArray) = requestOk(XrecCommands.pair(pin, key), "PAIR")
@@ -75,7 +119,13 @@ class XrecClient(
      * Downloads /record/[name] of the listed [size] into [sink], starting at [resumeOffset] (the bytes [sink] already
      * has). Returns the final offset, equal to [size]. [progress] gets the offset after each good frame.
      *
-     * The end comes from [size], not from a short frame: the device shortens frames to its link MTU.
+     * The end comes from [size], not from a short frame: the device shortens frames to its link MTU. A frame with no
+     * payload at the expected offset is the end of the file on the device ([XrecFailure.SIZE_CHANGED]).
+     *
+     * After a failed window (a timeout, a bad CRC or offset), the device keeps streaming the rest of that window: the
+     * client drains it until the link is quiet, then asks again from the last good offset. Frames of the old window
+     * that still come after the new GETS are skipped by their offset, within [STALE_BUDGET] bytes. [lastDownload]
+     * holds the measurements when the download ends.
      */
     fun download(
         name: String,
@@ -85,6 +135,7 @@ class XrecClient(
         progress: (Long) -> Unit = {},
     ): Long {
         require(size in 0..XrecLimits.MAX_OFFSET + 1 && resumeOffset in 0..size) { "Bad size or resume offset" }
+        val started = clock()
         val transfer = Transfer(resumeOffset)
         var failures = 0
         while (transfer.offset < size) {
@@ -93,15 +144,25 @@ class XrecClient(
                 burst(name, size, transfer, sink, progress)
             } catch (e: XrecException) {
                 if (!e.transient) throw e
+                transfer.retries++
+                transfer.recovering = true
                 failures = if (transfer.offset > before) 1 else failures + 1
-                // Frames of the burst can still arrive: the link is quiet again before a retry or the next command.
-                drain()
+                // The rest of the window still streams: the link is quiet again before a retry or the next command.
+                drain(drainLimit(getsWindow))
                 if (failures > maxRetries) {
                     val message = "Download of $name failed at ${transfer.offset}"
                     throw XrecException(XrecFailure.INTEGRITY, message, cause = e)
                 }
+                if (failures >= FALLBACK_FAILURES) getsWindow = minOf(getsWindow, XrecLimits.STOCK_GETS_WINDOW)
             }
         }
+        lastDownload = XrecDownloadStats(
+            bytes = transfer.offset - resumeOffset,
+            millis = clock() - started,
+            retries = transfer.retries,
+            requests = transfer.requests,
+            window = getsWindow,
+        )
         return transfer.offset
     }
 
@@ -191,26 +252,44 @@ class XrecClient(
         if (!committed) throw XrecException(XrecFailure.INTEGRITY, "$name is not on the recorder after PUTEND")
     }
 
+    /**
+     * One GETS window: frames until its end. Each frame must start at the expected offset; while [Transfer.recovering]
+     * after a failed window, a frame of that old window (before the expected offset, or after it while no frame of this
+     * window came yet) is skipped instead, within [STALE_BUDGET] bytes.
+     */
     private fun burst(name: String, size: Long, transfer: Transfer, sink: OutputStream, progress: (Long) -> Unit) {
-        val total = minOf(XrecLimits.GETS_TOTAL.toLong(), size - transfer.offset).toInt()
+        val total = minOf(getsWindow.toLong(), size - transfer.offset).toInt()
         val stop = transfer.offset + total
         send(XrecCommands.gets(transfer.offset, total, XrecLimits.GETS_CHUNK, name))
+        transfer.requests++
+        var accepted = false
+        var stale = 0L
         while (transfer.offset < stop) {
             val frame = readFrame(deadline(timeouts.frameMillis))
+            val old = transfer.recovering &&
+                (frame.offset < transfer.offset || (frame.offset > transfer.offset && !accepted))
+            if (old && stale + frame.payload.size + XrecLimits.FRAME_HEADER <= STALE_BUDGET) {
+                stale += frame.payload.size + XrecLimits.FRAME_HEADER
+                continue
+            }
             when {
                 frame.offset != transfer.offset ->
                     throw XrecException(XrecFailure.INTEGRITY, "Frame at ${frame.offset}, expected ${transfer.offset}")
                 frame.payload.isEmpty() ->
                     throw XrecException(XrecFailure.SIZE_CHANGED, "$name ended at ${transfer.offset}, not at $size")
-                frame.payload.size > stop - transfer.offset ->
+                // A frame of an old, larger window can pass the end of this one, never the end of the file.
+                frame.payload.size > size - transfer.offset ->
                     throw XrecException(XrecFailure.INTEGRITY, "Frame longer than requested")
                 Crc16CcittFalse.compute(frame.payload) != frame.crc ->
                     throw XrecException(XrecFailure.INTEGRITY, "CRC error in the frame at ${frame.offset}")
             }
             sink.write(frame.payload) // A local storage failure is a plain IOException, not an XrecException.
             transfer.offset += frame.payload.size
+            accepted = true
             progress(transfer.offset)
         }
+        // A window without old frames ends the recovery; one that skipped some can leave more for the next window.
+        if (stale == 0L) transfer.recovering = false
     }
 
     private fun putChunk(target: PutTarget, bytes: ByteArray, offset: Int, length: Int): PutResult {
@@ -370,34 +449,57 @@ class XrecClient(
         return n
     }
 
-    /** Discards the buffered bytes and what arrives until [XrecTimeouts.quietMillis] of silence. */
-    private fun drain() {
+    /** The longest drain after a failed window of [window] bytes: the rest of it can still stream at a slow link. */
+    private fun drainLimit(window: Int): Long =
+        timeouts.drainMillis + window * MILLIS_PER_SECOND / DRAIN_BYTES_PER_SECOND
+
+    /** Discards the buffered bytes and what arrives until [XrecTimeouts.quietMillis] of silence, at most [millis]. */
+    private fun drain(millis: Long) {
         start = 0
         end = 0
-        val limit = clock() + timeouts.drainMillis
+        val limit = clock() + millis
         while (clock() < limit) {
             if (readInput(scratch, 0, scratch.size, timeouts.quietMillis) == 0) return
         }
     }
 
-    private class Transfer(var offset: Long)
+    private class Transfer(var offset: Long) {
+        var retries = 0
+        var requests = 0
+
+        /** After a failed window: frames of that window can still come, and are skipped by their offset. */
+        var recovering = false
+    }
 
     private class Frame(val offset: Long, val payload: ByteArray, val crc: Int)
 
     private enum class PutResult { ACCEPTED, RETRY, RESTART }
 
-    private companion object {
-        const val NANOS_PER_MILLI = 1_000_000L
-        const val DEFAULT_RETRIES = 5
-        const val BUFFER_BYTES = 4096
-        const val CR = '\r'.code.toByte()
-        val RESYNC = "\r${XrecCommands.ping()}\r".toByteArray(Charsets.US_ASCII)
-        const val LF = '\n'.code.toByte()
-        val FRAME_MAGIC = "XREC".toByteArray(Charsets.US_ASCII)
-        const val OFFSET_FIELD = 4
-        const val LENGTH_FIELD = 8
-        const val CRC_FIELD = 10
-        const val BYTE = 0xFF
-        const val BYTE_BITS = 8
+    companion object {
+        /** Failed windows in a row of one download after which the client falls back to the stock window. */
+        const val FALLBACK_FAILURES = 2
+
+        /** The slowest link the drain after a failed window waits for: the rest of a 64 KiB window takes 8 s. */
+        const val DRAIN_BYTES_PER_SECOND = 8_192L
+
+        /**
+         * The bytes of old frames (headers included) one window may skip: the rest of a failed window, with room for a
+         * second one that the recovery itself left behind.
+         */
+        const val STALE_BUDGET = 2L * XrecLimits.GETS_WINDOW + 2L * XrecLimits.STOCK_GETS_WINDOW
+
+        private const val MILLIS_PER_SECOND = 1_000L
+        private const val NANOS_PER_MILLI = 1_000_000L
+        private const val DEFAULT_RETRIES = 5
+        private const val BUFFER_BYTES = 4096
+        private const val CR = '\r'.code.toByte()
+        private val RESYNC = "\r${XrecCommands.ping()}\r".toByteArray(Charsets.US_ASCII)
+        private const val LF = '\n'.code.toByte()
+        private val FRAME_MAGIC = "XREC".toByteArray(Charsets.US_ASCII)
+        private const val OFFSET_FIELD = 4
+        private const val LENGTH_FIELD = 8
+        private const val CRC_FIELD = 10
+        private const val BYTE = 0xFF
+        private const val BYTE_BITS = 8
     }
 }

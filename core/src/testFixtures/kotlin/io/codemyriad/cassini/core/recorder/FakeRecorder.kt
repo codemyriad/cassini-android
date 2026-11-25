@@ -24,7 +24,9 @@ import java.util.Collections
  * the older firmware: it knows only `CAS`, a refused header leaves the payload to the line parser, and a repeated
  * PUTEND gets `ERR,NOPUT`.
  *
- * GETS frames are clipped to `mtu - 12` bytes. Faults: [dropFrames] and [corruptFrames] (a GETS frame offset, once),
+ * GETS takes any total, as open_fw does, and streams the whole window before it reads the next command (the worst
+ * case of the device's TX ring: a new GETS does not cut the old window short). GETS frames are clipped to `mtu - 12`
+ * bytes. Faults: [dropFrames] and [corruptFrames] (a GETS frame offset, once),
  * [dropPutAcks] (the reply of a written PUT chunk, once), [corruptPutChunks] (a received PUT chunk, once),
  * [disconnectAtFrame] (the link closes instead of sending that GETS frame, once), [dropPutEndAck] (the reply of a
  * committed PUTEND, once), [unreadable] (GETS of these names gives `ERR,SDIO`), [refusedNames] (a `REC` header with
@@ -37,6 +39,8 @@ class FakeRecorder(
     @Volatile var mtu: Int = 0,
     @Volatile var recording: Boolean = false,
     @Volatile var recordTarget: Boolean = true,
+    /** The firmware field of PONG; the stock firmware names `pen133`. */
+    @Volatile var firmware: String = "openfw_v5",
 ) : Closeable {
     val files: MutableMap<String, ByteArray> = Collections.synchronizedMap(LinkedHashMap())
     val cassini: MutableMap<String, ByteArray> = Collections.synchronizedMap(LinkedHashMap())
@@ -111,7 +115,7 @@ class FakeRecorder(
      */
     fun reconnect(): FakeRecorder {
         close()
-        val next = FakeRecorder(key, pairingPin, mtu, recording, recordTarget)
+        val next = FakeRecorder(key, pairingPin, mtu, recording, recordTarget, firmware)
         synchronized(files) { next.files.putAll(files) }
         synchronized(cassini) { next.cassini.putAll(cassini) }
         next.dropFrames += dropFrames
@@ -215,7 +219,7 @@ class FakeRecorder(
 
     private fun pong() {
         val flags = "bound=${flag(key != null)},auth=${flag(authenticated)},pair=${flag(pairingPin != null)}"
-        reply("+XREC:PONG,openfw_v5,v5,$flags")
+        reply("+XREC:PONG,$firmware,v5,$flags")
     }
 
     private fun pair(args: String) {

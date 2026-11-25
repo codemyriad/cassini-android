@@ -70,7 +70,15 @@ One sync runs at a time (a `Mutex`). A sync does these steps:
    A different file (a new recording with the same name and size after a card format) is a new recording: the app
    copies it, and does not send the old transcript to it.
 5. For each new `.wav` file larger than 44 bytes: `GETS` downloads it into the cache (`recorder/<address>/<name>.part`).
-   The client checks the offset and the CRC of each frame, and asks again from the last good offset after an error.
+   Each `GETS` asks for a 64 KiB window (open_fw takes any total and paces the frames through its TX ring), so the
+   link does not wait for a round trip every 3840 bytes. The stock firmware (`pen133` in the `PONG` firmware field)
+   keeps the 3840-byte window, and so does a download after two failed windows in a row. The client checks the offset
+   and the CRC of each frame, and asks again from the last good offset after an error: first it drains the rest of the
+   failed window until the link is quiet (at most `drainMillis` plus the time 64 KiB take at 8 KiB/s), then it skips
+   frames of the old window that still arrive after the new `GETS`. A short frame is not the end (the device clips
+   frames to its MTU); the end is the listed size, and an empty frame at the expected offset means the file is
+   shorter than listed. Each finished download logs its bytes, time, KB/s, retries and `GETS` count at INFO with the
+   tag `Recorder`; the Recorder screen shows the speed of the last sync ("Downloaded: 2 (102 KB/s)").
    A download that stops (a lost link, process death) continues from the length of the `.part` file at the next
    sync. Then the app imports the file (`ImportRepository.import`, title = the file name without `.wav`) and asks
    for a transcription (`ProcessingCoordinator.transcribe`, origin AUTOMATIC). Without model consent, the note waits

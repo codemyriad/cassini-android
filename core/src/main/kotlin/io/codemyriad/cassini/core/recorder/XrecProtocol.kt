@@ -18,8 +18,20 @@ object XrecLimits {
     /** The largest GETS frame payload and PUT chunk the device accepts. */
     const val MAX_CHUNK = 640
 
-    /** The bytes the app asks for with one GETS command. */
-    const val GETS_TOTAL = 3840
+    /**
+     * The bytes the app asks for with one GETS command (its window) on open_fw: the device takes any total and paces
+     * the frames through its TX ring, so one request streams up to 64 KiB without a round trip between frames.
+     */
+    const val GETS_WINDOW = 65_536
+
+    /**
+     * The window of the stock firmware (its PONG names [STOCK_FIRMWARE_MARK]), and of the fallback after repeated
+     * failures with [GETS_WINDOW]: 6 frames of 640 bytes, strictly one request at a time.
+     */
+    const val STOCK_GETS_WINDOW = 3840
+
+    /** The PONG firmware field of the stock firmware contains this; open_fw names itself `openfw_v<n>`. */
+    const val STOCK_FIRMWARE_MARK = "pen133"
 
     /** The payload size the app asks for in each GETS frame. */
     const val GETS_CHUNK = 640

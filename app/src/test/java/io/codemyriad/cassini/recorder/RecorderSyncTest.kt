@@ -56,6 +56,48 @@ class RecorderSyncTest {
 
     private val parts: List<File> get() = File(root, "downloads").walk().filter { it.isFile }.toList()
 
+    /** The counts of a [SyncOutcome.Done]; its measured [SyncOutcome.Done.speed] varies from run to run. */
+    private fun assertDone(expected: SyncOutcome.Done, actual: SyncOutcome) =
+        assertEquals(expected, (actual as? SyncOutcome.Done)?.copy(speed = null) ?: actual)
+
+    @Test fun aSyncMeasuresItsDownloadsAndAsksForLargeWindows() = runBlocking {
+        val audio = recording(150_000, seed = 5)
+        recorder.files["REC_0001.wav"] = audio
+        val (sync, store) = sync()
+        store.bound(key)
+
+        val outcome = sync.sync() as SyncOutcome.Done
+        assertEquals(1, outcome.downloaded)
+        assertArrayEquals(audio, library.imported.getValue("note-1"))
+        // One GETS for each 64 KiB: the 3840-byte window of the stock firmware would need 40.
+        val gets = recorder.commands.filter { it.startsWith("+XREC:GETS") }
+        assertEquals(
+            listOf(
+                "+XREC:GETS,0,65536,640,REC_0001.wav",
+                "+XREC:GETS,65536,65536,640,REC_0001.wav",
+                "+XREC:GETS,131072,18928,640,REC_0001.wav",
+            ),
+            gets,
+        )
+        val speed = outcome.speed!!
+        assertEquals(150_000L, speed.bytes)
+        assertEquals(0, speed.retries)
+        val last = store.read().current!!.lastSync!!
+        assertEquals(150_000L, last.downloadedBytes)
+        assertEquals(speed.millis, last.downloadMillis)
+        val expected = last.downloadMillis.takeIf { it > 0 }?.let { 150_000L / it }
+        assertEquals(expected, RecorderTexts.speedKilobytesPerSecond(last))
+    }
+
+    @Test fun aSyncWithoutDownloadsHasNoSpeed() = runBlocking {
+        val (sync, store) = sync()
+        store.bound(key)
+        assertNull((sync.sync() as SyncOutcome.Done).speed)
+        val last = store.read().current!!.lastSync!!
+        assertEquals(0L, last.downloadedBytes)
+        assertNull(RecorderTexts.speedKilobytesPerSecond(last))
+    }
+
     @Test fun aNewRecordingIsImportedTranscribedAndItsTranscriptGoesBack() = runBlocking {
         val audio = recording(10_000)
         recorder.files["REC_0001.wav"] = audio
@@ -64,7 +106,7 @@ class RecorderSyncTest {
         store.bound(key)
 
         val first = sync.sync()
-        assertEquals(SyncOutcome.Done(downloaded = 1, uploaded = 0, skipped = 1, deviceRecording = false), first)
+        assertDone(SyncOutcome.Done(downloaded = 1, uploaded = 0, skipped = 1, deviceRecording = false), first)
         assertArrayEquals(audio, library.imported.getValue("note-1"))
         assertEquals("REC_0001.wav", library.titles.getValue("note-1"))
         assertEquals(listOf("note-1"), library.transcribed)
@@ -78,7 +120,7 @@ class RecorderSyncTest {
 
         // The note is transcribed now: the next sync sends the sidecar.
         library.ready["note-1"] = RecorderTranscript("v1", transcript("Standup"))
-        assertEquals(SyncOutcome.Done(0, 1, 1, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 1, 1, false), sync.sync())
         val cwx = CwxReader(radio.device.files.getValue("REC_0001.cwx"))
         assertEquals("Standup", cwx.title)
         assertEquals(listOf("Ada", "Speaker 2"), cwx.speakers.map { it.label })
@@ -87,12 +129,12 @@ class RecorderSyncTest {
         assertTrue(version!!.startsWith("v1:"))
 
         // Nothing new: no download and no upload.
-        assertEquals(SyncOutcome.Done(0, 0, 1, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 0, 1, false), sync.sync())
         assertFalse(radio.device.commands.any { it.startsWith("+XREC:PUT") || it.startsWith("+XREC:GETS") })
 
         // A renamed speaker in the same variant is a new transcript: it replaces the sidecar.
         library.ready["note-1"] = RecorderTranscript("v1", transcript("Standup", first = "Ada Lovelace"))
-        assertEquals(SyncOutcome.Done(0, 1, 1, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 1, 1, false), sync.sync())
         val renamed = CwxReader(radio.device.files.getValue("REC_0001.cwx"))
         assertEquals(listOf("Ada Lovelace", "Speaker 2"), renamed.speakers.map { it.label })
     }
@@ -107,7 +149,7 @@ class RecorderSyncTest {
         library.ready["note-1"] = RecorderTranscript("v1", transcript("Standup"))
         assertEquals(setOf("note-1"), sync.pendingUploads())
         radio.device.files["REC_0002.wav"] = recording(10_000, seed = 2)
-        assertEquals(SyncOutcome.Done(0, 1, 1, false), sync.sync(SyncMode.UPLOADS))
+        assertDone(SyncOutcome.Done(0, 1, 1, false), sync.sync(SyncMode.UPLOADS))
         assertTrue(radio.device.files.containsKey("REC_0001.cwx"))
         assertEquals(listOf("note-1"), library.imported.keys.toList())
         // Only the first 4 KiB of REC_0001.wav, the check before its first sidecar: REC_0002.wav is not downloaded.
@@ -117,7 +159,7 @@ class RecorderSyncTest {
         // A new version waits again; the next full sync downloads the new recording.
         library.ready["note-1"] = RecorderTranscript("v2", transcript("Standup"))
         assertEquals(setOf("note-1"), sync.pendingUploads())
-        assertEquals(SyncOutcome.Done(1, 1, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 1, 0, false), sync.sync())
         assertEquals(emptySet<String>(), sync.pendingUploads())
     }
 
@@ -130,7 +172,7 @@ class RecorderSyncTest {
         radio.device.beforeGets = { name ->
             if (name == "REC_0002.wav") library.ready["note-1"] = RecorderTranscript("v1", transcript("Standup"))
         }
-        assertEquals(SyncOutcome.Done(1, 1, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 1, 0, false), sync.sync())
         assertTrue(radio.device.files.containsKey("REC_0001.cwx"))
         assertEquals(emptySet<String>(), sync.pendingUploads())
     }
@@ -159,8 +201,8 @@ class RecorderSyncTest {
             delay(100)
             assertFalse(full.isCompleted)
             release.countDown()
-            assertEquals(SyncOutcome.Done(0, 1, 1, false), uploads.await())
-            assertEquals(SyncOutcome.Done(1, 0, 0, false), full.await())
+            assertDone(SyncOutcome.Done(0, 1, 1, false), uploads.await())
+            assertDone(SyncOutcome.Done(1, 0, 0, false), full.await())
         }
         sync.awaitIdle()
         assertEquals(listOf("note-1", "note-2"), library.imported.keys.toList())
@@ -180,10 +222,10 @@ class RecorderSyncTest {
         assertEquals(3_840L, partial.bytes)
         assertTrue(library.imported.isEmpty())
 
-        assertEquals(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
         // The second link asks for the rest only.
         val gets = radio.device.commands.first { it.startsWith("+XREC:GETS") }
-        assertEquals("+XREC:GETS,3840,3840,640,REC_0001.wav", gets)
+        assertEquals("+XREC:GETS,3840,6160,640,REC_0001.wav", gets)
         assertArrayEquals(audio, library.imported.getValue("note-1"))
         assertNull(store.read().current!!.partial)
     }
@@ -201,8 +243,8 @@ class RecorderSyncTest {
         part.parentFile!!.mkdirs()
         part.writeBytes(audio.copyOf(5_000))
 
-        assertEquals(SyncOutcome.Done(1, 0, 0, false), sync.sync())
-        assertEquals("+XREC:GETS,5000,3840,640,REC_0001.wav", recorder.commands.first { it.startsWith("+XREC:GETS") })
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertEquals("+XREC:GETS,5000,5000,640,REC_0001.wav", recorder.commands.first { it.startsWith("+XREC:GETS") })
         assertArrayEquals(audio, library.imported.getValue("note-1"))
     }
 
@@ -211,7 +253,7 @@ class RecorderSyncTest {
         recorder.files["REC_0001.wav"] = recording(2_000)
         val (sync, store) = sync()
         store.bound(key)
-        assertEquals(SyncOutcome.Done(0, 0, 1, true), sync.sync())
+        assertDone(SyncOutcome.Done(0, 0, 1, true), sync.sync())
         assertTrue(library.imported.isEmpty())
         assertFalse(recorder.commands.any { it.startsWith("+XREC:GETS") })
     }
@@ -223,7 +265,7 @@ class RecorderSyncTest {
         val (sync, store) = sync()
         store.bound(key)
         // STAT runs again before each download after the first: the second waits for the next sync.
-        assertEquals(SyncOutcome.Done(1, 0, 1, true), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 1, true), sync.sync())
         assertEquals(1, library.imported.size)
     }
 
@@ -245,10 +287,10 @@ class RecorderSyncTest {
         var now = NOW
         val (sync, store) = sync(clock = { now })
         store.bound(key)
-        assertEquals(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
         library.ready["note-1"] = RecorderTranscript("v1", transcript("Old"))
 
-        assertEquals(SyncOutcome.Done(0, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 0, 0, false), sync.sync())
         assertEquals("openfw_v5", store.read().current!!.transcriptsUnsupportedFirmware)
         assertFalse(radio.device.files.containsKey("REC_0001.cwx"))
         // Within the day the transcript does not wait: the push does not call the recorder for it.
@@ -256,12 +298,12 @@ class RecorderSyncTest {
         // The recorder gets the new firmware, which keeps the same name in PING. Within the day nothing is asked.
         radio.device.recordTarget = true
         now += TranscriptUploadProbe.RETRY_MS - 1
-        assertEquals(SyncOutcome.Done(0, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 0, 0, false), sync.sync())
         assertFalse(radio.device.commands.any { it.startsWith("+XREC:PUT") })
         // A day later the app asks again, and the firmware takes the transcript.
         now += 1
         assertEquals(setOf("note-1"), sync.pendingUploads())
-        assertEquals(SyncOutcome.Done(0, 1, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 1, 0, false), sync.sync())
         assertTrue(radio.device.files.containsKey("REC_0001.cwx"))
         assertNull(store.read().current!!.transcriptsUnsupportedFirmware)
     }
@@ -271,13 +313,13 @@ class RecorderSyncTest {
         recorder.files["REC_0002.wav"] = recording(3_000, seed = 2)
         val (sync, store) = sync()
         store.bound(key)
-        assertEquals(SyncOutcome.Done(2, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(2, 0, 0, false), sync.sync())
         library.ready["note-1"] = RecorderTranscript("v1", transcript("One"))
         library.ready["note-2"] = RecorderTranscript("v1", transcript("Two"))
         // REC_0001.wav goes after LS, before its sidecar: the recorder answers ERR,NOENT.
         radio.device.beforePut = { offset -> if (offset == 0L) radio.device.files.remove("REC_0001.wav") }
 
-        assertEquals(SyncOutcome.Done(0, 1, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 1, 0, false), sync.sync())
         val recordings = store.read().current!!.recordings.associateBy { it.recording.name }
         assertEquals(RecorderSync.UPLOAD_FAILURE + "NOT_FOUND", recordings.getValue("REC_0001.wav").failure)
         assertNull(recordings.getValue("REC_0002.wav").failure)
@@ -292,7 +334,7 @@ class RecorderSyncTest {
         store.bound(key)
         sync.sync()
         library.ready["note-1"] = RecorderTranscript("v1", transcript("One"))
-        assertEquals(SyncOutcome.Done(0, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 0, 0, false), sync.sync())
         val stored = store.read().current!!.recordings.single()
         assertEquals(RecorderSync.UPLOAD_FAILURE + "BAD_NAME", stored.failure)
         assertTrue(stored.recording.transcriptRefusedVersion!!.startsWith("v1:"))
@@ -303,7 +345,7 @@ class RecorderSyncTest {
         // A new version is.
         radio.device.refusedNames.clear()
         library.ready["note-1"] = RecorderTranscript("v2", transcript("One"))
-        assertEquals(SyncOutcome.Done(0, 1, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 1, 0, false), sync.sync())
         assertNull(store.read().current!!.recordings.single().recording.transcriptRefusedVersion)
     }
 
@@ -313,14 +355,14 @@ class RecorderSyncTest {
         recorder.unreadable += "REC_0001.wav"
         val (sync, store) = sync()
         store.bound(key)
-        assertEquals(SyncOutcome.Done(1, 0, 0, false, failed = 1), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 0, false, failed = 1), sync.sync())
         assertEquals(listOf("REC_0002.wav"), store.read().current!!.recordings.map { it.recording.name })
         // The stray .part file of the failed download goes at the end of the sync.
         assertTrue(parts.isEmpty())
 
         // The next sync tries it again.
         radio.device.unreadable.clear()
-        assertEquals(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
         assertEquals(2, library.imported.size)
     }
 
@@ -330,7 +372,7 @@ class RecorderSyncTest {
         recorder.beforeGets = { name -> if (name == "REC_0001.wav") recorder.files.remove(name) }
         val (sync, store) = sync()
         store.bound(key)
-        assertEquals(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
         val state = store.read().current!!
         assertEquals(listOf("REC_0002.wav"), state.recordings.map { it.recording.name })
         assertNull(state.partial)
@@ -342,13 +384,13 @@ class RecorderSyncTest {
         library.reject = "SPACE"
         val (sync, store) = sync()
         store.bound(key)
-        assertEquals(SyncOutcome.Done(0, 0, 0, false, failed = 1), sync.sync())
+        assertDone(SyncOutcome.Done(0, 0, 0, false, failed = 1), sync.sync())
         val state = store.read().current!!
         assertTrue(state.recordings.isEmpty())
         assertEquals(PartialDownload("REC_0001.wav", 3_000, 3_000), state.partial)
 
         library.reject = null
-        assertEquals(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
         assertFalse(radio.device.commands.any { it.startsWith("+XREC:GETS") })
         assertEquals(listOf("note-1"), store.read().current!!.recordings.map { it.recording.noteId })
     }
@@ -358,11 +400,11 @@ class RecorderSyncTest {
         library.reject = "WAV"
         val (sync, store) = sync()
         store.bound(key)
-        assertEquals(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
         val stored = store.read().current!!.recordings.single()
         assertNull(stored.recording.noteId)
         assertEquals(RecorderSync.IMPORT_FAILURE + "WAV", stored.failure)
-        assertEquals(SyncOutcome.Done(0, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 0, 0, false), sync.sync())
         assertFalse(radio.device.commands.any { it.startsWith("+XREC:GETS") })
     }
 
@@ -377,7 +419,7 @@ class RecorderSyncTest {
         assertTrue(library.transcribed.isEmpty())
 
         // The import finds the note (Existing), which has no transcription yet: the sync asks for it.
-        assertEquals(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
         assertEquals(listOf("note-1"), library.transcribed)
         assertEquals(1, library.imported.size)
         assertFalse(radio.device.commands.any { it.startsWith("+XREC:GETS") })
@@ -395,7 +437,7 @@ class RecorderSyncTest {
         sync.sync()
         // The card was wiped and the recorder numbered from 1 again.
         radio.device.files["REC_0001.wav"] = recording(4_000, seed = 2)
-        assertEquals(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
         val recordings = store.read().current!!.recordings.map { it.recording }
         assertEquals(listOf(4_000L), recordings.map { it.size })
         assertEquals(listOf("note-2"), recordings.map { it.noteId })
@@ -407,12 +449,12 @@ class RecorderSyncTest {
         store.bound(key)
         sync.sync()
         library.ready["note-1"] = RecorderTranscript("v1", transcript("Old"))
-        assertEquals(SyncOutcome.Done(0, 1, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 1, 0, false), sync.sync())
         // The card was wiped: a new recording with the same name and size, and no sidecar.
         radio.device.files.clear()
         radio.device.files["REC_0001.wav"] = recording(3_000, seed = 9)
 
-        assertEquals(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
         assertFalse(radio.device.files.containsKey("REC_0001.cwx"))
         assertEquals(listOf("note-2"), store.read().current!!.recordings.map { it.recording.noteId })
     }
@@ -420,7 +462,7 @@ class RecorderSyncTest {
     @Test fun aWrongClockIsSetToThePhoneTime() = runBlocking {
         val (sync, store) = sync(clock = { NOW + 3_600_000L })
         store.bound(key)
-        assertEquals(SyncOutcome.Done(0, 0, 0, false), sync.sync())
+        assertDone(SyncOutcome.Done(0, 0, 0, false), sync.sync())
         assertTrue(recorder.commands.contains("+XREC:RTC,2026,11,25,11,11,12,2"))
     }
 

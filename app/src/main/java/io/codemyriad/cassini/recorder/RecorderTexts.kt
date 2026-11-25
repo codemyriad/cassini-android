@@ -40,7 +40,7 @@ object RecorderTexts {
             DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_MONTH,
         )
         val outcome = when (last.outcome) {
-            RecorderSync.OUTCOME_OK -> context.getString(R.string.recorder_outcome_ok, last.downloaded, last.uploaded)
+            RecorderSync.OUTCOME_OK -> ok(context, last)
             RecorderSync.OUTCOME_UNREACHABLE -> context.getString(R.string.recorder_outcome_unreachable)
             RecorderSync.OUTCOME_REBIND -> context.getString(R.string.recorder_outcome_rebind)
             RecorderSync.OUTCOME_FAILED -> context.getString(R.string.recorder_outcome_failed, last.detail.orEmpty())
@@ -48,6 +48,20 @@ object RecorderTexts {
         }
         return context.getString(R.string.recorder_last_sync, time, outcome)
     }
+
+    /** "done. Downloaded: 2 (102 KB/s). …"; the speed only when the sync measured one. */
+    private fun ok(context: Context, last: LastSync): String {
+        val speed = speedKilobytesPerSecond(last)
+        return if (speed == null) {
+            context.getString(R.string.recorder_outcome_ok, last.downloaded, last.uploaded)
+        } else {
+            context.getString(R.string.recorder_outcome_ok_speed, last.downloaded, last.uploaded, speed)
+        }
+    }
+
+    /** The download speed of [last] in KB/s (1000 bytes), or null when it downloaded nothing. */
+    fun speedKilobytesPerSecond(last: LastSync): Long? =
+        if (last.downloadedBytes > 0 && last.downloadMillis > 0) last.downloadedBytes / last.downloadMillis else null
 
     fun status(context: Context, row: RecordingRow): String = when (row.status) {
         RecordingStatus.IMPORT_FAILED ->

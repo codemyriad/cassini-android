@@ -49,6 +49,9 @@ data class LastSync(
     val detail: String? = null,
     val downloaded: Int = 0,
     val uploaded: Int = 0,
+    /** The bytes the sync downloaded, and in how long: the screen shows the speed. 0 when none. */
+    val downloadedBytes: Long = 0,
+    val downloadMillis: Long = 0,
 )
 
 /**
@@ -227,7 +230,8 @@ internal object RecorderJson {
             json.put(
                 "lastSync",
                 JSONObject().put("at", it.at).put("outcome", it.outcome).putOpt("detail", it.detail)
-                    .put("downloaded", it.downloaded).put("uploaded", it.uploaded),
+                    .put("downloaded", it.downloaded).put("uploaded", it.uploaded)
+                    .put("downloadedBytes", it.downloadedBytes).put("downloadMillis", it.downloadMillis),
             )
         }
         return json
@@ -247,6 +251,8 @@ internal object RecorderJson {
                     it.optStringOrNull("detail"),
                     it.optInt("downloaded"),
                     it.optInt("uploaded"),
+                    it.optLong("downloadedBytes"),
+                    it.optLong("downloadMillis"),
                 )
             },
             lastSuccessAt = json.optLongOrNull("lastSuccessAt"),

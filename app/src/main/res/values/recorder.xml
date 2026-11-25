@@ -18,6 +18,7 @@
     <string name="recorder_last_sync">Last sync %1$s: %2$s</string>
     <string name="recorder_last_sync_never">No sync yet.</string>
     <string name="recorder_outcome_ok">done. Downloaded: %1$d. Transcripts sent: %2$d.</string>
+    <string name="recorder_outcome_ok_speed">done. Downloaded: %1$d (%3$d KB/s). Transcripts sent: %2$d.</string>
     <string name="recorder_outcome_unreachable">the recorder did not answer. Put it in Bluetooth phone mode.</string>
     <string name="recorder_outcome_rebind">the recorder refused the key.</string>
     <string name="recorder_outcome_failed">stopped (%1$s).</string>
