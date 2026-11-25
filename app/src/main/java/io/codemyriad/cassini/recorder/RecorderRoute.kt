@@ -219,6 +219,7 @@ private fun BindSection(bind: BindUi, state: RecorderUiState, actions: RecorderA
         is BindUi.Pin -> PinEntry(bind.wrong, actions)
         is BindUi.Failed -> {
             Body(RecorderTexts.bindFailure(context, bind.failure), error = true)
+            if (bind.failure == BindFailure.StaleBond) BluetoothSettings(actions)
             Button(onClick = { actions.onEvent(RecorderEvent.StartBind) }) {
                 Text(stringResource(R.string.recorder_try_again))
             }

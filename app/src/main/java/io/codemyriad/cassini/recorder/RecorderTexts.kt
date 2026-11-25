@@ -66,6 +66,7 @@ object RecorderTexts {
     fun bindFailure(context: Context, failure: BindFailure): String = when (failure) {
         is BindFailure.NotBonded -> context.getString(R.string.recorder_bind_failed_not_bonded)
         is BindFailure.Unreachable -> context.getString(R.string.recorder_bind_failed_unreachable)
+        is BindFailure.StaleBond -> context.getString(R.string.recorder_bind_failed_stale_bond)
         is BindFailure.PairingClosed -> context.getString(R.string.recorder_bind_failed_closed)
         is BindFailure.Chooser -> context.getString(R.string.recorder_bind_failed_chooser, failure.reason.orEmpty())
         is BindFailure.Unavailable -> readiness(context, failure.readiness)

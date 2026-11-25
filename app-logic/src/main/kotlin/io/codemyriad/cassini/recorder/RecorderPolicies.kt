@@ -17,10 +17,12 @@ object RecorderClock {
 
 /**
  * The waits of "Auto sync". The recorder accepts a connection only while its user has it in Bluetooth phone mode, so
- * most attempts fail: each failure in a row doubles the wait, up to [MAX_MS].
+ * most attempts fail: each failure in a row doubles the wait, up to [MAX_MS]. A sync that connected but had nothing to
+ * copy or send is idle: each idle sync in a row doubles the wait after it too, up to [MAX_MS], so a recorder left in
+ * Bluetooth phone mode is not checked every few minutes.
  */
 object AutoSyncBackoff {
-    /** The wait after a sync that connected. */
+    /** The wait after a sync that copied or sent something. */
     const val INTERVAL_MS = 3 * 60_000L
 
     /** The first wait after a failed connection. */
@@ -30,10 +32,28 @@ object AutoSyncBackoff {
 
     private const val MAX_DOUBLINGS = 10
 
-    /** The wait before the next attempt after [failures] failed attempts in a row (0: the last one connected). */
-    fun delayMs(failures: Int): Long = if (failures <= 0) {
-        INTERVAL_MS
-    } else {
-        (FIRST_RETRY_MS shl (failures - 1).coerceAtMost(MAX_DOUBLINGS)).coerceAtMost(MAX_MS)
+    /**
+     * The wait before the next attempt after [failures] failed attempts in a row, or, when the last one connected
+     * ([failures] 0), after [idle] idle syncs in a row.
+     */
+    fun delayMs(failures: Int, idle: Int = 0): Long = when {
+        failures > 0 -> doubled(FIRST_RETRY_MS, failures - 1)
+        else -> doubled(INTERVAL_MS, idle)
     }
+
+    private fun doubled(base: Long, times: Int): Long =
+        (base shl times.coerceIn(0, MAX_DOUBLINGS)).coerceAtMost(MAX_MS)
+}
+
+/**
+ * When the app offers a transcript to a recorder whose firmware refused the `REC` target. The firmware name in `PING`
+ * does not change when the recorder gets the firmware that takes transcripts, so the app asks again once a day, and at
+ * once when the firmware name changes.
+ */
+object TranscriptUploadProbe {
+    const val RETRY_MS = 24 * 60 * 60_000L
+
+    /** True when an upload may run: the firmware [firmware] never refused, or it refused at [refusedAt], long ago. */
+    fun mayUpload(refusedFirmware: String?, refusedAt: Long?, firmware: String, now: Long): Boolean =
+        refusedFirmware != firmware || refusedAt == null || now - refusedAt !in 0 until RETRY_MS
 }

@@ -6,18 +6,27 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import androidx.core.content.IntentCompat
 import io.codemyriad.cassini.core.recorder.StreamXrecInput
 import io.codemyriad.cassini.core.recorder.XrecInput
 import io.codemyriad.cassini.data.recorder.RecorderDevice
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
@@ -62,12 +71,49 @@ class BluetoothRecorderRadio(context: Context, private val io: CoroutineDispatch
         }
     }
 
-    override suspend fun bond(address: String): Boolean = withContext(io) {
+    override suspend fun bond(address: String): BondResult = withContext(io) {
         val device = remote(address)
-        if (device.bondState == BluetoothDevice.BOND_BONDED) return@withContext true
-        if (device.bondState != BluetoothDevice.BOND_BONDING && !device.createBond()) return@withContext false
+        if (device.bondState == BluetoothDevice.BOND_BONDED) return@withContext BondResult.BONDED_BEFORE
         // Android shows its pairing dialog; the bond ends BONDED, or NONE when the user or the recorder refuses.
-        withTimeoutOrNull(BOND_WAIT_MS) { awaitBond(device) } ?: false
+        var seenBonding = false
+        val end = withTimeoutOrNull(BOND_WAIT_MS) {
+            bondStates(device).first { state ->
+                if (state == BluetoothDevice.BOND_BONDING) seenBonding = true
+                state == BluetoothDevice.BOND_BONDED || state == NOT_STARTED ||
+                    (state == BluetoothDevice.BOND_NONE && seenBonding)
+            }
+        }
+        if (end == BluetoothDevice.BOND_BONDED) BondResult.BONDED else BondResult.FAILED
+    }
+
+    /**
+     * The bond states of [device] from `ACTION_BOND_STATE_CHANGED`, after `createBond()`. The receiver is registered
+     * before the bond starts, so a quick refusal (BONDING then NONE) is not missed. [NOT_STARTED] comes when the bond
+     * did not start, or is still NONE after [START_GRACE_MS].
+     */
+    private fun bondStates(device: BluetoothDevice): Flow<Int> = callbackFlow {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val changed = IntentCompat.getParcelableExtra(
+                    intent,
+                    BluetoothDevice.EXTRA_DEVICE,
+                    BluetoothDevice::class.java,
+                )
+                if (changed?.address == device.address) {
+                    trySend(intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR))
+                }
+            }
+        }
+        // The Bluetooth stack sends the broadcast from its own process.
+        val filter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
+        val state = device.bondState
+        if (state != BluetoothDevice.BOND_BONDING && !device.createBond()) trySend(NOT_STARTED) else trySend(state)
+        launch {
+            delay(START_GRACE_MS)
+            if (device.bondState == BluetoothDevice.BOND_NONE) trySend(NOT_STARTED)
+        }
+        awaitClose { app.unregisterReceiver(receiver) }
     }
 
     override suspend fun open(address: String): RecorderLink = withContext(io) {
@@ -98,18 +144,6 @@ class BluetoothRecorderRadio(context: Context, private val io: CoroutineDispatch
             .sortedBy { it.name }
     }
 
-    private suspend fun awaitBond(device: BluetoothDevice): Boolean {
-        var seenBonding = false
-        while (true) {
-            when (device.bondState) {
-                BluetoothDevice.BOND_BONDED -> return true
-                BluetoothDevice.BOND_BONDING -> seenBonding = true
-                else -> if (seenBonding) return false
-            }
-            delay(BOND_POLL_MS)
-        }
-    }
-
     private fun remote(address: String): BluetoothDevice =
         adapter?.getRemoteDevice(address) ?: throw IOException("This phone has no Bluetooth")
 
@@ -124,7 +158,12 @@ class BluetoothRecorderRadio(context: Context, private val io: CoroutineDispatch
         /** The Serial Port Profile service class: the recorder's XREC server (RFCOMM channel 1). */
         val SPP: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
         const val BOND_WAIT_MS = 60_000L
-        const val BOND_POLL_MS = 500L
+
+        /** A bond that is still NONE this long after `createBond()` did not start. */
+        const val START_GRACE_MS = 5_000L
+
+        /** Not a bond state of Android: the bond did not start. */
+        const val NOT_STARTED = -1
 
         fun closeQuietly(socket: BluetoothSocket) {
             try {

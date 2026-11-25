@@ -14,6 +14,7 @@ import java.io.IOException
 import java.io.OutputStream
 import java.security.GeneralSecurityException
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
 
 // The fakes of the recorder sync tests: a radio over FakeRecorder (the recorder's XREC state machine behind pipes), a
 // vault without the Keystore and a library that records what the sync asks for.
@@ -23,22 +24,28 @@ internal val DEVICE = RecorderDevice("00:11:22:33:44:55", "Cassini_55")
 /** Short waits: the fake recorder answers at once, and a lost frame should cost little test time. */
 internal val TEST_TIMEOUTS = XrecTimeouts(replyMillis = 2_000, frameMillis = 1_000, quietMillis = 50, drainMillis = 500)
 
-/** A radio whose recorder is [device]; each [open] after the first is a new link to the same recorder. */
+/**
+ * A radio whose recorder is [device]; each [open] after the first is a new link to the same recorder. With [stall], the
+ * link accepts no byte: a write blocks until the link closes, as a socket whose peer grants no credits.
+ */
 internal class FakeRadio(var device: FakeRecorder) : RecorderRadio {
     @Volatile var readiness = RadioReadiness.READY
 
     @Volatile var reachable = true
 
-    @Volatile var bondOk = true
+    @Volatile var bond = BondResult.BONDED
+
+    @Volatile var stall = false
     var opens = 0
         private set
 
     override fun readiness(): RadioReadiness = readiness
 
-    override suspend fun bond(address: String): Boolean = bondOk
+    override suspend fun bond(address: String): BondResult = bond
 
     override suspend fun open(address: String): RecorderLink {
         if (!reachable) throw IOException("No answer")
+        if (stall) return StalledLink()
         if (opens++ > 0) device = device.reconnect()
         val recorder = device
         return object : RecorderLink {
@@ -51,6 +58,26 @@ internal class FakeRadio(var device: FakeRecorder) : RecorderRadio {
                 stream.close()
             }
         }
+    }
+
+    private class StalledLink : RecorderLink {
+        private val closed = CountDownLatch(1)
+        override val input = XrecInput { _, _, _, _ -> if (closed.count == 0L) -1 else 0 }
+        override val output = object : OutputStream() {
+            override fun write(b: Int) {
+                // Ignores interrupts, as a socket write does; only the close ends it.
+                while (closed.count > 0) {
+                    try {
+                        closed.await()
+                    } catch (_: InterruptedException) {
+                        // A socket write does not end on an interrupt.
+                    }
+                }
+                throw IOException("Socket closed")
+            }
+        }
+
+        override fun close() = closed.countDown()
     }
 }
 
@@ -77,6 +104,9 @@ internal class FakeLibrary : RecorderLibrary {
 
     @Volatile var reject: String? = null
 
+    /** The next transcription request fails, as if the process ended after the import. */
+    @Volatile var failNextTranscribe = false
+
     override suspend fun import(file: File, displayName: String): LibraryImport {
         val bytes = file.readBytes()
         val existing = imported.entries.firstOrNull { it.value.contentEquals(bytes) }?.key
@@ -93,8 +123,14 @@ internal class FakeLibrary : RecorderLibrary {
     }
 
     override suspend fun transcribe(noteId: String) {
+        if (failNextTranscribe) {
+            failNextTranscribe = false
+            error("The transcription request failed")
+        }
         transcribed += noteId
     }
+
+    override suspend fun needsTranscription(noteId: String): Boolean = noteId !in transcribed && noteId !in ready
 
     override suspend fun transcripts(noteIds: Collection<String>): Map<String, RecorderTranscript> =
         synchronized(ready) { ready.filterKeys { it in noteIds } }
@@ -106,6 +142,7 @@ internal fun recorderSync(
     radio: FakeRadio,
     library: FakeLibrary,
     clock: () -> Long = { NOW },
+    stallMillis: Long = RecorderSync.DEFAULT_STALL_MS,
 ): Pair<RecorderSync, RecorderStore> {
     val store = RecorderStore(File(root, "recorder.json"), Dispatchers.IO)
     val sync = RecorderSync(
@@ -119,6 +156,7 @@ internal fun recorderSync(
             clock = clock,
             zone = { java.time.ZoneOffset.UTC },
             timeouts = TEST_TIMEOUTS,
+            stallMillis = stallMillis,
         ),
     )
     return sync to store

@@ -72,6 +72,9 @@ sealed interface BindFailure {
 
     data object Unreachable : BindFailure
 
+    /** The recorder refused the link over the phone's old bond: remove the bond in the Bluetooth settings. */
+    data object StaleBond : BindFailure
+
     data object PairingClosed : BindFailure
 
     data class Chooser(val reason: String?) : BindFailure
@@ -220,6 +223,7 @@ class RecorderViewModel(private val ports: RecorderScreenPorts) : ViewModel() {
         is BindOutcome.Unavailable -> BindFailure.Unavailable(outcome.readiness)
         BindOutcome.NotBonded -> BindFailure.NotBonded
         BindOutcome.Unreachable -> BindFailure.Unreachable
+        BindOutcome.StaleBond -> BindFailure.StaleBond
         BindOutcome.PairingClosed -> BindFailure.PairingClosed
         is BindOutcome.Failed -> BindFailure.Other(outcome.failure?.name ?: outcome.message)
     }

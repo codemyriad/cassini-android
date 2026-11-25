@@ -42,7 +42,7 @@ class SyncPlannerTest {
         val old = SyncedRecording("REC_0001.wav", 1_000, "n1", transcriptUploadedVersion = "v1")
         val state = RecorderSyncState(listOf(old))
         val plan = SyncPlanner.plan(listOf(file("REC_0001.wav", 2_000)), idle, state, mapOf("n1" to "v2"))
-        assertEquals(listOf(PlannedDownload("REC_0001.wav", 2_000, 0, old)), plan.downloads)
+        assertEquals(listOf(PlannedDownload("REC_0001.wav", 2_000)), plan.downloads)
         // The old note's transcript does not go to the new recording.
         assertTrue(plan.uploads.isEmpty())
     }
@@ -56,14 +56,15 @@ class SyncPlannerTest {
     }
 
     @Test fun resumesAStoppedDownloadOfTheSameFile() {
-        val state = RecorderSyncState(partial = PartialDownload("REC_0001.wav", 1_000, 640))
-        fun resumeOffset(size: Long): Long {
+        val partial = PartialDownload("REC_0001.wav", 1_000, 640)
+        val state = RecorderSyncState(partial = partial)
+        fun resume(size: Long): PartialDownload? {
             val plan = SyncPlanner.plan(listOf(file("REC_0001.wav", size)), idle, state, emptyMap())
-            return plan.downloads.single().resumeOffset
+            return plan.downloads.single().resume
         }
-        assertEquals(640L, resumeOffset(1_000))
+        assertEquals(partial, resume(1_000))
         // Another size: start again.
-        assertEquals(0L, resumeOffset(1_200))
+        assertNull(resume(1_200))
     }
 
     @Test fun uploadsMissingOrStaleTranscripts() {
@@ -95,6 +96,48 @@ class SyncPlannerTest {
             plan.uploads.map { it.sidecarName to it.transcriptVersion },
         )
         assertTrue(plan.downloads.isEmpty())
+    }
+
+    @Test fun aRefusedVersionIsNotSentAgainButANewOneIs() {
+        val refused = SyncedRecording("REC_0001.wav", 1_000, "n1", transcriptRefusedVersion = "v1")
+        val listing = listOf(file("REC_0001.wav", 1_000))
+        val state = RecorderSyncState(listOf(refused))
+        assertTrue(SyncPlanner.plan(listing, idle, state, mapOf("n1" to "v1")).uploads.isEmpty())
+        val newer = SyncPlanner.plan(listing, idle, state, mapOf("n1" to "v2"))
+        assertEquals(listOf("v2"), newer.uploads.map { it.transcriptVersion })
+    }
+
+    @Test fun aSidecarInAnotherCaseIsTheSameFile() {
+        val sent = SyncedRecording("REC_0001.wav", 1_000, "n1", transcriptUploadedVersion = "v1")
+        val state = RecorderSyncState(listOf(sent))
+        val listing = listOf(file("REC_0001.wav", 1_000), file("rec_0001.CWX", 300))
+        assertTrue(SyncPlanner.plan(listing, idle, state, mapOf("n1" to "v1")).uploads.isEmpty())
+    }
+
+    @Test fun suspectsAreKnownFilesWithoutTheirSidecar() {
+        val state = RecorderSyncState(
+            listOf(
+                SyncedRecording("REC_0001.wav", 1_000, "n1", "h1", transcriptUploadedVersion = "v1"), // sidecar gone
+                SyncedRecording("REC_0002.wav", 1_000, "n2", "h2", transcriptUploadedVersion = "v1"), // sidecar there
+                SyncedRecording("REC_0003.wav", 1_000, "n3", "h3"), // about to send a first one
+                SyncedRecording("REC_0004.wav", 1_000, "n4", "h4"), // nothing to send
+                SyncedRecording("REC_0005.wav", 1_000, "n5", null, transcriptUploadedVersion = "v1"), // no hash
+                SyncedRecording("REC_0006.wav", 1_000, "n6", "h6", transcriptUploadedVersion = "v1"), // other size
+                SyncedRecording("REC_0007.wav", 1_000, "n7", "h7", transcriptRefusedVersion = "v1"), // refused
+            ),
+        )
+        val listing = listOf(
+            file("REC_0001.wav", 1_000),
+            file("REC_0002.wav", 1_000),
+            file("REC_0002.cwx", 300),
+            file("REC_0003.wav", 1_000),
+            file("REC_0004.wav", 1_000),
+            file("REC_0005.wav", 1_000),
+            file("REC_0006.wav", 2_000),
+            file("REC_0007.wav", 1_000),
+        )
+        val suspects = SyncPlanner.suspects(listing, state, mapOf("n3" to "v1", "n7" to "v1"))
+        assertEquals(listOf("REC_0001.wav", "REC_0003.wav"), suspects.map { it.name })
     }
 
     @Test fun noUploadWhenTheSidecarNameIsTooLong() {

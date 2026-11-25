@@ -32,6 +32,12 @@ class GraphRecorderLibrary(
         graph.processing.transcribe(noteId, origin = StartOrigin.AUTOMATIC)
     }
 
+    override suspend fun needsTranscription(noteId: String): Boolean {
+        val catalogue = graph.awaitCatalogue()
+        val note = catalogue.notes.note(noteId).first()?.note ?: return false
+        return note.trashedAt == null && note.audioKind != AudioKind.DOCUMENT && catalogue.jobs.job(noteId) == null
+    }
+
     override suspend fun transcripts(noteIds: Collection<String>): Map<String, RecorderTranscript> {
         if (noteIds.isEmpty()) return emptyMap()
         val notes = graph.awaitCatalogue().notes

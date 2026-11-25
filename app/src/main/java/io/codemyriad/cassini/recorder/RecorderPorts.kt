@@ -29,15 +29,27 @@ enum class RadioReadiness {
     OFF,
 }
 
+/** How [RecorderRadio.bond] ended. */
+enum class BondResult {
+    /** The phone had a bond already. The recorder can have lost its side of it (a reset or new firmware). */
+    BONDED_BEFORE,
+
+    /** A new bond. */
+    BONDED,
+
+    /** No bond came in time, or the user or the recorder refused. */
+    FAILED,
+}
+
 /** Bluetooth, as the recorder sync needs it. */
 interface RecorderRadio {
     fun readiness(): RadioReadiness
 
     /**
      * Bonds with [address] when the phone has no bond with it yet: Android shows its pairing dialog, and the recorder
-     * accepts inside its pairing window. Returns false when no bond came in time or the user refused.
+     * accepts inside its pairing window.
      */
-    suspend fun bond(address: String): Boolean
+    suspend fun bond(address: String): BondResult
 
     /**
      * Opens the secure RFCOMM link to the recorder's SPP service. Throws an [java.io.IOException] when the recorder
@@ -77,6 +89,12 @@ interface RecorderLibrary {
 
     /** Asks for a transcription of [noteId]; without model consent the note waits for it ("Needs model"). */
     suspend fun transcribe(noteId: String)
+
+    /**
+     * True when the live note [noteId] has no transcript and no transcription job: an import that found the note
+     * already (the sync stopped between the import and the transcription request) asks for it then.
+     */
+    suspend fun needsTranscription(noteId: String): Boolean
 
     /** The finished transcripts of those of [noteIds] that have one now. */
     suspend fun transcripts(noteIds: Collection<String>): Map<String, RecorderTranscript>

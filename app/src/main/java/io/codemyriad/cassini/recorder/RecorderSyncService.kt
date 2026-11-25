@@ -21,7 +21,9 @@ import io.codemyriad.cassini.inAppLanguage
 import io.codemyriad.cassini.processing.NotificationChannels
 import io.codemyriad.cassini.startForegroundWithType
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import io.codemyriad.cassini.ui.R as UiR
@@ -29,15 +31,21 @@ import io.codemyriad.cassini.ui.R as UiR
 /**
  * The foreground lifetime of a recorder sync (type `connectedDevice`): it holds the process while
  * [RecorderSync.activity] is not idle, shows the step in its notification, and stops after the sync. The sync itself
- * runs in the application scope ([RecorderRunner]); a refused start does not stop it.
+ * runs in the application scope ([RecorderRunner]); a refused start does not stop it. The notification changes at
+ * most every [POST_INTERVAL_MS]: Android drops the updates of a package that posts more than a few each second.
  */
 class RecorderSyncService : LifecycleService() {
     private val sync: RecorderSync get() = (application as CassiniApplication).graph.recorder.sync
     private var follower: Job? = null
     private var foreground = false
 
+    /** The last start request, and whether it came while [follow] ran: all on the main thread. */
+    private var lastStartId = 0
+    private var restarted = false
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        lastStartId = startId
         if (!foreground) {
             foreground = enterForeground(RecorderNotifications.build(this, sync.activity.value))
             if (!foreground) {
@@ -45,7 +53,7 @@ class RecorderSyncService : LifecycleService() {
                 return START_NOT_STICKY
             }
         }
-        if (follower?.isActive != true) follower = lifecycleScope.launch { follow() }
+        if (follower?.isActive == true) restarted = true else follower = lifecycleScope.launch { follow() }
         return START_NOT_STICKY
     }
 
@@ -54,16 +62,23 @@ class RecorderSyncService : LifecycleService() {
         super.onDestroy()
     }
 
-    /** Waits for the sync to start (the service can start first), shows its steps, then stops when it is idle. */
+    /**
+     * Waits for the sync to start (the service can start first), shows its steps, then stops when it is idle, unless a
+     * new start request came meanwhile (then it follows the next sync).
+     */
     private suspend fun follow() {
-        withTimeoutOrNull(START_GRACE_MS) { sync.activity.first { it != RecorderActivity.Idle } }
-        sync.activity.first { activity ->
-            if (activity != RecorderActivity.Idle) post(RecorderNotifications.build(this, activity))
-            activity == RecorderActivity.Idle
-        }
+        do {
+            restarted = false
+            withTimeoutOrNull(START_GRACE_MS) { sync.activity.first { it != RecorderActivity.Idle } }
+            // A StateFlow keeps only its last value: while the collector waits, the steps in between are skipped.
+            sync.activity.takeWhile { it != RecorderActivity.Idle }.collect { activity ->
+                post(RecorderNotifications.build(this, activity))
+                delay(POST_INTERVAL_MS)
+            }
+        } while (restarted)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         foreground = false
-        stopSelf()
+        stopSelfResult(lastStartId)
     }
 
     private fun post(notification: Notification) {
@@ -94,6 +109,7 @@ class RecorderSyncService : LifecycleService() {
     companion object {
         private const val TAG = "RecorderSyncService"
         private const val START_GRACE_MS = 10_000L
+        private const val POST_INTERVAL_MS = 500L
 
         fun intent(context: Context): Intent = Intent(context, RecorderSyncService::class.java)
     }

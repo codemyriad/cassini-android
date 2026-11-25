@@ -54,6 +54,7 @@
     <string name="recorder_try_again">Try again</string>
     <string name="recorder_bind_failed_not_bonded">Android did not pair with the recorder. Press ENTER on the recorder, then try again.</string>
     <string name="recorder_bind_failed_unreachable">The recorder did not answer. Make sure that it shows its Bluetooth screen.</string>
+    <string name="recorder_bind_failed_stale_bond">The recorder does not know this phone any more. In the Bluetooth settings of Android, forget the recorder. Then bind it again.</string>
     <string name="recorder_bind_failed_closed">The pairing window of the recorder is closed. Press ENTER on the recorder, then try again.</string>
     <string name="recorder_bind_failed_chooser">Android could not show the recorders (%1$s).</string>
     <string name="recorder_bind_failed_other">Binding failed (%1$s).</string>

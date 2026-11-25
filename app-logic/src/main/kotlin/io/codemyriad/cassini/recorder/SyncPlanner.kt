@@ -7,7 +7,8 @@ import io.codemyriad.cassini.core.recorder.XrecReply
 /**
  * One recording of one recorder that the app has imported. The sync identity is ([name], [size]): the recorder can
  * number its files from 1 again after the card is wiped, so the same name with another size is a new recording.
- * [headSha256] is the SHA-256 of the first 4 KiB, when the app stored it, to compare after a download.
+ * [headSha256] is the SHA-256 of the first 4 KiB: a file with the same name and size whose sidecar is missing is
+ * compared with it ([SyncPlanner.suspects]), so a new recording that reuses both after a wipe is found.
  */
 data class SyncedRecording(
     val name: String,
@@ -16,6 +17,8 @@ data class SyncedRecording(
     val headSha256: String? = null,
     /** The transcript version that is on the recorder as the sidecar, or null when the app has not sent one. */
     val transcriptUploadedVersion: String? = null,
+    /** The transcript version that the recorder refused for good (a bad name): it is not sent again. */
+    val transcriptRefusedVersion: String? = null,
 )
 
 /** A download that stopped before its end; [bytes] are on disk. */
@@ -45,10 +48,11 @@ enum class SkipReason {
 data class PlannedDownload(
     val name: String,
     val size: Long,
-    /** The bytes to keep from an earlier, stopped download of the same file. */
-    val resumeOffset: Long,
-    /** The state of an earlier recording with the same name and another size, which this one replaces. */
-    val replaces: SyncedRecording?,
+    /**
+     * The stopped download of this same file (name and size), or null: start from 0. The sync continues from the
+     * length of its `.part` file, which can be ahead of the stored bytes after process death.
+     */
+    val resume: PartialDownload? = null,
 )
 
 data class PlannedUpload(
@@ -74,8 +78,8 @@ data class SyncPlan(
  * - Download each `.wav` larger than its header that the state does not have with the same name and size. While the
  *   recorder records (STAT media 33), no download starts. A stopped download of the same name and size resumes.
  * - Upload the transcript of each imported recording that is still on the recorder, when the note has a transcript and
- *   the recorder has no sidecar for it or an older one. Uploads also run while the recorder records: they go to a
- *   temporary file that PUTEND commits.
+ *   the recorder has no sidecar for it or an older one, unless the recorder refused that version for good. Uploads
+ *   also run while the recorder records: they go to a temporary file that PUTEND commits.
  */
 object SyncPlanner {
     fun plan(
@@ -99,6 +103,26 @@ object SyncPlanner {
         return SyncPlan(downloads, uploads, skipped, status.recording)
     }
 
+    /**
+     * The imported recordings to compare by their first 4 KiB before the sync trusts (name, size): the listing has the
+     * file but not its sidecar, although the app sent one or is about to send one. After a card wipe, a new recording
+     * can have the name and the size of an old one; the old note's transcript must not go to it.
+     */
+    fun suspects(
+        listing: List<XrecReply.Entry>,
+        state: RecorderSyncState,
+        transcriptVersions: Map<String, String>,
+    ): List<SyncedRecording> = state.recordings.filter { recording ->
+        val sidecar = XrecNames.sidecarFor(recording.name)
+        val version = recording.noteId?.let(transcriptVersions::get)
+        val sendsOrSent = recording.transcriptUploadedVersion != null ||
+            (version != null && version != recording.transcriptRefusedVersion)
+        recording.headSha256 != null && sidecar != null && sendsOrSent && listing.has(recording.name, recording.size) &&
+            listing.none { it.name.equals(sidecar, ignoreCase = true) }
+    }
+
+    private fun List<XrecReply.Entry>.has(name: String, size: Long) = any { it.name == name && it.size == size }
+
     private fun skipReason(entry: XrecReply.Entry, status: XrecReply.Status): SkipReason? = when {
         !XrecNames.isWav(entry.name) -> SkipReason.NOT_WAV
         entry.size <= XrecLimits.EMPTY_WAV_BYTES -> SkipReason.EMPTY
@@ -110,8 +134,7 @@ object SyncPlanner {
     private fun download(entry: XrecReply.Entry, state: RecorderSyncState): PlannedDownload {
         val partial = state.partial?.takeIf { it.name == entry.name && it.size == entry.size }
             ?.takeIf { it.bytes in 0..entry.size }
-        val replaces = state.recordings.lastOrNull { it.name == entry.name && it.size != entry.size }
-        return PlannedDownload(entry.name, entry.size, partial?.bytes ?: 0L, replaces)
+        return PlannedDownload(entry.name, entry.size, partial)
     }
 
     private fun upload(
@@ -120,10 +143,13 @@ object SyncPlanner {
         transcriptVersions: Map<String, String>,
     ): PlannedUpload? {
         val version = recording.noteId?.let(transcriptVersions::get)
-        val present = listing.any { it.name == recording.name && it.size == recording.size }
         val sidecar = XrecNames.sidecarFor(recording.name)
-        if (version == null || !present || sidecar == null) return null
-        val current = recording.transcriptUploadedVersion == version && listing.any { it.name == sidecar }
-        return if (current) null else PlannedUpload(recording, sidecar, version)
+        val wanted = version != null && sidecar != null && listing.has(recording.name, recording.size) &&
+            recording.transcriptRefusedVersion != version
+        if (!wanted) return null
+        // The card's names are case-insensitive.
+        val current = recording.transcriptUploadedVersion == version &&
+            listing.any { it.name.equals(sidecar, ignoreCase = true) }
+        return if (current) null else PlannedUpload(recording, checkNotNull(sidecar), checkNotNull(version))
     }
 }

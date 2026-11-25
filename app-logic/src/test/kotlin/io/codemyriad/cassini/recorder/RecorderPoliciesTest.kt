@@ -26,4 +26,26 @@ class RecorderPoliciesTest {
         assertEquals(AutoSyncBackoff.MAX_MS, AutoSyncBackoff.delayMs(5))
         assertEquals(AutoSyncBackoff.MAX_MS, AutoSyncBackoff.delayMs(Int.MAX_VALUE))
     }
+
+    @Test fun idleSyncsDoubleTheWaitUpToTheCap() {
+        assertEquals(AutoSyncBackoff.INTERVAL_MS, AutoSyncBackoff.delayMs(0, idle = 0))
+        assertEquals(360_000L, AutoSyncBackoff.delayMs(0, idle = 1))
+        assertEquals(720_000L, AutoSyncBackoff.delayMs(0, idle = 2))
+        assertEquals(AutoSyncBackoff.MAX_MS, AutoSyncBackoff.delayMs(0, idle = 3))
+        assertEquals(AutoSyncBackoff.MAX_MS, AutoSyncBackoff.delayMs(0, idle = Int.MAX_VALUE))
+        // A failure counts first.
+        assertEquals(60_000L, AutoSyncBackoff.delayMs(1, idle = 3))
+    }
+
+    @Test fun aFirmwareThatRefusedTranscriptsIsAskedAgainDailyOrAfterAChange() {
+        val day = TranscriptUploadProbe.RETRY_MS
+        assertTrue(TranscriptUploadProbe.mayUpload(null, null, "openfw_v5", 0))
+        assertFalse(TranscriptUploadProbe.mayUpload("openfw_v5", 1_000, "openfw_v5", 1_000 + day - 1))
+        assertTrue(TranscriptUploadProbe.mayUpload("openfw_v5", 1_000, "openfw_v5", 1_000 + day))
+        assertTrue(TranscriptUploadProbe.mayUpload("openfw_v5", 1_000, "openfw_v6", 2_000))
+        // A clock that went back does not stop the uploads for good.
+        assertTrue(TranscriptUploadProbe.mayUpload("openfw_v5", 1_000, "openfw_v5", 500))
+        // A refusal stored without its time (an older state file) is asked again.
+        assertTrue(TranscriptUploadProbe.mayUpload("openfw_v5", null, "openfw_v5", 0))
+    }
 }

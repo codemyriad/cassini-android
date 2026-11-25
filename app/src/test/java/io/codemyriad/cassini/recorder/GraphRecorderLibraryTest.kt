@@ -14,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
@@ -59,8 +60,13 @@ class GraphRecorderLibraryTest {
         assertEquals("REC_0001", notes.note(noteId).first()!!.note.title)
         assertEquals(LibraryImport.Existing(noteId), library.import(wav, "REC_0001.wav"))
 
+        // No transcript and no job yet: a sync that found the note again asks for the transcription.
+        assertTrue(library.needsTranscription(noteId))
         library.transcribe(noteId)
         assertEquals(JobState.NEEDS_CONSENT, graph.awaitCatalogue().jobs.job(noteId)?.state)
+        // A job exists now: no second request.
+        assertFalse(library.needsTranscription(noteId))
+        assertFalse(library.needsTranscription("missing"))
         assertEquals(emptyMap<String, RecorderTranscript>(), library.transcripts(listOf(noteId, "missing")))
     }
 
