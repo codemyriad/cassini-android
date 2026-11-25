@@ -497,4 +497,5 @@
     <string name="ui_transcription_after_recording">Dopo la registrazione</string>
     <string name="ui_actions_export">Esporta…</string>
     <string name="ui_actions_export_body">File Cassini, Markdown e altro</string>
+    <string name="ui_name_voices_off">Il riconoscimento vocale è disattivato. Attivalo nelle %1$s per ricordare le voci.</string>
 </resources>

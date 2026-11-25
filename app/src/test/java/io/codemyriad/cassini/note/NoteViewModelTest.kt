@@ -949,6 +949,15 @@ class NoteViewModelTest {
 
     // Naming. ---------------------------------------------------------------------------------------------------
 
+    /** QA 25 Nov: the Settings link under Remember this voice opens Settings and keeps the sheet for the return. */
+    @Test
+    fun theNameSheetSettingsLinkOpensSettingsAndKeepsTheSheet() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.SpeakerTap("b"), NoteEvent.NameSheet(NameSheetEvent.OpenSettings))
+        assertEquals(NoteEffect.OpenSettings, effects.last())
+        assertTrue(viewModel.now().sheet is NoteSheet.NameSpeaker)
+    }
+
     @Test
     fun theNameSheetAsksAboutTheSamePersonThenEnrolsANewVoice() = runTest(dispatcher) {
         val viewModel = viewModel()

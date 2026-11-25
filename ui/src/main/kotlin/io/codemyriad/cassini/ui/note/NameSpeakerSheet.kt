@@ -41,8 +41,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
 import io.codemyriad.cassini.ui.R
@@ -162,7 +169,7 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
                     modifier = Modifier.offset(x = (-14).dp),
                 )
             }
-            RememberVoiceCard(ui, rememberSubtitle(ui), onEvent)
+            RememberVoiceCard(ui, rememberSubtitle(ui, onEvent), onEvent)
         }
         // Bottom 25: board 04's Cancel is 50 dp tall (a content-box border) and centres Save in its row. Top 16: the
         // gap of the column above.
@@ -317,23 +324,50 @@ private fun RowDivider() {
     )
 }
 
-/** "Future notes will name Anna automatically. …", or why Remember is disabled. */
+/**
+ * "Future notes will name Anna automatically. …", or why Remember is disabled. With voice recognition off it is the
+ * short "Voice recognition is off. Turn it on in Settings to remember voices.", where Settings is a link that opens
+ * Settings (QA 25 Nov, [NameSheetEvent.OpenSettings]).
+ */
 @Composable
-private fun rememberSubtitle(ui: NameSheetUi): String {
+private fun rememberSubtitle(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit): AnnotatedString {
     val reason = ui.rememberReason
     if (!ui.rememberEnabled && reason != null) {
         return when (reason) {
-            RememberReason.NO_MODEL -> stringResource(R.string.ui_sp_remember_models)
-            RememberReason.TOO_LITTLE_SPEECH -> stringResource(R.string.ui_sp_remember_too_short)
+            RememberReason.NO_MODEL -> voicesOffLine(onEvent)
+            RememberReason.TOO_LITTLE_SPEECH -> AnnotatedString(stringResource(R.string.ui_sp_remember_too_short))
         }
     }
     val name = ui.name.trim()
-    return if (name.isEmpty()) {
-        stringResource(R.string.ui_sp_remember_unnamed)
-    } else {
-        stringResource(R.string.ui_sp_remember_body, name)
+    return AnnotatedString(
+        if (name.isEmpty()) {
+            stringResource(R.string.ui_sp_remember_unnamed)
+        } else {
+            stringResource(R.string.ui_sp_remember_body, name)
+        },
+    )
+}
+
+@Composable
+private fun voicesOffLine(onEvent: (NameSheetEvent) -> Unit): AnnotatedString {
+    val c = CassiniTheme.colors
+    val link = stringResource(R.string.ui_settings_title)
+    val line = stringResource(R.string.ui_name_voices_off, LINK_MARK)
+    val at = line.indexOf(LINK_MARK)
+    return buildAnnotatedString {
+        append(line.substring(0, at.coerceAtLeast(0)))
+        withLink(
+            LinkAnnotation.Clickable(
+                tag = "settings",
+                styles = TextLinkStyles(SpanStyle(color = c.accentInk, fontWeight = FontWeight.SemiBold)),
+            ) { onEvent(NameSheetEvent.OpenSettings) },
+        ) { append(link) }
+        if (at >= 0) append(line.substring(at + LINK_MARK.length))
     }
 }
+
+/** Stands for the Settings link in `ui_name_voices_off` while the line is split around it. */
+private const val LINK_MARK = "\u0000"
 
 /**
  * The footer, 4 dp below the gap: "Merge into…" at the start (its text 14 dp in, as on the board), then Cancel and

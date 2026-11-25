@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performFirstLinkClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
@@ -181,6 +182,17 @@ class SheetBehaviourTest {
         rule.onNodeWithText("Show all").performClick()
         rule.onNodeWithText("Not Anna Ricci?").performClick()
         rule.runOnIdle { assertEquals(listOf(NameSheetEvent.ShowAll, NameSheetEvent.NotName), events) }
+    }
+
+    /** QA 25 Nov: with voice recognition off, one short line whose "Settings" opens Settings. */
+    @Test fun voiceRecognitionOffLinksToSettings() {
+        val events = mutableListOf<NameSheetEvent>()
+        setThemed {
+            NameSpeakerSheetContent(VariantFixtures.nameSheet.getValue("name-no-model"), onEvent = { events += it })
+        }
+        val line = "Voice recognition is off. Turn it on in Settings to remember voices."
+        rule.onNodeWithText(line, useUnmergedTree = true).performScrollTo().performFirstLinkClick()
+        rule.runOnIdle { assertEquals(listOf<NameSheetEvent>(NameSheetEvent.OpenSettings), events) }
     }
 
     @Test fun exportShowsHeadingSizeAndOneLineDescriptions() {

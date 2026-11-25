@@ -110,6 +110,9 @@ sealed interface NameSheetEvent {
 
     data object Save : NameSheetEvent
 
+    /** The Settings link of "Voice recognition is off. Turn it on in Settings to remember voices." (QA 25 Nov). */
+    data object OpenSettings : NameSheetEvent
+
     /**
      * Save was pressed while [SaveState.BLOCKED_BY_QUESTION]: the screen moves accessibility focus to the question
      * and announces "Answer the question above first"; the ViewModel may pulse the card.

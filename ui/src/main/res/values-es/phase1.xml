@@ -61,7 +61,6 @@
     <string name="ui_sp_remember_body">Cassini pondrá el nombre %1$s automáticamente la próxima vez.\nLa huella de voz se queda en este teléfono.</string>
     <string name="ui_sp_remember_unnamed">Cassini pondrá nombre a esta persona automáticamente la próxima vez.\nLa huella de voz se queda en este teléfono.</string>
     <string name="ui_sp_remember_too_short">Cassini necesita al menos 4 segundos de esta voz para recordarla.</string>
-    <string name="ui_sp_remember_models">Para recordar voces, descarga y activa Distinguir hablantes y Reconocer voces guardadas en Ajustes.</string>
     <string name="ui_sp_merge">Fusionar con…</string>
     <string name="ui_sp_save">Guardar nombre</string>
     <plurals name="ui_tx_eta_minutes">
