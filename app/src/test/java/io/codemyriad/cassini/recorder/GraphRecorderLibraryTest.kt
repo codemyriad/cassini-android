@@ -3,15 +3,21 @@ package io.codemyriad.cassini.recorder
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.format.CassiniDocument
+import io.codemyriad.cassini.core.format.OggOpus
+import io.codemyriad.cassini.core.format.Transcript
+import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
+import io.codemyriad.cassini.data.db.NoteCache
 import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,6 +31,7 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.time.Instant
 
 /** The library port of the recorder sync over a real graph: import, the consent wait, and no transcript yet. */
 @RunWith(RobolectricTestRunner::class)
@@ -68,6 +75,70 @@ class GraphRecorderLibraryTest {
         assertFalse(library.needsTranscription(noteId))
         assertFalse(library.needsTranscription("missing"))
         assertEquals(emptyMap<String, RecorderTranscript>(), library.transcripts(listOf(noteId, "missing")))
+    }
+
+    @Test fun transcriptsRefreshDroppedWordCacheAndFallBackToAReadableVariant() = runBlocking {
+        val paths = AppPaths(folder.newFolder(), folder.newFolder(), modelRoot = folder.newFolder())
+        graph = AppGraph(
+            context,
+            AppGraph.Config(
+                paths = paths,
+                dispatchers = CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined),
+                fetcher = ModelFetcher { _, _, _ -> fail("No model is fetched in this test") },
+                network = { false },
+            ),
+        )
+        val library = GraphRecorderLibrary(graph) { "Speaker $it" }
+        val opus = sealedDocument("Standup", listOf("Hello", "world"))
+        val imported = withTimeout(TIMEOUT_MS) { library.import(opus, "Standup.opus") } as LibraryImport.Created
+        val noteId = imported.noteId
+
+        // Evicting the cached word rows must re-derive them from document.opus instead of producing an empty CWX.
+        val cache = graph.awaitCatalogue().database.cache()
+        cache.dropWords(noteId)
+        val refreshed = library.transcripts(listOf(noteId)).getValue(noteId)
+        assertEquals(listOf("Hello", "world"), refreshed.cwx.words.map { it.text })
+
+        // If selectedVariant names an unreadable variant (and no variant is marked default), fall back to the first
+        // readable variant with words, matching NoteRepository.selectedVariant.
+        val details = graph.awaitCatalogue().notes.note(noteId).first()!!
+        val good = details.variants.single().copy(isDefault = false, ordinal = 1)
+        val unreadable = good.copy(variantId = "broken", ordinal = 0, readable = false, isDefault = false)
+        val words = cache.words(noteId, good.variantId)
+        cache.replaceCache(
+            NoteCache(
+                note = details.note.copy(selectedVariant = "broken"),
+                variants = listOf(unreadable, good),
+                speakers = details.speakers,
+                words = words,
+                body = "Hello world",
+            ),
+        )
+        val fallback = library.transcripts(listOf(noteId)).getValue(noteId)
+        assertEquals(good.variantId, fallback.variantId)
+        assertEquals(listOf("Hello", "world"), fallback.cwx.words.map { it.text })
+    }
+
+    private fun sealedDocument(title: String, words: List<String>): File {
+        val dir = folder.newFolder()
+        val raw = File(dir, "raw.opus")
+        val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0x38, 1, -128, -69, 0, 0, 0, 0, 0)
+        val tags = CassiniDocument.tagsPacket(listOf("ENCODER=test"))
+        val packets = (0 until 8).map { idx -> byteArrayOf(0xF8.toByte(), idx.toByte(), 1) }
+        raw.writeBytes(OggOpus.mux(OggOpus.Stream(head, tags, packets, 8 * 960L, true), tags, 0xCA55))
+        val out = File(dir, "sealed.opus")
+        val transcript = Transcript(words.mapIndexed { idx, w -> Word("S1", idx * 400L, idx * 400L + 300L, w) })
+        CassiniDocument.create(
+            raw,
+            transcript,
+            title,
+            JSONObject().put("engine", "test"),
+            null,
+            mapOf("S1" to "Ada"),
+            out,
+            createdAtUtc = Instant.parse("2026-11-25T10:00:00Z"),
+        )
+        return out
     }
 
     /** A 16 kHz mono 16-bit PCM WAV of [samples] samples of a quiet tone. */

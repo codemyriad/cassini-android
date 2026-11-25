@@ -49,16 +49,20 @@ class GraphRecorderLibrary(
     }
 
     /** The shown variant of [noteId] when it is a finished, readable transcript. */
+    @Suppress("ReturnCount") // absent note, no readable variant, or an unrecoverable word cache
     private suspend fun transcript(notes: NoteRepository, noteId: String): RecorderTranscript? {
+        notes.note(noteId).first()
+            ?.takeIf { it.note.audioKind == AudioKind.DOCUMENT && it.note.trashedAt == null } ?: return null
+        notes.refreshIfStale(noteId)
         val details = notes.note(noteId).first()
-            ?.takeIf { it.note.audioKind == AudioKind.DOCUMENT && it.note.trashedAt == null }
-        val variant = details?.variants?.let { variants ->
-            variants.firstOrNull { it.variantId == details.note.selectedVariant }
-                ?: variants.firstOrNull { it.isDefault }
-        }
-        val finished = variant?.takeIf { it.readable && it.wordCount > 0 }
-        if (details == null || finished == null) return null
+            ?.takeIf { it.note.audioKind == AudioKind.DOCUMENT && it.note.trashedAt == null } ?: return null
+        val candidates = details.variants.filter { it.readable && it.wordCount > 0 }
+        val finished = candidates.firstOrNull { it.variantId == details.note.selectedVariant }
+            ?: candidates.firstOrNull { it.isDefault }
+            ?: candidates.firstOrNull()
+            ?: return null
         val words = notes.words(noteId, finished.variantId)
+        if (words.isEmpty()) return null
         val speakers = details.speakers.filter { it.variantId == finished.variantId }
         val note = details.note
         return RecorderTranscript(
