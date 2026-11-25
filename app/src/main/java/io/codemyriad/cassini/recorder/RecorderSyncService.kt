@@ -87,13 +87,14 @@ class RecorderSyncService : LifecycleService() {
     }
 
     private suspend fun followActiveSync() {
-        while (true) {
-            val activity = sync.activity.value
-            if (activity == RecorderActivity.Idle) break
+        var activity = sync.activity.value
+        while (activity != RecorderActivity.Idle) {
             post(RecorderNotifications.build(this, activity))
             withTimeoutOrNull(POST_INTERVAL_MS) { sync.activity.first { it == RecorderActivity.Idle } }
-            if (sync.activity.value == RecorderActivity.Idle) break
-            sync.activity.first { it != activity }
+            if (sync.activity.value != RecorderActivity.Idle) {
+                sync.activity.first { it != activity }
+            }
+            activity = sync.activity.value
         }
     }
 

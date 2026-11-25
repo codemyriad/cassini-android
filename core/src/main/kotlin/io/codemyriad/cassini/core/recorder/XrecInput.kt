@@ -42,7 +42,7 @@ class StreamXrecInput(
 
     override fun read(buffer: ByteArray, offset: Int, length: Int, timeoutMillis: Long): Int = lock.withLock {
         var remaining = TimeUnit.MILLISECONDS.toNanos(timeoutMillis.coerceAtLeast(0))
-        while (count == 0 && !ended && !closed && remaining > 0) {
+        while (canWait() && remaining > 0) {
             remaining = changed.awaitNanos(remaining)
         }
         when {
@@ -52,6 +52,8 @@ class StreamXrecInput(
             else -> 0
         }
     }
+
+    private fun canWait(): Boolean = count == 0 && !ended && !closed
 
     override fun close() {
         lock.withLock {

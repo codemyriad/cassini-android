@@ -57,7 +57,8 @@ class RecorderAndroidAdaptersTest {
     }
 
     @Suppress("DEPRECATION")
-    @Test fun companionResultFallsBackToBluetoothDeviceNameWhenAssociationDisplayNameIsNull() {
+    @Test
+    fun companionResultFallsBackToBluetoothDeviceNameWhenAssociationDisplayNameIsNull() {
         val btDevice = adapter.getRemoteDevice("00:11:22:33:44:55")
         shadowOf(btDevice).setName("Cassini_55")
 

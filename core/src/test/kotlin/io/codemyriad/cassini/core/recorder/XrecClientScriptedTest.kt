@@ -328,7 +328,13 @@ class XrecClientScriptedTest {
         val b = ByteArray(640) { 9 }
         val device = OpenFwGetsDevice(mapOf("a.wav" to a, "b.wav" to b))
         var clock = 0L
-        val client = XrecClient(device.input { clock += it }, device.output, timeouts, clock = { clock }, maxRetries = 2)
+        val client = XrecClient(
+            device.input { clock += it },
+            device.output,
+            timeouts,
+            clock = { clock },
+            maxRetries = 2,
+        )
 
         // Window 1 (0..20000) stalls after frame 0, then delivers the rest late just as window 2 (640..20000) starts;
         // window 2 pauses after 2 frames so drain() ends while ~18 KiB of window 2 still wait in gets_rem.
@@ -432,34 +438,36 @@ class XrecClientScriptedTest {
         }
 
         private fun pumpOneGetsFrame() {
-            val data = getsFile ?: return
-            if (getsRem <= 0) return
-            if (getsCount == 1 && pauseFirstWindowAt == getsOffset) {
-                pauseFirstWindowAt = null
-                val rest = mutableListOf<ByteArray>()
-                var at = getsOffset.toInt()
-                while (at < data.size && getsRem > 0) {
-                    val n = minOf(getsChunk, data.size - at, getsRem.toInt())
-                    rest += frame(at.toLong(), data.copyOfRange(at, at + n))
-                    at += n
-                    getsRem -= n
+            val data = getsFile
+            when {
+                data == null || getsRem <= 0 -> Unit
+                getsCount == 1 && pauseFirstWindowAt == getsOffset -> {
+                    pauseFirstWindowAt = null
+                    val rest = mutableListOf<ByteArray>()
+                    var at = getsOffset.toInt()
+                    while (at < data.size && getsRem > 0) {
+                        val n = minOf(getsChunk, data.size - at, getsRem.toInt())
+                        rest += frame(at.toLong(), data.copyOfRange(at, at + n))
+                        at += n
+                        getsRem -= n
+                    }
+                    delayedWindow = rest
+                    getsFile = null
                 }
-                delayedWindow = rest
-                getsFile = null
-                return
+                getsCount == 2 && pauseSecondWindowAfterFrames == framesSentInCurrentGets -> {
+                    pauseSecondWindowAfterFrames = null
+                }
+                else -> {
+                    val want = minOf(getsRem, getsChunk.toLong()).toInt()
+                    val got = if (getsOffset >= data.size) 0 else minOf(want.toLong(), data.size - getsOffset).toInt()
+                    val from = getsOffset.toInt().coerceAtMost(data.size)
+                    wire.addLast(frame(getsOffset, data.copyOfRange(from, from + got)))
+                    getsOffset += got
+                    getsRem -= got
+                    framesSentInCurrentGets++
+                    if (got < want || getsRem == 0L) getsFile = null
+                }
             }
-            if (getsCount == 2 && pauseSecondWindowAfterFrames == framesSentInCurrentGets) {
-                pauseSecondWindowAfterFrames = null
-                return
-            }
-            val want = minOf(getsRem, getsChunk.toLong()).toInt()
-            val got = if (getsOffset >= data.size) 0 else minOf(want.toLong(), data.size - getsOffset).toInt()
-            val from = getsOffset.toInt().coerceAtMost(data.size)
-            wire.addLast(frame(getsOffset, data.copyOfRange(from, from + got)))
-            getsOffset += got
-            getsRem -= got
-            framesSentInCurrentGets++
-            if (got < want || getsRem == 0L) getsFile = null
         }
     }
 

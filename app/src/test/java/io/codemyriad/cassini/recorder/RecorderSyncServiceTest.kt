@@ -128,7 +128,10 @@ class RecorderSyncServiceTest {
         service.onStartCommand(RecorderSyncService.intent(app), 0, 1)
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertTrue("Service should stop immediately when no sync is active or pending", shadowOf(service).isStoppedBySelf)
+        assertTrue(
+            "Service should stop immediately when no sync is active or pending",
+            shadowOf(service).isStoppedBySelf,
+        )
         assertTrue(shadowOf(service).isForegroundStopped)
     }
 

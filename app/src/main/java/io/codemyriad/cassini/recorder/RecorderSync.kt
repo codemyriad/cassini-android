@@ -235,7 +235,7 @@ class RecorderSync(private val parts: Parts) {
                 running = mode
                 active.update { it + 1 }
                 true
-            } else if (mode == SyncMode.FULL && running == SyncMode.UPLOADS && !fullQueued && bindWaiters == 0) {
+            } else if (canQueueFull(mode)) {
                 fullQueued = true
                 active.update { it + 1 }
                 false
@@ -354,6 +354,9 @@ class RecorderSync(private val parts: Parts) {
             releaseLock()
         }
     }
+
+    private fun canQueueFull(mode: SyncMode): Boolean =
+        mode == SyncMode.FULL && running == SyncMode.UPLOADS && !fullQueued && bindWaiters == 0
 
     private fun releaseLock() {
         synchronized(stateLock) {
@@ -508,7 +511,7 @@ class RecorderSync(private val parts: Parts) {
         }
         // A transcript can have finished during the downloads (a long one, or an existing note): it goes now too.
         val checked = (suspects.map { fileKey(it.name) } + plan.downloads.map { fileKey(it.name) }).toSet()
-        val (uploads, latest) = latestUploads(session, address, listing, status, checked, unverified)
+        val (uploads, latest) = latestUploads(session, address, listing, status, SuspectChecks(checked, unverified))
         val sent = upload(session, address, pong, uploads, latest, holdUploads)
         withContext(parts.io) { deleteStrayParts(address) }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
@@ -566,23 +569,25 @@ class RecorderSync(private val parts: Parts) {
         }
     }
 
+    private class SuspectChecks(val checked: Set<String>, val unverified: Set<String>)
+
     /**
      * The uploads and their transcripts as the library has them now, after the downloads. A recording whose transcript
-     * finished meanwhile is compared first, unless [checked] (by name) already.
+     * finished meanwhile is compared first, unless already in [checks].
      */
     private suspend fun latestUploads(
         session: Session,
         address: String,
         listing: List<XrecReply.Entry>,
         status: XrecReply.Status,
-        checked: Set<String>,
-        unverified: Set<String>,
+        checks: SuspectChecks,
     ): Pair<List<PlannedUpload>, Map<String, EncodedTranscript>> {
         val noteIds = deviceState(address).recordings.mapNotNull { it.recording.noteId }
         val transcripts = encode(parts.library.transcripts(noteIds))
         val versions = transcripts.mapValues { it.value.version }
         val suspects = SyncPlanner.suspects(listing, deviceState(address).syncState(), versions)
-        val skipped = unverified + verifySuspects(session, address, suspects.filterNot { fileKey(it.name) in checked })
+        val remaining = suspects.filterNot { fileKey(it.name) in checks.checked }
+        val skipped = checks.unverified + verifySuspects(session, address, remaining)
         val uploads = SyncPlanner.plan(listing, status, deviceState(address).syncState(), versions)
             .uploads
             .filterNot { fileKey(it.recording.name) in skipped }

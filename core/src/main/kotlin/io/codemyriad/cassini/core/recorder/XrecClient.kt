@@ -180,20 +180,7 @@ class XrecClient(
                 burst(name, size, transfer, sink, progress)
             } catch (e: XrecException) {
                 if (!e.transient) throw e
-                transfer.retries++
-                transfer.recovering = true
-                failures = if (transfer.offset > before) 1 else failures + 1
-                // The rest of the window still streams: the link is quiet again before a retry or the next command.
-                drain(drainLimit(transfer.lastWindow), heartbeat)
-                if (failures > maxRetries) {
-                    if (transfer.requests > 0) stopGets(name, size)
-                    val message = "Download of $name failed at ${transfer.offset}"
-                    throw XrecException(XrecFailure.INTEGRITY, message, cause = e)
-                }
-                if (failures >= FALLBACK_FAILURES && getsWindow > XrecLimits.STOCK_GETS_WINDOW) {
-                    getsWindow = XrecLimits.STOCK_GETS_WINDOW
-                    onFallback(name, transfer.offset, getsWindow)
-                }
+                failures = recoverDownload(name, size, transfer, before, failures, heartbeat, e)
             }
         }
         if (transfer.recovering) {
@@ -209,6 +196,33 @@ class XrecClient(
             window = getsWindow,
         )
         return transfer.offset
+    }
+
+    @Suppress("LongParameterList") // internal recovery state of download()
+    private fun recoverDownload(
+        name: String,
+        size: Long,
+        transfer: Transfer,
+        before: Long,
+        previousFailures: Int,
+        heartbeat: () -> Unit,
+        cause: XrecException,
+    ): Int {
+        transfer.retries++
+        transfer.recovering = true
+        val failures = if (transfer.offset > before) 1 else previousFailures + 1
+        // The rest of the window still streams: the link is quiet again before a retry or the next command.
+        drain(drainLimit(transfer.lastWindow), heartbeat)
+        if (failures > maxRetries) {
+            if (transfer.requests > 0) stopGets(name, size)
+            val message = "Download of $name failed at ${transfer.offset}"
+            throw XrecException(XrecFailure.INTEGRITY, message, cause = cause)
+        }
+        if (failures >= FALLBACK_FAILURES && getsWindow > XrecLimits.STOCK_GETS_WINDOW) {
+            getsWindow = XrecLimits.STOCK_GETS_WINDOW
+            onFallback(name, transfer.offset, getsWindow)
+        }
+        return failures
     }
 
     /**

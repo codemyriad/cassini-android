@@ -151,6 +151,7 @@ internal class FakeLibrary : RecorderLibrary {
 }
 
 /** A sync over [radio] with a store in [root]. */
+@Suppress("LongParameterList") // test factory with defaults for each collaborator
 internal fun recorderSync(
     root: File,
     radio: FakeRadio,

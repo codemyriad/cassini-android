@@ -188,7 +188,8 @@ class SyncPlannerTest {
         assertEquals(listOf(known), SyncPlanner.suspects(listing, state, mapOf("n1" to "v1")))
 
         val partial = PartialDownload("rec_0001.wav", 1_000, 640)
-        val resumed = SyncPlanner.plan(listOf(file("REC_0001.WAV", 1_000)), idle, RecorderSyncState(partial = partial), emptyMap())
+        val partialState = RecorderSyncState(partial = partial)
+        val resumed = SyncPlanner.plan(listOf(file("REC_0001.WAV", 1_000)), idle, partialState, emptyMap())
         assertEquals(partial, resumed.downloads.single().resume)
     }
 
