@@ -85,7 +85,8 @@ class Phase1LibraryTest {
         val last = state.sections.last().rows.last().title
         rule.onNodeWithTag("library-list").performScrollToNode(hasContentDescription(last, substring = true))
         assertEquals(bar, rule.onNodeWithTag("library-search-bar").getBoundsInRoot())
-        rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
+        // QA 25 Nov: Trash is reached from Settings only; Settings is the one action beside search.
+        rule.onNodeWithContentDescription("Trash").assertDoesNotExist()
         rule.onNodeWithTag("saturn-nav", useUnmergedTree = true).assertIsDisplayed()
         // Acceptance returns to index zero; the pinned Settings action is not a lazy item.
         rule.onNodeWithTag("library-list").performScrollToIndex(0)
@@ -128,7 +129,7 @@ class Phase1LibraryTest {
         rule.onNode(hasSetTextAction()).performClick()
         rule.onNodeWithContentDescription("Close search").assertIsDisplayed()
         rule.runOnIdle { focus.clearFocus() }
-        rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Trash").assertDoesNotExist()
         rule.onNodeWithContentDescription("Settings").assertIsDisplayed()
         rule.onNodeWithContentDescription("Close search").assertDoesNotExist()
     }

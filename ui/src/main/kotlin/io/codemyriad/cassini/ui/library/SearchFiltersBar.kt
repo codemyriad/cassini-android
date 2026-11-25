@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -115,6 +114,10 @@ private fun SpeakerMenu(
     }
 }
 
+/**
+ * A filter chip of the Library (All / Starred) and of Search, at Material's standard 32 dp (QA 25 Nov; it was forced
+ * to 48). The chip itself lays its tap area out at 48 dp, so it stays as easy to tap.
+ */
 @Composable
 internal fun SearchChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = CassiniTheme.colors
@@ -122,7 +125,7 @@ internal fun SearchChip(text: String, selected: Boolean, onClick: () -> Unit, mo
         selected,
         onClick,
         label = { Text(text, style = CassiniTheme.type.fieldLabel) },
-        modifier = modifier.heightIn(min = 48.dp),
+        modifier = modifier,
         colors = FilterChipDefaults.filterChipColors(
             containerColor = colors.surface,
             labelColor = colors.ink,

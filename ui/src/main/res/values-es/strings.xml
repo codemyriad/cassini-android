@@ -115,7 +115,6 @@
     </plurals>
 
     <!-- Library. -->
-    <string name="ui_library_trash">Papelera</string>
     <string name="ui_library_settings">Ajustes</string>
     <string name="ui_search_clear">Borrar búsqueda</string>
     <string name="ui_library_recording_card">Grabando · %1$s</string>

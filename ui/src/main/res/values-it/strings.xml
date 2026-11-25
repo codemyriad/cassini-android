@@ -114,7 +114,6 @@
     </plurals>
 
     <!-- Libreria. -->
-    <string name="ui_library_trash">Cestino</string>
     <string name="ui_library_settings">Impostazioni</string>
     <string name="ui_search_clear">Cancella la ricerca</string>
     <string name="ui_library_recording_card">Registrazione · %1$s</string>

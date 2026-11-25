@@ -55,7 +55,7 @@ class FirstRunHeroBehaviourTest {
             CassiniTheme { LibraryScreen(LibraryUiState(hero = FirstRunHeroUi), onEvent = { events += it }) }
         }
         rule.onNodeWithTag("library-search-bar").assertDoesNotExist()
-        rule.onNodeWithContentDescription(text(R.string.ui_library_trash)).assertDoesNotExist()
+        rule.onNodeWithContentDescription("Trash").assertDoesNotExist()
         rule.onNodeWithTag("first-run-top-bar").assertIsDisplayed()
         rule.onNodeWithContentDescription(text(R.string.ui_library_settings)).assertIsDisplayed().performClick()
         assertEquals(listOf<LibraryEvent>(LibraryEvent.OpenSettings), events)

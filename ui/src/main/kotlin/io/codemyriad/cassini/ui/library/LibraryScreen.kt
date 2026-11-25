@@ -309,7 +309,6 @@ private fun LibraryPinnedHeader(
             onClear = { onEvent(LibraryEvent.ClearQuery) },
             onClose = { onEvent(LibraryEvent.ClearQuery) },
             onSearch = { keyboard?.hide() },
-            onTrash = { onEvent(LibraryEvent.OpenTrash) },
             onSettings = { onEvent(LibraryEvent.OpenSettings) },
         )
     }

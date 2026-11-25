@@ -214,7 +214,7 @@ class AppShellTest {
         Espresso.pressBack()
         waitFor(hasContentDescription("Settings"))
         rule.onNode(hasSetTextAction()).assertIsNotFocused()
-        rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Settings").assertIsDisplayed()
         rule.onNodeWithContentDescription("Close search").assertDoesNotExist()
     }
 

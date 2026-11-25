@@ -115,7 +115,6 @@
     </plurals>
 
     <!-- Library (board 00, features.md section 1). -->
-    <string name="ui_library_trash">Corbeille</string>
     <string name="ui_library_settings">Paramètres</string>
     <string name="ui_search_clear">Effacer la recherche</string>
     <string name="ui_library_recording_card">Enregistrement · %1$s</string>

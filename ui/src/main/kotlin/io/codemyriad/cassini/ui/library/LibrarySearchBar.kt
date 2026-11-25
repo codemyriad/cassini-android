@@ -8,11 +8,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -46,7 +44,10 @@ import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 
-/** Search stays in its native collapsed surface; results use the existing Library list, never an overlay. */
+/**
+ * Search stays in its native collapsed surface; results use the existing Library list, never an overlay. At rest the
+ * only action beside it is Settings: Trash is reached from Settings, as on iPhone and iPad (QA 25 Nov).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("LongParameterList", "LongMethod") // Native input slot and its fixed leading/trailing controls.
@@ -57,7 +58,6 @@ internal fun LibrarySearchBar(
     onClear: () -> Unit,
     onClose: () -> Unit,
     onSearch: () -> Unit,
-    onTrash: () -> Unit,
     onSettings: () -> Unit,
 ) {
     val c = CassiniTheme.colors
@@ -118,15 +118,13 @@ internal fun LibrarySearchBar(
                     },
                     trailingIcon = {
                         Crossfade(active, label = "Library search trailing icons") { searching ->
-                            Row(Modifier.width(96.dp)) {
+                            Box(Modifier.size(48.dp)) {
                                 if (searching) {
-                                    Spacer(Modifier.size(48.dp))
                                     SearchIcon(Glyph.Close, stringResource(R.string.ui_search_clear)) {
                                         text.set("")
                                         onClear()
                                     }
                                 } else {
-                                    SearchIcon(Glyph.Trash, stringResource(R.string.ui_library_trash), onTrash)
                                     SearchIcon(Glyph.Settings, stringResource(R.string.ui_library_settings), onSettings)
                                 }
                             }
