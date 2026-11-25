@@ -178,6 +178,20 @@ class SyncPlannerTest {
         assertTrue(SyncPlanner.plan(listing, idle, state, mapOf("n1" to "v1")).uploads.isEmpty())
     }
 
+    @Test fun aRecordingInAnotherCaseIsTheSameFile() {
+        val known = SyncedRecording("REC_0001.wav", 1_000, "n1", headSha256 = "h1")
+        val listing = listOf(file("rec_0001.WAV", 1_000))
+        val state = RecorderSyncState(listOf(known))
+        val plan = SyncPlanner.plan(listing, idle, state, mapOf("n1" to "v1"))
+        assertTrue(plan.downloads.isEmpty())
+        assertEquals(listOf("REC_0001.cwx"), plan.uploads.map { it.sidecarName })
+        assertEquals(listOf(known), SyncPlanner.suspects(listing, state, mapOf("n1" to "v1")))
+
+        val partial = PartialDownload("rec_0001.wav", 1_000, 640)
+        val resumed = SyncPlanner.plan(listOf(file("REC_0001.WAV", 1_000)), idle, RecorderSyncState(partial = partial), emptyMap())
+        assertEquals(partial, resumed.downloads.single().resume)
+    }
+
     @Test fun suspectsAreKnownFilesWithoutTheirSidecar() {
         val state = RecorderSyncState(
             listOf(

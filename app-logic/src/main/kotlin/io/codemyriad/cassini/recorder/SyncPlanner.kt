@@ -3,6 +3,7 @@ package io.codemyriad.cassini.recorder
 import io.codemyriad.cassini.core.recorder.XrecLimits
 import io.codemyriad.cassini.core.recorder.XrecNames
 import io.codemyriad.cassini.core.recorder.XrecReply
+import java.util.Locale
 
 /**
  * One recording of one recorder that the app has imported. The sync identity is ([name], [size]): the recorder can
@@ -106,11 +107,11 @@ object SyncPlanner {
         transcriptVersions: Map<String, String>,
         syncWhileRecording: Boolean = false,
     ): SyncPlan {
-        val known = state.recordings.map { it.name to it.size }.toSet()
+        val known = state.recordings.map { fileKey(it.name, it.size) }.toSet()
         val downloads = mutableListOf<PlannedDownload>()
         val skipped = mutableListOf<SkippedFile>()
         val whileRecording = syncWhileRecording && downloadsWhileRecording(status)
-        for (entry in listing.filterNot { (it.name to it.size) in known }) {
+        for (entry in listing.filterNot { fileKey(it.name, it.size) in known }) {
             val reason = skipReason(entry, status, whileRecording)
             when {
                 reason == null -> downloads += download(entry, state)
@@ -160,7 +161,10 @@ object SyncPlanner {
             listing.none { it.name.equals(sidecar, ignoreCase = true) }
     }
 
-    private fun List<XrecReply.Entry>.has(name: String, size: Long) = any { it.name == name && it.size == size }
+    private fun fileKey(name: String, size: Long): Pair<String, Long> = name.lowercase(Locale.ROOT) to size
+
+    private fun List<XrecReply.Entry>.has(name: String, size: Long) =
+        any { it.name.equals(name, ignoreCase = true) && it.size == size }
 
     private fun skipReason(entry: XrecReply.Entry, status: XrecReply.Status, whileRecording: Boolean): SkipReason? =
         when {
@@ -177,7 +181,7 @@ object SyncPlanner {
     private fun isActive(name: String, index: Long): Boolean = recordingNumber(name) == index
 
     private fun download(entry: XrecReply.Entry, state: RecorderSyncState): PlannedDownload {
-        val partial = state.partial?.takeIf { it.name == entry.name && it.size == entry.size }
+        val partial = state.partial?.takeIf { it.name.equals(entry.name, ignoreCase = true) && it.size == entry.size }
             ?.takeIf { it.bytes in 0..entry.size }
         return PlannedDownload(entry.name, entry.size, partial)
     }

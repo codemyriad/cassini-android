@@ -91,8 +91,9 @@ object XrecNames {
     /** True when [name] is a valid PUT target name: safe, ASCII only, at most 30 characters. */
     fun isPutName(name: String): Boolean = isSafe(name) && name.length <= MAX_PUT_NAME && name.all { it.code < 0x80 }
 
-    /** True when [name] is a valid `REC` target: a PUT name that ends in `.cwx`. */
-    fun isSidecarName(name: String): Boolean = isPutName(name) && name.endsWith(SIDECAR_EXTENSION)
+    /** True when [name] is a valid `REC` target: a non-hidden PUT name with a stem before `.cwx` (any case). */
+    fun isSidecarName(name: String): Boolean =
+        isPutName(name) && !name.startsWith('.') && name.length > SIDECAR_EXTENSION.length && isSidecar(name)
 
     /** True when [name] ends in `.wav` in any case. */
     fun isWav(name: String): Boolean = name.endsWith(WAV_EXTENSION, ignoreCase = true)

@@ -648,6 +648,29 @@ class RecorderSyncTest {
         assertEquals(listOf("note-2"), recordings.map { it.noteId })
     }
 
+    @Test fun recordingsOnTheCardAreMatchedWithoutCase() = runBlocking {
+        val audio = recording(3_000, seed = 1)
+        recorder.files["REC_0001.WAV"] = audio
+        val (sync, store) = sync()
+        store.bound(key)
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+
+        // The same file listed in lower case on the exFAT card is neither re-downloaded nor marked absent.
+        radio.device.files.clear()
+        radio.device.files["rec_0001.wav"] = audio
+        library.ready["note-1"] = RecorderTranscript("v1", transcript("Case"))
+        assertDone(SyncOutcome.Done(0, 1, 0, false), sync.sync())
+        assertFalse(store.read().current!!.recordings.single().absent)
+        assertTrue(radio.device.files.keys.any { it.equals("REC_0001.cwx", ignoreCase = true) })
+
+        // After a card wipe, a new recording whose name differs only in case replaces the old record.
+        radio.device.files.clear()
+        radio.device.files["rec_0001.wav"] = recording(4_000, seed = 2)
+        assertDone(SyncOutcome.Done(1, 0, 0, false), sync.sync())
+        val recordings = store.read().current!!.recordings.map { it.recording }
+        assertEquals(listOf("note-2"), recordings.map { it.noteId })
+    }
+
     @Test fun aNewRecordingWithTheSameNameAndSizeGetsNoOldTranscript() = runBlocking {
         recorder.files["REC_0001.wav"] = recording(3_000, seed = 1)
         val (sync, store) = sync()

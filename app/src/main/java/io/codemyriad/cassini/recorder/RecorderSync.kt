@@ -44,6 +44,7 @@ import java.security.SecureRandom
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.Locale
 
 /** What the recorder sync does now, for the Recorder screen and the notification. */
 sealed interface RecorderActivity {
@@ -395,7 +396,7 @@ class RecorderSync(private val parts: Parts) {
         // A firmware that names the file it records refuses every card write while it records: transcripts wait.
         val holdUploads = status.recording && status.namesActiveFile
         if (mode == SyncMode.UPLOADS) {
-            val uploads = plan.uploads.filterNot { it.recording.name in unverified }
+            val uploads = plan.uploads.filterNot { fileKey(it.recording.name) in unverified }
             val sent = upload(session, address, pong, uploads, transcripts, holdUploads)
             return SyncOutcome.Done(
                 0,
@@ -437,7 +438,7 @@ class RecorderSync(private val parts: Parts) {
             }
         }
         // A transcript can have finished during the downloads (a long one, or an existing note): it goes now too.
-        val checked = suspects.map { it.name }.toSet() + plan.downloads.map { it.name }
+        val checked = (suspects.map { fileKey(it.name) } + plan.downloads.map { fileKey(it.name) }).toSet()
         val (uploads, latest) = latestUploads(session, address, listing, status, checked, unverified)
         val sent = upload(session, address, pong, uploads, latest, holdUploads)
         withContext(parts.io) { deleteStrayParts(address) }
@@ -488,8 +489,8 @@ class RecorderSync(private val parts: Parts) {
 
     /** Marks each record whose recording [listing] does not have (deleted, or the card was wiped), and the others not. */
     private suspend fun markAbsent(address: String, listing: List<XrecReply.Entry>) {
-        val listed = listing.map { it.name to it.size }.toSet()
-        fun StoredRecording.absentNow() = (recording.name to recording.size) !in listed
+        val listed = listing.map { fileKey(it.name) to it.size }.toSet()
+        fun StoredRecording.absentNow() = (fileKey(recording.name) to recording.size) !in listed
         if (deviceState(address).recordings.all { it.absent == it.absentNow() }) return
         store.updateDevice(address) { state ->
             state.copy(recordings = state.recordings.map { it.copy(absent = it.absentNow()) })
@@ -512,10 +513,10 @@ class RecorderSync(private val parts: Parts) {
         val transcripts = encode(parts.library.transcripts(noteIds))
         val versions = transcripts.mapValues { it.value.version }
         val suspects = SyncPlanner.suspects(listing, deviceState(address).syncState(), versions)
-        val skipped = unverified + verifySuspects(session, address, suspects.filterNot { it.name in checked })
+        val skipped = unverified + verifySuspects(session, address, suspects.filterNot { fileKey(it.name) in checked })
         val uploads = SyncPlanner.plan(listing, status, deviceState(address).syncState(), versions)
             .uploads
-            .filterNot { it.recording.name in skipped }
+            .filterNot { fileKey(it.recording.name) in skipped }
         return uploads to transcripts
     }
 
@@ -546,7 +547,7 @@ class RecorderSync(private val parts: Parts) {
         val unverified = HashSet<String>()
         val replaced = suspects.filter { suspect ->
             val head = headOnRecorder(session, suspect)
-            if (head == null) unverified += suspect.name
+            if (head == null) unverified += fileKey(suspect.name)
             head != null && head != suspect.headSha256
         }
         for (suspect in replaced) {
@@ -590,6 +591,10 @@ class RecorderSync(private val parts: Parts) {
         measured: (XrecDownloadStats) -> Unit,
     ): FileResult {
         val part = partFile(address, planned.name)
+        val previousPart = planned.resume?.let { partFile(address, it.name) }
+        if (previousPart != null && previousPart != part) {
+            withContext(parts.io) { if (previousPart.isFile && !part.exists()) previousPart.renameTo(part) }
+        }
         // The file length is the truth: after process death the stored offset can be behind it.
         val resume = if (planned.resume != null && part.isFile) part.length().coerceAtMost(planned.size) else 0L
         withContext(parts.io) { prepare(part, resume) }
@@ -699,7 +704,8 @@ class RecorderSync(private val parts: Parts) {
 
     /** A recording with the same name and another size is a new one: it replaces the old record. */
     private fun RecorderDeviceState.withRecording(recording: SyncedRecording, failure: String?) = copy(
-        recordings = recordings.filterNot { it.recording.name == recording.name } + StoredRecording(recording, failure),
+        recordings = recordings.filterNot { it.recording.name.equals(recording.name, ignoreCase = true) } +
+            StoredRecording(recording, failure),
         partial = null,
     )
 
@@ -1030,6 +1036,8 @@ class RecorderSync(private val parts: Parts) {
     }
 
     private fun sha256(bytes: ByteArray): String = XrecAuth.toHex(MessageDigest.getInstance("SHA-256").digest(bytes))
+
+    private fun fileKey(name: String): String = name.lowercase(Locale.ROOT)
 
     companion object {
         private const val TAG = "RecorderSync"

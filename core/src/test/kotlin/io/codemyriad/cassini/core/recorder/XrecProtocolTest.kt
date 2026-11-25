@@ -64,13 +64,19 @@ class XrecProtocolTest {
         )
         unsafe.forEach { assertFalse(it, XrecNames.isSafe(it)) }
         assertTrue(XrecNames.isSidecarName("x".repeat(26) + ".cwx"))
+        assertTrue(XrecNames.isSidecarName("REC_0001.CWX"))
         assertFalse(XrecNames.isSidecarName("x".repeat(27) + ".cwx"))
+        assertFalse(XrecNames.isSidecarName(".cwx"))
+        assertFalse(XrecNames.isSidecarName(".a.cwx"))
+        assertFalse(XrecNames.isSidecarName(".wav.cwx"))
     }
 
     @Test fun derivesTheSidecarName() {
         assertEquals("REC_0001.cwx", XrecNames.sidecarFor("REC_0001.wav"))
         assertEquals("REC_0001.cwx", XrecNames.sidecarFor("REC_0001.WAV"))
         assertEquals("noext.cwx", XrecNames.sidecarFor("noext"))
+        assertNull(XrecNames.sidecarFor(".wav"))
+        assertNull(XrecNames.sidecarFor(".hidden.wav"))
         assertNull(XrecNames.sidecarFor("x".repeat(40) + ".wav"))
         assertNull(XrecNames.sidecarFor("é.wav"))
     }
