@@ -1,5 +1,6 @@
 // Composables are nouns in PascalCase; the numbers are the board values of docs/design/ui.md section 8.
-@file:Suppress("FunctionNaming", "MagicNumber")
+// The sheet's two pages and their rows are kept together in one file.
+@file:Suppress("FunctionNaming", "MagicNumber", "TooManyFunctions")
 
 package io.codemyriad.cassini.ui.note
 
@@ -16,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.collapse
 import androidx.compose.ui.semantics.expand
@@ -49,63 +51,114 @@ fun NoteActionsSheet(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, onDismis
 /**
  * The sheet's content (board 06; features.md section 6), also drawn inline in screenshots (`SheetBoardFrame`):
  * padding 12 (below the handle; 10.5 measured) / 12 / 20; the title (margin 12 horizontal, 2 below; 3.5 measured) and
- * the meta line
- * "Yesterday, 15:10 · 23:50 · 3 speakers" (12 below); "Save a copy" with the Cassini file or audio row, Markdown and
- * More formats; the divider; Rename, Star or Unstar (L-34), the transcribe row(s), Document info (documents only)
- * and Move to trash (hidden while recording). The content scrolls when it does not fit (large fonts, landscape).
+ * the meta line "Yesterday, 15:10 · 23:50 · 3 speakers" (12 below). Then, in iPhone's order (QA 25 Nov): Rename,
+ * Star or Unstar (L-34), the transcribe row(s), one "Export…" row ("Cassini file, Markdown and more") instead of the
+ * three export rows on top, Document info (documents only) and Move to trash (hidden while recording). Export… turns
+ * the sheet into its export page ([ExportPage]), which also shows while one of its rows writes. The content scrolls
+ * when it does not fit (large fonts, landscape).
  */
 @Composable
-fun NoteActionsSheetContent(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, modifier: Modifier = Modifier) {
-    val c = CassiniTheme.colors
+fun NoteActionsSheetContent(
+    ui: NoteActionsUi,
+    onAction: (NoteAction) -> Unit,
+    modifier: Modifier = Modifier,
+    exportPage: Boolean = false,
+) {
     val document = ui.documentKind == DocumentKindUi.Document
+    var exportChosen by rememberSaveable(ui.noteId) { mutableStateOf(exportPage) }
+    val exporting = exportChosen || ui.busyRow in EXPORT_ACTIONS
     Column(
         modifier
             .verticalScroll(rememberScrollState())
             .padding(start = 12.dp, end = 12.dp, top = 10.5.dp, bottom = 20.dp),
     ) {
-        // Board 06 puts the title 12 dp below the handle and the meta 2 dp below it. Android sets an 18 sp line's
-        // glyphs 1.5 dp lower in the line than the browser, so the title starts 1.5 dp higher and keeps 3.5 below.
-        Text(
-            text = ui.title,
-            modifier = Modifier
-                .padding(start = 12.dp, end = 12.dp, bottom = 3.5.dp)
-                .semantics { heading() },
-            style = CassiniTheme.type.noteTitle,
-            color = c.ink,
-        )
-        Text(
-            text = metaLine(ui, document),
-            modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-            style = CassiniTheme.type.body14,
-            color = c.text2,
-        )
-        SaveACopy(ui, document, onAction)
-        SheetDivider()
-        SheetActionRow(stringResource(R.string.ui_action_rename), Glyph.Pencil, { onAction(NoteAction.RENAME) })
-        // L-34 (D99): per-device star; never written into the Cassini file or an export (D53.1).
-        SheetActionRow(
-            label = stringResource(if (ui.starred) R.string.ui_meeting_unstar else R.string.ui_meeting_star),
-            glyph = Glyph.Star,
-            onClick = { onAction(if (ui.starred) NoteAction.UNSTAR else NoteAction.STAR) },
-        )
-        TranscribeRows(ui.transcribeRow, stopBusy = ui.busyRow == NoteAction.STOP, onAction = onAction)
-        if (document) {
-            SheetActionRow(
-                label = stringResource(R.string.ui_actions_document_info),
-                glyph = Glyph.Info,
-                onClick = { onAction(NoteAction.DOCUMENT_INFO) },
-            )
-        }
-        if (!ui.recording) {
-            SheetActionRow(
-                label = stringResource(R.string.ui_action_move_to_trash),
-                glyph = Glyph.Trash,
-                onClick = { onAction(NoteAction.MOVE_TO_TRASH) },
-                subtitle = stringResource(R.string.ui_actions_trash_body),
-                style = SheetRowStyle.Destructive,
-            )
+        SheetTitle(ui, document)
+        if (exporting) {
+            ExportPage(ui, document, onAction, onBack = { exportChosen = false })
+        } else {
+            ActionRows(ui, document, onAction, onExport = { exportChosen = true })
         }
     }
+}
+
+/**
+ * The title and the meta line. Board 06 puts the title 12 dp below the handle and the meta 2 dp below it. Android sets
+ * an 18 sp line's glyphs 1.5 dp lower in the line than the browser, so the title starts 1.5 dp higher and keeps 3.5 below.
+ */
+@Composable
+private fun SheetTitle(ui: NoteActionsUi, document: Boolean) {
+    val c = CassiniTheme.colors
+    Text(
+        text = ui.title,
+        modifier = Modifier
+            .padding(start = 12.dp, end = 12.dp, bottom = 3.5.dp)
+            .semantics { heading() },
+        style = CassiniTheme.type.noteTitle,
+        color = c.ink,
+    )
+    Text(
+        text = metaLine(ui, document),
+        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+        style = CassiniTheme.type.body14,
+        color = c.text2,
+    )
+}
+
+/** The actions in iPhone's order (QA 25 Nov); "Set date and time…" joins them with the Imported recordings work. */
+@Composable
+private fun ActionRows(ui: NoteActionsUi, document: Boolean, onAction: (NoteAction) -> Unit, onExport: () -> Unit) {
+    SheetActionRow(stringResource(R.string.ui_action_rename), Glyph.Pencil, { onAction(NoteAction.RENAME) })
+    // L-34 (D99): per-device star; never written into the Cassini file or an export (D53.1).
+    SheetActionRow(
+        label = stringResource(if (ui.starred) R.string.ui_meeting_unstar else R.string.ui_meeting_star),
+        glyph = Glyph.Star,
+        onClick = { onAction(if (ui.starred) NoteAction.UNSTAR else NoteAction.STAR) },
+    )
+    TranscribeRows(ui.transcribeRow, stopBusy = ui.busyRow == NoteAction.STOP, onAction = onAction)
+    SheetActionRow(
+        label = stringResource(R.string.ui_actions_export),
+        glyph = Glyph.Share,
+        onClick = onExport,
+        subtitle = stringResource(R.string.ui_actions_export_body),
+        modifier = Modifier.testTag("actions-export"),
+    )
+    if (document) {
+        SheetActionRow(
+            label = stringResource(R.string.ui_actions_document_info),
+            glyph = Glyph.Info,
+            onClick = { onAction(NoteAction.DOCUMENT_INFO) },
+        )
+    }
+    if (!ui.recording) {
+        SheetActionRow(
+            label = stringResource(R.string.ui_action_move_to_trash),
+            glyph = Glyph.Trash,
+            onClick = { onAction(NoteAction.MOVE_TO_TRASH) },
+            subtitle = stringResource(R.string.ui_actions_trash_body),
+            style = SheetRowStyle.Destructive,
+        )
+    }
+}
+
+/**
+ * The export page of the sheet: Back to the actions, then "Export" with the rows of [SaveACopy], unchanged from the
+ * export rows that the sheet used to start with (approved 18 Nov).
+ */
+@Composable
+private fun ColumnScope.ExportPage(
+    ui: NoteActionsUi,
+    document: Boolean,
+    onAction: (NoteAction) -> Unit,
+    onBack: () -> Unit,
+) {
+    SheetActionRow(
+        label = stringResource(R.string.ui_back),
+        glyph = Glyph.Back,
+        onClick = onBack,
+        enabled = ui.busyRow == null,
+    )
+    SheetDivider()
+    SaveACopy(ui, document, onAction)
 }
 
 /** "Yesterday, 15:10 · 23:50", plus "· 3 speakers" for a document with speakers. */
@@ -241,6 +294,15 @@ private val MARKDOWN_ROW = ExportFormatRow(
     glyph = Glyph.TextFile,
     save = NoteAction.SAVE_MARKDOWN,
     share = NoteAction.SHARE_MARKDOWN,
+)
+
+/** Every row of the export page: while one of them writes, the sheet stays on that page. */
+private val EXPORT_ACTIONS = setOf(
+    NoteAction.SAVE_DOCUMENT,
+    NoteAction.SAVE_TEXT,
+    NoteAction.SAVE_MARKDOWN,
+    NoteAction.SAVE_SRT,
+    NoteAction.SAVE_VTT,
 )
 
 /** The rows under "More formats", in the contract's order. */

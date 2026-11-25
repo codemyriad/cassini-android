@@ -167,11 +167,10 @@ class QaScreenshotsTest {
         shot(fileName("02", "read-and-listen"))
 
         rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_more_actions))).performClick()
-        see(rule.text(UiR.string.ui_export_heading))
-        see(rule.text(UiR.string.ui_export_cassini_file))
+        see(rule.text(UiR.string.ui_actions_export))
         shot(fileName("12", "note-actions"))
         Espresso.pressBack()
-        rule.waitGone(hasText(rule.text(UiR.string.ui_export_heading)))
+        rule.waitGone(hasText(rule.text(UiR.string.ui_actions_export)))
 
         captureNameSpeaker()
         library()

@@ -159,7 +159,7 @@ class NoteFlowTest {
     }
 
     /**
-     * Runs the export row [label] (under "More formats" when [moreFormats]) with the picker answered by a file in the
+     * Runs the export row [label] (on the export page, under "More formats" when [moreFormats]) with the picker answered by a file in the
      * scratch cache, and returns that file once the "Saved" snackbar shows.
      */
     private fun export(label: String, name: String, moreFormats: Boolean = false): File {
@@ -170,6 +170,8 @@ class NoteFlowTest {
         try {
             openActions()
             // A semantics click: the sheet may still be settling, and a touch then misses the window.
+            // The export rows are on the sheet's export page (QA 25 Nov), behind its one "Export…" row.
+            clickOnce(hasText(rule.text(UiR.string.ui_actions_export)) and hasClickAction())
             if (moreFormats) clickOnce(hasText(rule.text(UiR.string.ui_export_more_formats)) and hasClickAction())
             clickOnce(hasText(label, substring = true) and hasClickAction())
             rule.waitText(rule.text(UiR.string.ui_actions_saved_file, name))
