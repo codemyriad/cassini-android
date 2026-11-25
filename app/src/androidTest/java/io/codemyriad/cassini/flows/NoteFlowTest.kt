@@ -78,9 +78,8 @@ class NoteFlowTest {
         rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_tx_stop_keep)), timeoutMs = Flows.JOB_MS)
         val sealed = awaitSealedDocument(noteId, variants = 1)
 
-        // Read & listen: verified, with the words; a word tap seeks there and plays.
-        rule.waitText(rule.text(UiR.string.ui_trust_verified), timeoutMs = Flows.SCREEN_MS)
-        rule.waitShown(hasText(WORD, substring = true), unmerged = true)
+        // Read & listen with the words (a verified meeting shows no trust tag); a word tap seeks there and plays.
+        rule.waitShown(hasText(WORD, substring = true), timeoutMs = Flows.SCREEN_MS, unmerged = true)
         // Words can appear before the replacement Opus player finishes preparing. A tap then has no player.
         awaitPreparedPlayer(noteId, afterEpoch = importedAudioEpoch)
         val word = sealed.selected(null)!!.transcript!!.words.first { WORD in it.text }

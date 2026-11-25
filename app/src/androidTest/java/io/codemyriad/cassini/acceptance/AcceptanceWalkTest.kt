@@ -300,7 +300,6 @@ class AcceptanceWalkTest {
     /** 03 Read & listen with a word playing, then 06 Note actions. */
     private fun readAndListen(noteId: String) {
         openRow(SUPPLIER_CALL)
-        see(rule.text(UiR.string.ui_trust_verified))
         val document = runBlocking { documentOf(noteId) }
         val words = document.selected(null)!!.transcript!!.words
         val word = words.first { it.text.filter(Char::isLetter).length >= WORD_LETTERS }
