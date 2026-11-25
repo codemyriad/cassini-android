@@ -17,11 +17,8 @@ import androidx.core.content.IntentCompat
 import io.codemyriad.cassini.core.recorder.StreamXrecInput
 import io.codemyriad.cassini.core.recorder.XrecInput
 import io.codemyriad.cassini.data.recorder.RecorderDevice
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -116,23 +113,14 @@ class BluetoothRecorderRadio(context: Context, private val io: CoroutineDispatch
         awaitClose { app.unregisterReceiver(receiver) }
     }
 
-    override suspend fun open(address: String): RecorderLink = withContext(io) {
-        val socket = remote(address).createRfcommSocketToServiceRecord(SPP)
-        coroutineScope {
-            // connect() blocks and ignores interrupts: closing the socket is the only way to stop it.
-            val connecting = async { socket.connect() }
-            try {
-                connecting.await()
-            } catch (error: CancellationException) {
-                closeQuietly(socket)
-                throw error
-            } catch (error: IOException) {
-                closeQuietly(socket)
-                throw error
-            }
-        }
-        SocketLink(socket)
-    }
+    override suspend fun open(address: String): RecorderLink = openClosing(
+        io = io,
+        create = { remote(address).createRfcommSocketToServiceRecord(SPP) },
+        // connect() blocks and ignores interrupts: closing the socket is the only way to stop it.
+        connect = { it.connect() },
+        close = ::closeQuietly,
+        wrap = ::SocketLink,
+    )
 
     /** The bonded devices whose name is `Cassini_…`: the choice when the companion device chooser is missing. */
     fun bondedRecorders(): List<RecorderDevice> {
