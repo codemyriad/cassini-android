@@ -14,14 +14,14 @@
     <string name="recorder_forget">Forget recorder</string>
     <string name="recorder_sync_now">Sync now</string>
     <string name="recorder_auto_sync">Auto sync</string>
-    <string name="recorder_auto_sync_hint">Cassini tries every few minutes while it runs. The recorder must be in Bluetooth phone mode.</string>
+    <string name="recorder_auto_sync_hint">Syncs automatically when your recorder is on and in range, and sends transcripts back as soon as they finish.</string>
     <string name="recorder_sync_while_recording">Sync while the recorder records</string>
     <string name="recorder_sync_while_recording_hint">Copies finished recordings while the recorder makes a new mono recording, at a slow pace. Needs recorder firmware that supports it; transcripts go after the recording.</string>
     <string name="recorder_last_sync">Last sync %1$s: %2$s</string>
     <string name="recorder_last_sync_never">No sync yet.</string>
     <string name="recorder_outcome_ok">done. Downloaded: %1$d. Transcripts sent: %2$d.</string>
     <string name="recorder_outcome_ok_speed">done. Downloaded: %1$d (%3$d KB/s). Transcripts sent: %2$d.</string>
-    <string name="recorder_outcome_unreachable">the recorder did not answer. Put it in Bluetooth phone mode.</string>
+    <string name="recorder_outcome_unreachable">the recorder did not answer. Turn the recorder on and bring it in range.</string>
     <string name="recorder_outcome_rebind">the recorder refused the key.</string>
     <string name="recorder_outcome_failed">stopped (%1$s).</string>
     <string name="recorder_outcome_unavailable">Bluetooth was not available.</string>
@@ -41,11 +41,38 @@
     <string name="recorder_status_transcribing">Transcribing</string>
     <string name="recorder_status_transcription_failed">Transcription failed</string>
     <string name="recorder_status_imported">Imported</string>
-    <string name="recorder_status_transcribed">Transcribed. Waiting for the recorder: put it in Bluetooth phone mode.</string>
-    <string name="recorder_status_no_speech">Transcribed, no speech</string>
+    <string name="recorder_status_transcribed">Transcribed · Waiting to send to the recorder</string>
+    <string name="recorder_status_no_speech">Transcribed (no speech) · Waiting to send to the recorder</string>
     <string name="recorder_status_not_on_recorder">Transcribed. The recording is no longer on the recorder.</string>
     <string name="recorder_status_uploaded">Transcript sent to the recorder</string>
+    <string name="recorder_status_uploaded_no_speech">Transcript sent to the recorder (no speech)</string>
     <string name="recorder_status_upload_failed">Transcript not sent (%1$s)</string>
+    <string name="recorder_action_open">Open recorder</string>
+    <string name="recorder_banner_downloading_title">Downloading %1$s</string>
+    <plurals name="recorder_banner_waiting_title">
+        <item quantity="one">%1$d transcript waiting for the recorder</item>
+        <item quantity="other">%1$d transcripts waiting for the recorder</item>
+    </plurals>
+    <string name="recorder_banner_waiting_line">%1$s · Sent automatically when in range</string>
+    <string name="recorder_banner_waiting_with_tx">%1$s · %2$s</string>
+    <plurals name="recorder_queue_transcribing">
+        <item quantity="one">%1$d transcribing</item>
+        <item quantity="other">%1$d transcribing</item>
+    </plurals>
+    <plurals name="recorder_queue_waiting">
+        <item quantity="one">%1$d waiting for the recorder</item>
+        <item quantity="other">%1$d waiting for the recorder</item>
+    </plurals>
+    <string name="recorder_queue_summary">Queue: %1$s</string>
+    <string name="recorder_settings_subtitle_status">%1$s · %2$s</string>
+    <plurals name="recorder_notif_waiting">
+        <item quantity="one">Transcribing %1$d recording for the recorder…</item>
+        <item quantity="other">Transcribing %1$d recordings for the recorder…</item>
+    </plurals>
+    <plurals name="recorder_notif_sending_queued">
+        <item quantity="one">Sending %1$d queued transcript to the recorder…</item>
+        <item quantity="other">Sending %1$d queued transcripts to the recorder…</item>
+    </plurals>
     <string name="recorder_bind_instructions">On the recorder, open the Bluetooth screen (Home, BT, ENTER; choose Phone if it asks). Press ENTER: the recorder shows a PIN for 60 seconds. Then tap Find recorder.</string>
     <string name="recorder_bind_find">Find recorder</string>
     <string name="recorder_bind_choose">Choose your recorder. If it is not in the list, pair it in the Bluetooth settings of Android first.</string>

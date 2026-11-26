@@ -16,8 +16,12 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import io.codemyriad.cassini.CassiniApplication
+import io.codemyriad.cassini.nav.RecorderKey
 import io.codemyriad.cassini.nav.SettingsKey
 import io.codemyriad.cassini.nav.TrashKey
+import io.codemyriad.cassini.recorder.RecorderActivity
+import io.codemyriad.cassini.recorder.RecorderTexts
 import io.codemyriad.cassini.ui.library.LibraryScreen
 
 /**
@@ -42,6 +46,7 @@ fun LibraryRoute(viewModel: LibraryViewModel, navigator: LibraryNavigator, modif
                     LibraryEffect.OpenRecording -> navigator.openRecording()
                     LibraryEffect.OpenTrash -> navigator.open(TrashKey)
                     LibraryEffect.OpenSettings -> navigator.open(SettingsKey)
+                    LibraryEffect.OpenRecorder -> navigator.open(RecorderKey)
                     is LibraryEffect.OpenModelDownload -> navigator.open(effect.key)
                     LibraryEffect.PickAudio -> launch(context) { picker.launch(LibraryViewModel.IMPORT_TYPES) }
                     LibraryEffect.OpenNotificationSettings -> launch(context) {
@@ -55,7 +60,22 @@ fun LibraryRoute(viewModel: LibraryViewModel, navigator: LibraryNavigator, modif
         viewModel.onResume()
         onPauseOrDispose { }
     }
-    LibraryScreen(state = state, onEvent = viewModel::onEvent, modifier = modifier)
+    val recorderFeature = (context.applicationContext as? CassiniApplication)?.graph?.recorder
+    val recorderSettings = recorderFeature?.store?.settings?.collectAsStateWithLifecycle(initialValue = null)?.value
+    val recorderActivity = recorderFeature?.sync?.activity
+        ?.collectAsStateWithLifecycle(initialValue = RecorderActivity.Idle)?.value ?: RecorderActivity.Idle
+    val recorderNotes = recorderFeature?.notes
+        ?.collectAsStateWithLifecycle(initialValue = emptyMap())?.value ?: emptyMap()
+    val recorderBanner = if (state.query.isBlank()) {
+        RecorderTexts.libraryBanner(context, recorderSettings, recorderActivity, recorderNotes)
+    } else {
+        null
+    }
+    LibraryScreen(
+        state = if (recorderBanner != null) state.copy(recorder = recorderBanner) else state,
+        onEvent = viewModel::onEvent,
+        modifier = modifier,
+    )
 }
 
 /** The app's notification settings (API 26+). */

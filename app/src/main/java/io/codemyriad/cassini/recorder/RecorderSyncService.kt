@@ -85,7 +85,12 @@ class RecorderSyncService : LifecycleService() {
             }
             followActiveSync()
             if (runner.serviceActive.value && sync.activity.value == RecorderActivity.Idle) {
-                // Waiting for background transcription + .cwx upload round-trip: stay foregrounded until released.
+                // Waiting for background transcription + .cwx upload round-trip: stay foregrounded with a clear status.
+                val waitingTx = sync.activeTranscriptions()
+                val waitingUp = sync.pendingUploads().size
+                if (waitingTx > 0 || waitingUp > 0) {
+                    post(RecorderNotifications.buildWaiting(this, waitingTx, waitingUp))
+                }
                 withTimeoutOrNull(POST_INTERVAL_MS) {
                     combine(sync.activity, runner.serviceActive) { activity, active ->
                         activity != RecorderActivity.Idle || !active
@@ -207,7 +212,34 @@ object RecorderNotifications {
     }
 
     fun build(context: Context, activity: RecorderActivity): Notification {
-        val res = context.inAppLanguage()
+        val lang = context.inAppLanguage()
+        val step = activity as? RecorderActivity.Syncing
+        val progress = if (step != null && step.total > 0) {
+            (step.done * PERMILLE / step.total).toInt().coerceIn(0, PERMILLE)
+        } else {
+            null
+        }
+        return build(context, lang.resources, RecorderTexts.activity(lang, activity), progress)
+    }
+
+    fun buildWaiting(context: Context, transcribing: Int, pendingUploads: Int): Notification {
+        val res = context.inAppLanguage().resources
+        val text = when {
+            transcribing > 0 ->
+                res.getQuantityString(R.plurals.recorder_notif_waiting, transcribing, transcribing)
+            pendingUploads > 0 ->
+                res.getQuantityString(R.plurals.recorder_notif_sending_queued, pendingUploads, pendingUploads)
+            else -> ""
+        }
+        return build(context, res, text, progress = null)
+    }
+
+    private fun build(
+        context: Context,
+        res: android.content.res.Resources,
+        text: String,
+        progress: Int?,
+    ): Notification {
         val title = res.getString(R.string.recorder_notif_title)
         val public = NotificationCompat.Builder(context, NotificationChannels.RECORDER)
             .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
@@ -216,7 +248,7 @@ object RecorderNotifications {
         val builder = NotificationCompat.Builder(context, NotificationChannels.RECORDER)
             .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
             .setContentTitle(title)
-            .setContentText(RecorderTexts.activity(res, activity))
+            .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
@@ -224,10 +256,8 @@ object RecorderNotifications {
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setPublicVersion(public)
             .setContentIntent(openIntent(context))
-        val step = activity as? RecorderActivity.Syncing
-        if (step != null && step.total > 0) {
-            val permille = (step.done * PERMILLE / step.total).toInt().coerceIn(0, PERMILLE)
-            builder.setProgress(PERMILLE, permille, false)
+        if (progress != null) {
+            builder.setProgress(PERMILLE, progress, false)
         }
         return builder.build()
     }

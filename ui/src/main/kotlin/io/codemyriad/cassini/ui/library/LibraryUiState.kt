@@ -42,6 +42,7 @@ data class LibraryUiState(
     val searchFilters: SearchFiltersUi = SearchFiltersUi(),
     val recording: RecordingPillUi? = null,
     val progress: ProgressBannerUi? = null,
+    val recorder: RecorderBannerUi? = null,
     val banners: ImmutableList<BannerSpec> = persistentListOf(),
     val imports: ImmutableList<ImportRowUi> = persistentListOf(),
     val sections: ImmutableList<DaySection> = persistentListOf(),
@@ -84,6 +85,19 @@ data class ProgressBannerUi(
     val progress: Float?,
     val line: ProgressLine,
     val queued: Int = 0,
+)
+
+/**
+ * The Library recorder sync & queue banner: shown above notes during an active transfer or when finished
+ * transcripts wait for the bound recorder. Tapping opens the Recorder screen.
+ */
+@Immutable
+data class RecorderBannerUi(
+    val title: String,
+    val percent: Int? = null,
+    val progress: Float? = null,
+    val line: String,
+    val clickLabel: String,
 )
 
 /** Line 2 of the transcription banner. */

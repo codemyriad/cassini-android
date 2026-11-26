@@ -180,6 +180,7 @@ private fun DeviceSection(state: RecorderUiState, actions: RecorderActions) {
     }
     if (device == null) return
     if (state.busy) Body(RecorderTexts.activity(context, state.activity))
+    RecorderTexts.queue(context, state.queue)?.let { Body(it) }
     val canSync = ready && !state.busy && !state.rebindNeeded
     Button(onClick = { actions.onEvent(RecorderEvent.SyncNow) }, enabled = canSync) {
         Text(stringResource(R.string.recorder_sync_now))

@@ -47,8 +47,7 @@ interface RecorderScreenPorts {
 
 /**
  * A note as the recorder rows show it: [transcribed] when it has a finished transcript with words, [noSpeech] when its
- * transcription finished without any word (a silent recording). A transcript without words never goes to the recorder
- * ([GraphRecorderLibrary.transcripts] leaves it out), so such a row waits for nothing.
+ * transcription finished without any word (a silent recording). Both push sidecars back to the recorder.
  */
 data class NoteSyncInfo(
     val title: String,
@@ -66,13 +65,22 @@ enum class RecordingStatus {
     IMPORTED,
     TRANSCRIBED,
 
-    /** The transcription finished without any word: there is no transcript to send to the recorder. */
+    /** The transcription finished without any word: its "No speech" sidecar waits for the recorder. */
     TRANSCRIBED_NO_SPEECH,
 
     /** Transcribed, but the recording is no longer on the recorder: the transcript has nowhere to go. */
     TRANSCRIBED_NOT_ON_RECORDER,
     UPLOADED,
+    UPLOADED_NO_SPEECH,
     UPLOAD_FAILED,
+}
+
+/** Pending round-trip counts for the bound recorder. */
+data class RecorderQueueCounts(
+    val transcribing: Int = 0,
+    val waitingForRecorder: Int = 0,
+) {
+    val hasWork: Boolean get() = transcribing > 0 || waitingForRecorder > 0
 }
 
 /** One synced recording: its file [name], its note ([noteId], [title]) and where it is now. */
@@ -128,6 +136,7 @@ data class RecorderUiState(
     val lastSync: LastSync? = null,
     val transcriptsUnsupported: Boolean = false,
     val recordings: List<RecordingRow> = emptyList(),
+    val queue: RecorderQueueCounts = RecorderQueueCounts(),
     val bind: BindUi? = null,
 ) {
     val busy: Boolean get() = activity != RecorderActivity.Idle
@@ -183,6 +192,7 @@ class RecorderViewModel(private val ports: RecorderScreenPorts) : ViewModel() {
         bind,
     ) { settings, activity, notes, readiness, bind ->
         val current = settings.current
+        val rows = RecorderRows.rows(current?.recordings.orEmpty(), notes)
         RecorderUiState(
             readiness = readiness,
             companionSupported = ports.companionSupported,
@@ -193,7 +203,8 @@ class RecorderViewModel(private val ports: RecorderScreenPorts) : ViewModel() {
             activity = activity,
             lastSync = current?.lastSync,
             transcriptsUnsupported = current?.transcriptsUnsupportedFirmware != null,
-            recordings = RecorderRows.rows(current?.recordings.orEmpty(), notes),
+            recordings = rows,
+            queue = RecorderRows.queue(rows),
             bind = bind,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), RecorderUiState())
@@ -272,17 +283,32 @@ object RecorderRows {
             )
         }
 
+    fun queue(rows: List<RecordingRow>): RecorderQueueCounts = RecorderQueueCounts(
+        transcribing = rows.count { it.status == RecordingStatus.TRANSCRIBING || it.status == RecordingStatus.IMPORTED },
+        waitingForRecorder = rows.count {
+            it.status == RecordingStatus.TRANSCRIBED || it.status == RecordingStatus.TRANSCRIBED_NO_SPEECH
+        },
+    )
+
     private fun status(stored: StoredRecording, note: NoteSyncInfo?): RecordingStatus = when {
         stored.recording.noteId == null -> RecordingStatus.IMPORT_FAILED
         note == null -> RecordingStatus.NOTE_GONE
         stored.failure?.startsWith(RecorderSync.UPLOAD_FAILURE) == true -> RecordingStatus.UPLOAD_FAILED
-        note.transcribed && stored.recording.transcriptUploadedVersion != null -> RecordingStatus.UPLOADED
-        note.transcribed && stored.absent -> RecordingStatus.TRANSCRIBED_NOT_ON_RECORDER
-        note.transcribed -> RecordingStatus.TRANSCRIBED
-        note.noSpeech -> RecordingStatus.TRANSCRIBED_NO_SPEECH
-        note.jobState == JobState.NEEDS_CONSENT -> RecordingStatus.WAITING_FOR_CONSENT
-        note.jobState == JobState.FAILED -> RecordingStatus.TRANSCRIPTION_FAILED
-        note.jobState != null -> RecordingStatus.TRANSCRIBING
-        else -> RecordingStatus.IMPORTED
+        else -> noteStatus(stored, note)
+    }
+
+    private fun noteStatus(stored: StoredRecording, note: NoteSyncInfo): RecordingStatus {
+        val done = note.transcribed || note.noSpeech
+        return when {
+            done && stored.recording.transcriptUploadedVersion != null ->
+                if (note.noSpeech) RecordingStatus.UPLOADED_NO_SPEECH else RecordingStatus.UPLOADED
+            done && stored.absent -> RecordingStatus.TRANSCRIBED_NOT_ON_RECORDER
+            note.transcribed -> RecordingStatus.TRANSCRIBED
+            note.noSpeech -> RecordingStatus.TRANSCRIBED_NO_SPEECH
+            note.jobState == JobState.NEEDS_CONSENT -> RecordingStatus.WAITING_FOR_CONSENT
+            note.jobState == JobState.FAILED -> RecordingStatus.TRANSCRIPTION_FAILED
+            note.jobState != null -> RecordingStatus.TRANSCRIBING
+            else -> RecordingStatus.IMPORTED
+        }
     }
 }

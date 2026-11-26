@@ -2,6 +2,7 @@ package io.codemyriad.cassini.recorder
 
 import android.Manifest
 import android.app.Application
+import android.app.Notification
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.AppGraph
@@ -173,5 +174,19 @@ class RecorderSyncServiceTest {
             scope.coroutineContext.job.cancelAndJoin()
             localRadio.device.close()
         }
+    }
+
+    @Test fun waitingNotificationSummarizesTranscribingAndPendingUploads() {
+        val tx = RecorderNotifications.buildWaiting(app, transcribing = 2, pendingUploads = 1)
+        assertEquals(
+            "Transcribing 2 recordings for the recorder…",
+            tx.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
+        )
+
+        val queued = RecorderNotifications.buildWaiting(app, transcribing = 0, pendingUploads = 3)
+        assertEquals(
+            "Sending 3 queued transcripts to the recorder…",
+            queued.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
+        )
     }
 }

@@ -57,6 +57,7 @@ import io.codemyriad.cassini.ui.components.LibraryBottomBar
 import io.codemyriad.cassini.ui.components.NoteRow
 import io.codemyriad.cassini.ui.components.NoteRowAction
 import io.codemyriad.cassini.ui.components.NoteRowUi
+import io.codemyriad.cassini.ui.components.ProgressBannerCard
 import io.codemyriad.cassini.ui.components.RecordingBannerCard
 import io.codemyriad.cassini.ui.components.screenContentWidth
 import io.codemyriad.cassini.ui.format.Counts
@@ -136,7 +137,7 @@ private val LibraryUiState.firstRun: Boolean
 
 private val LibraryUiState.heroAtBottom: Boolean
     get() = hero != null && !loading && results == null && sections.isEmpty() &&
-        banners.isEmpty() && imports.isEmpty() && recording == null && progress == null
+        banners.isEmpty() && imports.isEmpty() && recording == null && progress == null && recorder == null
 
 @Composable
 private fun LibraryList(
@@ -204,6 +205,20 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
     state.progress?.takeIf { it.line is ProgressLine.Downloading || it.line is ProgressLine.Checking }?.let { progress ->
         val modifier = top()
         item(key = "download-progress", contentType = "progress") { LibraryDownloadCard(progress, onEvent, modifier) }
+    }
+    state.recorder?.let { recorder ->
+        val modifier = top()
+        item(key = "recorder-sync", contentType = "progress") {
+            ProgressBannerCard(
+                title = recorder.title,
+                percent = recorder.percent,
+                progress = recorder.progress,
+                line = recorder.line,
+                onClick = { onEvent(LibraryEvent.OpenRecorder) },
+                modifier = modifier,
+                onClickLabel = recorder.clickLabel,
+            )
+        }
     }
     state.banners.forEachIndexed { index, spec ->
         val modifier = top()

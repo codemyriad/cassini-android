@@ -19,6 +19,8 @@ import io.codemyriad.cassini.library.notificationSettings
 import io.codemyriad.cassini.nav.RecorderKey
 import io.codemyriad.cassini.nav.ScreenNavigator
 import io.codemyriad.cassini.nav.startSystemScreen
+import io.codemyriad.cassini.recorder.RecorderActivity
+import io.codemyriad.cassini.recorder.RecorderTexts
 import io.codemyriad.cassini.transfer.BulkTransferControls
 import io.codemyriad.cassini.transfer.BulkTransfers
 import io.codemyriad.cassini.ui.settings.SettingsExtraRow
@@ -52,6 +54,10 @@ fun SettingsRoute(viewModel: SettingsViewModel, navigator: ScreenNavigator, modi
     val graph = (context.applicationContext as CassiniApplication).graph
     val transfers = graph.transfers
     val recorder by graph.recorder.store.settings.collectAsStateWithLifecycle(initialValue = null)
+    val recorderActivity by graph.recorder.sync.activity.collectAsStateWithLifecycle(
+        initialValue = RecorderActivity.Idle,
+    )
+    val recorderNotes by graph.recorder.notes.collectAsStateWithLifecycle(initialValue = emptyMap())
     val transferState by transfers.state.collectAsStateWithLifecycle()
     val choices: List<BulkTransfers.Choice>? by transfers.available.collectAsStateWithLifecycle(initialValue = null)
     BulkTransferControls(transfers, transferState, choices) { enabled, onExport ->
@@ -63,7 +69,7 @@ fun SettingsRoute(viewModel: SettingsViewModel, navigator: ScreenNavigator, modi
             onExport = onExport,
             extraRow = SettingsExtraRow(
                 stringResource(R.string.recorder_title),
-                recorder?.binding?.device?.name ?: stringResource(R.string.recorder_not_bound),
+                RecorderTexts.settingsSubtitle(context, recorder, recorderActivity, recorderNotes),
             ),
             onExtraRow = { navigator.open(RecorderKey) },
         )

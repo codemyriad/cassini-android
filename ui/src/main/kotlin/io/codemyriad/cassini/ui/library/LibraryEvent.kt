@@ -47,6 +47,9 @@ sealed interface LibraryEvent {
     /** The transcription banner: the running note, or Settings for a standalone download. */
     data object OpenProgress : LibraryEvent
 
+    /** The recorder sync banner: opens the Recorder screen. */
+    data object OpenRecorder : LibraryEvent
+
     /** "· Resume" on a paused row. */
     @Immutable
     data class Resume(val id: String) : LibraryEvent

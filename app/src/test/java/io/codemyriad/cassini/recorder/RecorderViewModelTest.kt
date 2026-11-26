@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.recorder
 
+import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.data.recorder.LastSync
@@ -21,6 +22,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,6 +57,7 @@ class RecorderViewModelTest {
                             stored("REC_0007.wav", "e"),
                             stored("REC_0008.wav", "f", absent = true),
                             stored("REC_0009.wav", "g"),
+                            stored("REC_0010.wav", "h", uploaded = "v1"),
                         ),
                         lastSync = LastSync(1, RecorderSync.OUTCOME_OK, downloaded = 2),
                     ),
@@ -68,14 +71,17 @@ class RecorderViewModelTest {
                 "e" to NoteSyncInfo("Waits", null, transcribed = true),
                 "f" to NoteSyncInfo("Wiped", null, transcribed = true),
                 "g" to NoteSyncInfo("Silence", null, transcribed = false, noSpeech = true),
+                "h" to NoteSyncInfo("Quiet", null, transcribed = false, noSpeech = true),
             )
             val state = expectMostRecentItem()
             assertEquals(DEVICE, state.device)
             assertEquals(true, state.autoSync)
             assertEquals(LastSync(1, RecorderSync.OUTCOME_OK, downloaded = 2), state.lastSync)
+            assertEquals(RecorderQueueCounts(transcribing = 1, waitingForRecorder = 2), state.queue)
             assertEquals(
                 listOf(
-                    // A transcription without words: done, and no transcript waits for the recorder.
+                    RecordingRow("REC_0010.wav", "h", "Quiet", RecordingStatus.UPLOADED_NO_SPEECH),
+                    // A 0-word sidecar waits in the queue until uploaded to the recorder.
                     RecordingRow("REC_0009.wav", "g", "Silence", RecordingStatus.TRANSCRIBED_NO_SPEECH),
                     RecordingRow("REC_0008.wav", "f", "Wiped", RecordingStatus.TRANSCRIBED_NOT_ON_RECORDER),
                     RecordingRow("REC_0007.wav", "e", "Waits", RecordingStatus.TRANSCRIBED),
@@ -89,6 +95,50 @@ class RecorderViewModelTest {
                 state.recordings,
             )
         }
+    }
+
+    @Test fun libraryBannerFormatsActiveTransfersAndWaitingQueue() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val settings = RecorderSettings(
+            binding = RecorderBinding(DEVICE, "wrapped"),
+            autoSync = true,
+            devices = mapOf(
+                DEVICE.address to RecorderDeviceState(
+                    recordings = listOf(
+                        stored("REC_0001.wav", "a"),
+                        stored("REC_0002.wav", "b"),
+                    ),
+                ),
+            ),
+        )
+        val notes = mapOf(
+            "a" to NoteSyncInfo("One", JobState.RUNNING, transcribed = false),
+            "b" to NoteSyncInfo("Two", null, transcribed = true),
+        )
+        val dl = RecorderTexts.libraryBanner(
+            context,
+            settings,
+            RecorderActivity.Syncing(SyncStep.DOWNLOADING, "REC_0056.wav", done = 42, total = 100),
+            notes,
+        )!!
+        assertEquals("Downloading REC_0056.wav", dl.title)
+        assertEquals(42, dl.percent)
+        assertTrue((dl.progress ?: 0f) > 0.4f)
+        assertTrue(dl.line.contains("1 transcribing") && dl.line.contains("1 waiting"))
+
+        val queued = RecorderTexts.libraryBanner(context, settings, RecorderActivity.Idle, notes)!!
+        assertEquals("1 transcript waiting for the recorder", queued.title)
+        assertNull(queued.percent)
+        assertTrue(queued.line.contains("1 transcribing"))
+
+        assertNull(
+            RecorderTexts.libraryBanner(
+                context,
+                settings.copy(devices = emptyMap()),
+                RecorderActivity.Idle,
+                emptyMap(),
+            ),
+        )
     }
 
     @Test fun bindingAsksForThePinAndSyncsWhenBound() = runTest {
