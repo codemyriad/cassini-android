@@ -183,9 +183,10 @@ class SpeakerSessionTest {
             .select("s5").on(NamingEvent.BackgroundToggled(true))
         val effects = SpeakerNaming.reduce(session, NamingEvent.Save).effects
         assertTrue(effects.any { it is NamingEffect.RememberVoice && it.speakerId == "s3" })
-        val undo = SpeakerUndo.of(session, effects) { "x" }
-        assertEquals(listOf("s3"), undo.enrolled)
-        assertEquals(mapOf("s3" to earlier), undo.matches)
+        val recorder = SpeakerUndo.Recorder(session)
+        recorder.onEnrolled("s3")
+        val undo = SpeakerUndo.of(session, effects) { "x" }.copy(voiceOps = recorder.ops())
+        assertEquals(listOf(VoiceUndoOp.Unenrol("s3", earlier)), undo.voiceOps)
     }
 
     @Test fun visitingAnUnchangedNamedSpeakerDoesNotEnrolItWhenSavingAnotherSpeaker() {

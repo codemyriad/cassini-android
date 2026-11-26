@@ -24,7 +24,7 @@ import io.codemyriad.cassini.data.notes.EditOutcome
 import io.codemyriad.cassini.data.notes.ExportOutcome
 import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.data.voices.SavedVoices
-import io.codemyriad.cassini.data.voices.UnenrolRollback
+import io.codemyriad.cassini.data.voices.VoiceEdit
 import io.codemyriad.cassini.engine.job.DraftState
 import io.codemyriad.cassini.engine.job.JobFailure
 import io.codemyriad.cassini.engine.job.JobPhase
@@ -1448,7 +1448,7 @@ class NoteViewModel(
         val labels = effects.filterIsInstance<NamingEffect.Relabel>().associate { it.speakerId to it.label }
         val background = effects.filterIsInstance<NamingEffect.Background>().associate { it.speakerId to it.background }
         val undo = saved?.let { SpeakerUndo.of(it, effects, variant, ::speakerName) }
-        val rollbacks = mutableListOf<UnenrolRollback>()
+        val recorder = saved?.let(SpeakerUndo::Recorder)
         if (labels.isNotEmpty() || background.isNotEmpty()) {
             refusal(ports.relabel(noteId, labels, background))?.let {
                 showReadOnly(it)
@@ -1456,14 +1456,14 @@ class NoteViewModel(
             }
         }
         for (effect in effects) {
-            val refused = applyEffect(effect, details, variant, draft, rollbacks)
+            val refused = applyEffect(effect, details, variant, draft, recorder)
             if (refused != null) {
                 showReadOnly(refused)
                 break
             }
         }
         printsVersion.update { it + 1 }
-        undo?.copy(unenrolled = rollbacks)?.takeIf { it.summary != null }?.let(::offerUndo)
+        undo?.copy(voiceOps = recorder?.ops().orEmpty())?.takeIf { it.summary != null }?.let(::offerUndo)
     }
 
     private suspend fun applyEffect(
@@ -1471,17 +1471,13 @@ class NoteViewModel(
         details: NoteDetails,
         variant: String?,
         draft: DraftNaming,
-        rollbacks: MutableList<UnenrolRollback>,
+        recorder: SpeakerUndo.Recorder?,
     ): ReadOnlyReason? = when (effect) {
         is NamingEffect.Relabel, is NamingEffect.Background -> null
         is NamingEffect.Reject -> reject(effect, details, variant, draft)
         is NamingEffect.MergeSealed -> mergeSealed(effect, variant)
-        is NamingEffect.Unenrol -> {
-            variant?.let { ports.unenrolWithRollback(noteId, it, effect.speakerId).second }?.let(rollbacks::add)
-            null
-        }
         else -> {
-            applyOther(effect, variant, draft)
+            applyOther(effect, variant, draft, recorder)
             null
         }
     }
@@ -1516,29 +1512,62 @@ class NoteViewModel(
             refusal(ports.relabel(noteId, undo.labels, undo.background))?.let { return@launch showReadOnly(it) }
             val variant = undo.variantId
             if (variant != null) {
-                undo.enrolled.forEach { ports.unenrol(noteId, variant, it) }
-                undo.unenrolled.asReversed().forEach { ports.restoreUnenrol(it) }
-                undo.matches.forEach { (speaker, match) -> ports.setMatch(noteId, variant, speaker, match) }
-                undo.renamedVoices.forEach { (voice, name) -> ports.renameVoice(voice, name) }
+                undo.voiceOps.asReversed().forEach { replayVoiceUndo(variant, it) }
             }
             printsVersion.update { it + 1 }
         }
     }
 
-    /** The effects that never refuse: voice files, draft names and the sample. */
-    private suspend fun applyOther(effect: NamingEffect, variant: String?, draft: DraftNaming) {
-        when (effect) {
-            is NamingEffect.RememberVoice -> variant?.let {
-                ports.enrol(noteId, it, effect.speakerId, effect.voiceId, effect.name)
+    private suspend fun replayVoiceUndo(variant: String, op: VoiceUndoOp) {
+        when (op) {
+            is VoiceUndoOp.Unenrol -> {
+                ports.unenrol(noteId, variant, op.speakerId)
+                op.previousMatch?.let { ports.setMatch(noteId, variant, op.speakerId, it) }
             }
-            is NamingEffect.RenameVoice -> ports.renameVoice(effect.voiceId, effect.name)
-            is NamingEffect.ClearMatch -> variant?.let { ports.setMatch(noteId, it, effect.speakerId, null) }
-            is NamingEffect.Unenrol -> variant?.let { ports.unenrol(noteId, it, effect.speakerId) }
+            is VoiceUndoOp.RestoreUnenrol -> ports.restoreUnenrol(op.rollback)
+            is VoiceUndoOp.RestoreMatch -> ports.setMatch(noteId, variant, op.speakerId, op.match)
+            is VoiceUndoOp.RenameVoice -> ports.renameVoice(op.voiceId, op.previousName)
+        }
+    }
+
+    /** The effects that never refuse: voice files, draft names and the sample. */
+    private suspend fun applyOther(
+        effect: NamingEffect,
+        variant: String?,
+        draft: DraftNaming,
+        recorder: SpeakerUndo.Recorder?,
+    ) {
+        when (effect) {
+            is NamingEffect.RememberVoice -> applyRemember(effect, variant, recorder)
+            is NamingEffect.RenameVoice -> {
+                if (ports.renameVoice(effect.voiceId, effect.name) == VoiceEdit.Done) {
+                    recorder?.onRenamedVoice(effect.voiceId, effect.name)
+                }
+            }
+            is NamingEffect.ClearMatch -> variant?.let {
+                if (ports.setMatch(noteId, it, effect.speakerId, null)) recorder?.onClearedMatch(effect.speakerId)
+            }
+            is NamingEffect.Unenrol -> variant?.let {
+                ports.unenrolWithRollback(noteId, it, effect.speakerId).second?.let { rollback ->
+                    recorder?.onUnenrolled(effect.speakerId, rollback)
+                }
+            }
             is NamingEffect.MergeDraft -> draft.merge(effect.source, effect.target, effect.targetLabel)
             is NamingEffect.DraftName -> draftName(effect, draft)
             is NamingEffect.PlayRange -> ports.playRange(noteId, effect.startMs, effect.endMs)
             is NamingEffect.Relabel, is NamingEffect.Reject, is NamingEffect.MergeSealed, is NamingEffect.Background,
             NamingEffect.FocusQuestion, NamingEffect.Close -> Unit
+        }
+    }
+
+    private suspend fun applyRemember(
+        effect: NamingEffect.RememberVoice,
+        variant: String?,
+        recorder: SpeakerUndo.Recorder?,
+    ) {
+        val target = variant ?: return
+        if (ports.enrol(noteId, target, effect.speakerId, effect.voiceId, effect.name) != null) {
+            recorder?.onEnrolled(effect.speakerId)
         }
     }
 

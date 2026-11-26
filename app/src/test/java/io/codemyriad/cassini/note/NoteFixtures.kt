@@ -131,7 +131,7 @@ internal fun voice(id: String, name: String) = Voice(
 
 /** A [NotePorts] over flows the test sets; it records every action. */
 @Suppress("TooManyFunctions") // one fake per port function
-internal class FakeNotePorts : NotePorts {
+internal open class FakeNotePorts : NotePorts {
     val details = MutableStateFlow<NoteDetails?>(documentNote())
     val wordRows = MutableStateFlow(WORDS)
     val printRows = MutableStateFlow<Map<String, SpeakerPrint>>(

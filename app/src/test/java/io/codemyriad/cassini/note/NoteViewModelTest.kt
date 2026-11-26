@@ -15,6 +15,7 @@ import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.SpeakerPrint
+import io.codemyriad.cassini.core.speakers.Voice
 import io.codemyriad.cassini.data.checkpoint.DraftTranscript
 import io.codemyriad.cassini.data.db.SpeakerEntity
 import io.codemyriad.cassini.data.db.WordEntity
@@ -22,6 +23,7 @@ import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.notes.TranscriptFormat
 import io.codemyriad.cassini.data.voices.SavedVoice
 import io.codemyriad.cassini.data.voices.SavedVoices
+import io.codemyriad.cassini.data.voices.UnenrolOutcome
 import io.codemyriad.cassini.data.voices.UnenrolRollback
 import io.codemyriad.cassini.data.voices.VoiceProblem
 import io.codemyriad.cassini.engine.job.BatteryLine
@@ -106,8 +108,9 @@ class NoteViewModelTest {
         query: String? = null,
         visible: Boolean = true,
         start: NoteStart? = null,
+        notePorts: NotePorts = ports,
     ): NoteViewModel {
-        val viewModel = NoteViewModel(saved, NoteKey(NOTE, query, start), ports, CLOCK, dispatcher, recentWords)
+        val viewModel = NoteViewModel(saved, NoteKey(NOTE, query, start), notePorts, CLOCK, dispatcher, recentWords)
         backgroundScope.launch { viewModel.state.collect {} }
         // Unconfined: advanceUntilIdle does not wait for background work, so the effects are taken at once.
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.effects.collect { effects += it } }
@@ -1083,6 +1086,66 @@ class NoteViewModelTest {
         assertEquals(listOf("unenrol:v1:a", "restoreUnenrol:v1:a:anna"), ports.voiceOps)
     }
 
+    /**
+     * Round-2 review: A (Alice, count 1) -> Bob, B (Bob, count 1) -> new Carol, C -> background; Save then Undo.
+     * Replaying inverse voice ops in strict reverse order never temporarily deletes Bob, keeps Bob's final count at 1,
+     * removes Carol, restores Alice, clears C's background flag, and leaves Bob's matches in another note intact.
+     */
+    @Test
+    fun undoReplaysVoiceOpsInStrictReverseOrderAcrossMultiSpeakerSave() = runTest(dispatcher) {
+        val alice = voice("alice", "Alice").copy(count = 1, colourIndex = 0)
+        val bob = voice("bob", "Bob").copy(count = 1, colourIndex = 1)
+        val bobInOtherNote = Match("bob", 0.85f, Match.State.AUTO)
+        val stateful = StatefulVoicePorts(listOf(alice, bob), mutableMapOf("v1/s1" to bobInOtherNote))
+        stateful.details.value = documentNote().copy(
+            speakers = SPEAKERS.map {
+                when (it.speakerId) {
+                    "a" -> it.copy(label = "Alice")
+                    "b" -> it.copy(label = "Bob")
+                    else -> it
+                }
+            },
+        )
+        fun unitPrint(axis: Int, match: Match? = null) =
+            SpeakerPrint(FloatArray(ModelCatalog.VOICEPRINT_DIM).also { it[axis] = 1f }, 12.0, match)
+        stateful.printRows.value = mapOf(
+            "a" to unitPrint(0, Match("alice", 0.9f, Match.State.CONFIRMED)),
+            "b" to unitPrint(1, Match("bob", 0.9f, Match.State.CONFIRMED)),
+            "c" to unitPrint(2),
+        )
+
+        val viewModel = viewModel(notePorts = stateful)
+        send(
+            viewModel,
+            NoteEvent.SpeakerTap("a"),
+            NoteEvent.NameSheet(NameSheetEvent.PickVoice("bob")),
+            NoteEvent.NameSheet(NameSheetEvent.SelectSpeaker("b")),
+            NoteEvent.NameSheet(NameSheetEvent.NameChanged("Carol")),
+            NoteEvent.NameSheet(NameSheetEvent.SomeoneElse),
+            NoteEvent.NameSheet(NameSheetEvent.SelectSpeaker("c")),
+            NoteEvent.NameSheet(NameSheetEvent.BackgroundChanged(true)),
+            NoteEvent.NameSheet(NameSheetEvent.Save),
+        )
+        assertNotNull(viewModel.now().snackbar)
+        assertNull(stateful.voices["alice"])
+        assertEquals(1, stateful.voices["bob"]?.count)
+        assertEquals(1, stateful.voices.values.single { it.name == "Carol" }.count)
+        stateful.voiceOps.clear()
+
+        send(viewModel, NoteEvent.SnackbarUndo)
+        assertEquals(
+            listOf("unenrol:v1:b", "restoreUnenrol:v1:b:bob", "unenrol:v1:a", "restoreUnenrol:v1:a:alice"),
+            stateful.voiceOps,
+        )
+        assertEquals(1, stateful.voices["alice"]?.count)
+        assertEquals(1, stateful.voices["bob"]?.count)
+        assertTrue(stateful.voices.values.none { it.name == "Carol" })
+        assertEquals(Match("alice", 0.9f, Match.State.CONFIRMED), stateful.printRows.value["a"]?.match)
+        assertEquals(Match("bob", 0.9f, Match.State.CONFIRMED), stateful.printRows.value["b"]?.match)
+        assertEquals(mapOf("c" to false), stateful.backgrounds.last())
+        assertEquals(bobInOtherNote, stateful.otherNoteMatches["v1/s1"])
+    }
+
     /** Round-1 review #4: Save -> switch transcript version -> Undo still rolls back the edited variant. */
     @Test
     fun undoTargetsTheEditedVariantEvenAfterSwitchingTranscriptVersions() = runTest(dispatcher) {
@@ -1413,4 +1476,108 @@ class NoteViewModelTest {
         words = 2,
         lowMemory = false,
     )
+
+    /**
+     * Stateful voice-store fake matching [io.codemyriad.cassini.data.voices.VoiceRepository] count, forget-scrub and
+     * [UnenrolRollback] semantics so multi-speaker Save/Undo ordering bugs surface directly in ViewModel tests.
+     */
+    private class StatefulVoicePorts(
+        initialVoices: List<Voice>,
+        val otherNoteMatches: MutableMap<String, Match>,
+    ) : FakeNotePorts() {
+        val voices = initialVoices.associateByTo(LinkedHashMap()) { it.id }
+        private var nextId = 1
+
+        init {
+            publishSaved()
+        }
+
+        private fun publishSaved() {
+            saved.value = SavedVoices(voices.values.map { SavedVoice(it, 1, false) }, null)
+        }
+
+        override suspend fun enrol(id: String, variantId: String, speakerId: String, voiceId: String?, name: String): Voice? {
+            calls += "enrol:$speakerId:$voiceId:$name"
+            voiceOps += "enrol:$variantId:$speakerId:$voiceId:$name"
+            val target = voiceId?.let(voices::get)
+            val updated = if (target != null) {
+                target.copy(count = target.count + 1)
+            } else {
+                voice("new-${nextId++}", name).copy(count = 1)
+            }
+            voices[updated.id] = updated
+            val print = printRows.value[speakerId] ?: return null
+            printRows.value = printRows.value + (speakerId to print.copy(match = Match(updated.id, 1f, Match.State.CONFIRMED)))
+            publishSaved()
+            return updated
+        }
+
+        override suspend fun unenrol(id: String, variantId: String, speakerId: String): UnenrolOutcome {
+            calls += "unenrol:$speakerId"
+            voiceOps += "unenrol:$variantId:$speakerId"
+            return doUnenrol(id, variantId, speakerId).first
+        }
+
+        override suspend fun unenrolWithRollback(
+            id: String,
+            variantId: String,
+            speakerId: String,
+        ): Pair<UnenrolOutcome, UnenrolRollback?> {
+            calls += "unenrol:$speakerId"
+            voiceOps += "unenrolWithRollback:$variantId:$speakerId"
+            return doUnenrol(id, variantId, speakerId)
+        }
+
+        private fun doUnenrol(id: String, variantId: String, speakerId: String): Pair<UnenrolOutcome, UnenrolRollback?> {
+            val print = printRows.value[speakerId]
+            val match = print?.match?.takeIf { it.state == Match.State.CONFIRMED }
+            if (print == null || match == null) return UnenrolOutcome.NothingToUndo to null
+            val current = voices[match.voiceId]
+            printRows.value = printRows.value + (speakerId to print.copy(match = null))
+            val result = if (current == null || current.count <= 1) {
+                voices.remove(match.voiceId)
+                val scrubbed = otherNoteMatches.filterValues { it.voiceId == match.voiceId }
+                scrubbed.keys.forEach(otherNoteMatches::remove)
+                val rollback = UnenrolRollback(
+                    noteId = id,
+                    variantId = variantId,
+                    speakerId = speakerId,
+                    voice = current,
+                    forgotten = true,
+                    match = match,
+                    scrubbedNotes = if (scrubbed.isEmpty()) emptyMap() else mapOf("other-note" to scrubbed),
+                )
+                UnenrolOutcome.Forgotten to rollback
+            } else {
+                voices[current.id] = current.copy(count = current.count - 1)
+                val rollback = UnenrolRollback(
+                    noteId = id,
+                    variantId = variantId,
+                    speakerId = speakerId,
+                    voice = current,
+                    forgotten = false,
+                    match = match,
+                )
+                UnenrolOutcome.Unenrolled to rollback
+            }
+            publishSaved()
+            return result
+        }
+
+        override suspend fun restoreUnenrol(rollback: UnenrolRollback): Boolean {
+            voiceOps += "restoreUnenrol:${rollback.variantId}:${rollback.speakerId}:${rollback.voice?.id}"
+            restoredRollbacks += rollback
+            val v = rollback.voice
+            if (v != null) {
+                val existing = voices[v.id]
+                voices[v.id] = existing?.copy(count = existing.count + 1) ?: v
+            }
+            rollback.scrubbedNotes["other-note"]?.forEach { (key, m) -> otherNoteMatches.putIfAbsent(key, m) }
+            printRows.value[rollback.speakerId]?.let { print ->
+                printRows.value = printRows.value + (rollback.speakerId to print.copy(match = rollback.match))
+            }
+            publishSaved()
+            return true
+        }
+    }
 }
