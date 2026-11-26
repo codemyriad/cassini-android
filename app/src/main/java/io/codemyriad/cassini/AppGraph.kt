@@ -44,6 +44,8 @@ import io.codemyriad.cassini.data.notes.RebuildReport
 import io.codemyriad.cassini.data.notes.RecoveryRepository
 import io.codemyriad.cassini.data.notes.SealedAdopter
 import io.codemyriad.cassini.data.notes.SweepReport
+import io.codemyriad.cassini.data.recorder.RecorderStore
+import io.codemyriad.cassini.data.settings.ExperimentalChoices
 import io.codemyriad.cassini.data.settings.SettingsRepository
 import io.codemyriad.cassini.data.voices.VoiceRepository
 import io.codemyriad.cassini.engine.job.BatterySource
@@ -104,12 +106,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -341,12 +347,63 @@ class AppGraph(context: Context, val config: Config) {
         NoticeCenter(this, app, imports)
     }
 
-    /**
-     * The recorder sync (docs/recorder-sync.md), created on first use or when the app is first visible; "Auto sync"
-     * starts with it.
-     */
-    val recorder: RecorderFeature by lazy {
+    private val recorderHolder = lazy {
         (config.recorder?.invoke(app, this) ?: RecorderFeature(app, this)).also(RecorderFeature::start)
+    }
+
+    /**
+     * The recorder sync (docs/recorder-sync.md), created and started on first use; "Auto sync" starts with it. Read
+     * it only while [recorderEnabled] is true (D-1178): the app's screens and wakeups go through [enabledRecorder] or
+     * check the flag first, and the graph starts and stops it as "Voice recorder" changes while the app is visible.
+     */
+    val recorder: RecorderFeature by recorderHolder
+
+    /**
+     * The one-time upgrade of D-1178: an install whose `recorder/recorder.json` has a bound recorder gets
+     * Experimental features and "Voice recorder" on, so the update does not cut off a paired recorder.
+     */
+    private val experimentalMigration: Deferred<Unit> by lazy {
+        appScope.async<Unit>(dispatchers.io) {
+            try {
+                val seeded = settings.migrateExperimental {
+                    val file = File(File(paths.root, "recorder"), "recorder.json")
+                    file.isFile && RecorderStore(file, dispatchers.io).read().binding != null
+                }
+                if (seeded) Log.i(TAG, "A bound recorder turned Experimental features and Voice recorder on")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                Log.w(TAG, "Cannot check for a bound recorder", error)
+            }
+        }
+    }
+
+    /**
+     * Whether the recorder integration may run: Experimental features unlocked and "Voice recorder" on (D-1178),
+     * after the bound-recorder upgrade. Off on a fresh install.
+     */
+    val recorderEnabled: Flow<Boolean> = flow {
+        experimentalMigration.await()
+        emitAll(settings.voiceRecorderEnabled)
+    }
+
+    /** Experimental features and "Voice recorder" (D-1178) for Settings, after the bound-recorder upgrade. */
+    val experimentalChoices: Flow<ExperimentalChoices> = flow {
+        experimentalMigration.await()
+        emitAll(settings.experimentalChoices)
+    }
+
+    /** [recorder] when "Voice recorder" is on; null otherwise, without creating it. */
+    suspend fun enabledRecorder(): RecorderFeature? = if (recorderEnabled.first()) recorder else null
+
+    /** Starts [recorder] when "Voice recorder" turns on and stops it, if it exists, when it turns off. */
+    private suspend fun followRecorderSwitch() {
+        recorderEnabled.distinctUntilChanged().collect { enabled ->
+            when {
+                enabled -> recorder.start()
+                recorderHolder.isInitialized() -> recorder.stop()
+            }
+        }
     }
 
     /** The last full word lists that the Note screen showed (FAST NOTE OPENING: later opens skip the word cache). */
@@ -417,7 +474,7 @@ class AppGraph(context: Context, val config: Config) {
         appScope.launch {
             visibility.visible.first { it }
             processing
-            recorder
+            followRecorderSwitch()
         }
     }
 

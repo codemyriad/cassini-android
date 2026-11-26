@@ -9,6 +9,7 @@ import io.codemyriad.cassini.core.backup.BackupChoices
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
+import io.codemyriad.cassini.data.settings.ExperimentalChoices
 import io.codemyriad.cassini.data.settings.SpeakerChoices
 import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.notices.NoticeFacts
@@ -64,6 +65,18 @@ interface SettingsPorts {
     val transcribeRightAway: Flow<Boolean> get() = flowOf(true)
 
     suspend fun setTranscribeRightAway(enabled: Boolean) { error("Transcription choices are unavailable") }
+
+    /** Experimental features and "Voice recorder" (D-1178); locked by default. */
+    val experimental: Flow<ExperimentalChoices> get() = flowOf(ExperimentalChoices())
+
+    /** Eight taps on the version in Settings › About. */
+    suspend fun unlockExperimental() { error("Experimental features are unavailable") }
+
+    /** The "Experimental features" switch; off turns every experimental feature off too. */
+    suspend fun setExperimentalFeatures(enabled: Boolean) { error("Experimental features are unavailable") }
+
+    /** "Voice recorder" in Settings › Experimental features. */
+    suspend fun setVoiceRecorder(enabled: Boolean) { error("Experimental features are unavailable") }
 
     fun meetings(): Flow<Int> = flowOf(0)
 
@@ -125,6 +138,14 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
     override val transcribeRightAway: Flow<Boolean> get() = graph.settings.transcribeRightAway
 
     override suspend fun setTranscribeRightAway(enabled: Boolean) = graph.settings.setTranscribeRightAway(enabled)
+
+    override val experimental: Flow<ExperimentalChoices> get() = graph.experimentalChoices
+
+    override suspend fun unlockExperimental() = graph.settings.unlockExperimental()
+
+    override suspend fun setExperimentalFeatures(enabled: Boolean) = graph.settings.setExperimentalFeatures(enabled)
+
+    override suspend fun setVoiceRecorder(enabled: Boolean) = graph.settings.setVoiceRecorderEnabled(enabled)
 
     override fun meetings(): Flow<Int> = flow { emitAll(graph.awaitCatalogue().notes.counts()) }.map { it.live }
 

@@ -20,6 +20,7 @@ import io.codemyriad.cassini.nav.RecorderKey
 import io.codemyriad.cassini.nav.ScreenNavigator
 import io.codemyriad.cassini.nav.startSystemScreen
 import io.codemyriad.cassini.recorder.RecorderActivity
+import io.codemyriad.cassini.recorder.RecorderFeature
 import io.codemyriad.cassini.recorder.RecorderTexts
 import io.codemyriad.cassini.transfer.BulkTransferControls
 import io.codemyriad.cassini.transfer.BulkTransfers
@@ -53,11 +54,9 @@ fun SettingsRoute(viewModel: SettingsViewModel, navigator: ScreenNavigator, modi
     }
     val graph = (context.applicationContext as CassiniApplication).graph
     val transfers = graph.transfers
-    val recorder by graph.recorder.store.settings.collectAsStateWithLifecycle(initialValue = null)
-    val recorderActivity by graph.recorder.sync.activity.collectAsStateWithLifecycle(
-        initialValue = RecorderActivity.Idle,
-    )
-    val recorderNotes by graph.recorder.notes.collectAsStateWithLifecycle(initialValue = emptyMap())
+    // D-1178: the recorder feature is read (and so created) only while "Voice recorder" is on.
+    val recorderEnabled by graph.recorderEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val recorderRow = if (recorderEnabled) recorderRow(graph.recorder) else null
     val transferState by transfers.state.collectAsStateWithLifecycle()
     val choices: List<BulkTransfers.Choice>? by transfers.available.collectAsStateWithLifecycle(initialValue = null)
     BulkTransferControls(transfers, transferState, choices) { enabled, onExport ->
@@ -67,11 +66,21 @@ fun SettingsRoute(viewModel: SettingsViewModel, navigator: ScreenNavigator, modi
             modifier,
             exportEnabled = enabled,
             onExport = onExport,
-            extraRow = SettingsExtraRow(
-                stringResource(R.string.recorder_title),
-                RecorderTexts.settingsSubtitle(context, recorder, recorderActivity, recorderNotes),
-            ),
+            extraRow = recorderRow,
             onExtraRow = { navigator.open(RecorderKey) },
         )
     }
+}
+
+/** The Recorder row of Settings › Experimental features, with what the recorder does now. */
+@Composable
+private fun recorderRow(feature: RecorderFeature): SettingsExtraRow {
+    val context = LocalContext.current
+    val recorder by feature.store.settings.collectAsStateWithLifecycle(initialValue = null)
+    val activity by feature.sync.activity.collectAsStateWithLifecycle(initialValue = RecorderActivity.Idle)
+    val notes by feature.notes.collectAsStateWithLifecycle(initialValue = emptyMap())
+    return SettingsExtraRow(
+        stringResource(R.string.recorder_title),
+        RecorderTexts.settingsSubtitle(context, recorder, activity, notes),
+    )
 }

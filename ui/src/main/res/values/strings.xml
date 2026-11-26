@@ -533,4 +533,17 @@
     <string name="ui_recording_title_placeholder">Add a title</string>
     <string name="ui_settings_export_all">Export all meetings</string>
     <string name="ui_voices_stale_body_each">Voice recognition was updated, and voices saved before the update can’t be recognised. Name each person again in a meeting to save their voice.</string>
+    <!-- D-1178: Experimental features, unlocked by eight taps on the version in About. -->
+    <string name="ui_experimental_title">Experimental features</string>
+    <string name="ui_experimental_subtitle">Early previews that may change or go away</string>
+    <string name="ui_experimental_note">These features are early previews. They may change, stop working or go away in a later version.</string>
+    <string name="ui_experimental_voice_recorder">Voice recorder</string>
+    <string name="ui_experimental_voice_recorder_subtitle">Copies recordings from your own Bluetooth voice recorder and sends their transcripts back to it.</string>
+    <string name="ui_experimental_switch_subtitle">Turn off to hide this page and turn off every experimental feature. Your meetings and recorder history stay.</string>
+    <plurals name="ui_experimental_taps_away">
+        <item quantity="one">%1$s tap away from Experimental features</item>
+        <item quantity="other">%1$s taps away from Experimental features</item>
+    </plurals>
+    <string name="ui_experimental_unlocked">Experimental features unlocked</string>
+    <string name="ui_experimental_already_unlocked">Experimental features are already unlocked</string>
 </resources>

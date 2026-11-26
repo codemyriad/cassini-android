@@ -25,16 +25,27 @@ class RecorderCompanionService : CompanionDeviceService() {
     override fun onDeviceAppeared(associationInfo: AssociationInfo) {
         val address = associationInfo.deviceMacAddress?.toString()
         Log.i(TAG, "Companion recorder appeared: $address (id=${associationInfo.id})")
-        val app = application as? CassiniApplication ?: return
-        app.graph.recorder.onDevicePresent(address, "companion_appeared")
+        wake(address)
     }
 
     @Deprecated("Replaced by AssociationInfo overload in API 33")
     override fun onDeviceAppeared(address: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return
         Log.i(TAG, "Companion recorder appeared: $address")
-        val app = application as? CassiniApplication ?: return
-        app.graph.recorder.onDevicePresent(address, "companion_appeared")
+        wake(address)
+    }
+
+    /** Wakes the recorder sync only while "Voice recorder" is on (D-1178); otherwise the feature is not created. */
+    private fun wake(address: String?) {
+        val graph = (application as? CassiniApplication)?.graph ?: return
+        graph.appScope.launch(graph.dispatchers.io) {
+            val recorder = graph.enabledRecorder()
+            if (recorder == null) {
+                Log.i(TAG, "Voice recorder is off; ignoring companion_appeared for $address")
+            } else {
+                recorder.onDevicePresent(address, "companion_appeared")
+            }
+        }
     }
 
     @Suppress("OVERRIDE_DEPRECATION")
@@ -60,6 +71,8 @@ class RecorderCompanionService : CompanionDeviceService() {
  *   recorder (covers pre-API 31 phones and devices bound without a companion association).
  * - [Intent.ACTION_BOOT_COMPLETED] and [Intent.ACTION_MY_PACKAGE_REPLACED]: re-registers companion presence observation
  *   when a recorder is bound and "Auto sync" is enabled.
+ *
+ * All of them are ignored while "Voice recorder" (Settings › Experimental features, D-1178) is off.
  */
 class RecorderBluetoothReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -71,6 +84,12 @@ class RecorderBluetoothReceiver : BroadcastReceiver() {
         graph.appScope.launch(graph.dispatchers.io) {
             try {
                 withTimeoutOrNull(RECEIVER_BUDGET_MS) {
+                    // D-1178: with "Voice recorder" off no wakeup creates or starts the recorder sync.
+                    val recorder = graph.enabledRecorder()
+                    if (recorder == null) {
+                        Log.i(TAG, "Voice recorder is off; ignoring $action")
+                        return@withTimeoutOrNull
+                    }
                     when (action) {
                         BluetoothDevice.ACTION_ACL_CONNECTED -> {
                             val device = IntentCompat.getParcelableExtra(
@@ -79,11 +98,11 @@ class RecorderBluetoothReceiver : BroadcastReceiver() {
                                 BluetoothDevice::class.java,
                             )
                             val address = device?.address ?: return@withTimeoutOrNull
-                            graph.recorder.onDevicePresent(address, "acl_connected")
+                            recorder.onDevicePresent(address, "acl_connected")
                         }
                         Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
                             Log.i(TAG, "Refreshing recorder presence observation after $action")
-                            graph.recorder.ensurePresenceObserved(action)
+                            recorder.ensurePresenceObserved(action)
                         }
                     }
                 }

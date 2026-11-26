@@ -510,4 +510,18 @@
     <string name="ui_recording_title_placeholder">Adicionar um título</string>
     <string name="ui_settings_export_all">Exportar todas as reuniões</string>
     <string name="ui_voices_stale_body_each">O reconhecimento de voz foi atualizado, e as vozes salvas antes da atualização não podem ser reconhecidas. Nomeie cada pessoa de novo em uma reunião para salvar a voz dela.</string>
+    <!-- D-1178: Experimental features, unlocked by eight taps on the version in About. -->
+    <string name="ui_experimental_title">Recursos experimentais</string>
+    <string name="ui_experimental_subtitle">Prévias que podem mudar ou sumir</string>
+    <string name="ui_experimental_note">Estes recursos são prévias. Eles podem mudar, parar de funcionar ou sumir em uma versão futura.</string>
+    <string name="ui_experimental_voice_recorder">Gravador de voz</string>
+    <string name="ui_experimental_voice_recorder_subtitle">Copia as gravações do seu gravador de voz Bluetooth e envia as transcrições de volta para ele.</string>
+    <string name="ui_experimental_switch_subtitle">Desative para ocultar esta página e desligar todos os recursos experimentais. Suas reuniões e o histórico do gravador continuam salvos.</string>
+    <plurals name="ui_experimental_taps_away">
+        <item quantity="one">Falta %1$s toque para os recursos experimentais</item>
+        <item quantity="many">Faltam %1$s toques para os recursos experimentais</item>
+        <item quantity="other">Faltam %1$s toques para os recursos experimentais</item>
+    </plurals>
+    <string name="ui_experimental_unlocked">Recursos experimentais desbloqueados</string>
+    <string name="ui_experimental_already_unlocked">Os recursos experimentais já estão desbloqueados</string>
 </resources>

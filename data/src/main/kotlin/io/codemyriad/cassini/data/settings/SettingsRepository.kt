@@ -64,6 +64,13 @@ data class SpeakerChoices(
 }
 
 /**
+ * Experimental features (D-1178): [unlocked] after eight taps on the version in Settings › About; [voiceRecorder] is
+ * the "Voice recorder" switch of Settings › Experimental features, off until turned on and never on while the
+ * features are locked.
+ */
+data class ExperimentalChoices(val unlocked: Boolean = false, val voiceRecorder: Boolean = false)
+
+/**
  * The small settings in `settings.preferences_pb` (docs/architecture.md, section 3.4), with one typed accessor per
  * key. The app creates one instance per process with [create]: DataStore allows one instance per file.
  */
@@ -309,6 +316,59 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun setLibraryStarredOnly(starredOnly: Boolean) = set(Keys.LIBRARY_STARRED_ONLY, starredOnly)
 
+    /** Experimental features and their switches (D-1178). */
+    val experimentalChoices: Flow<ExperimentalChoices> = preferences.map {
+        val unlocked = it[Keys.EXPERIMENTAL_UNLOCKED] ?: false
+        ExperimentalChoices(unlocked, unlocked && (it[Keys.VOICE_RECORDER] ?: false))
+    }.distinctUntilChanged()
+
+    /** Whether the recorder integration may run: Experimental features unlocked and "Voice recorder" on. */
+    val voiceRecorderEnabled: Flow<Boolean> = experimentalChoices.map { it.voiceRecorder }.distinctUntilChanged()
+
+    /** Eight taps on the version in Settings › About; "Voice recorder" stays as it was (off when never set). */
+    suspend fun unlockExperimental() = set(Keys.EXPERIMENTAL_UNLOCKED, true)
+
+    /**
+     * The "Experimental features" switch: off locks them again and turns every experimental feature off, so a later
+     * unlock starts with them off; on unlocks them again (as the eight taps do).
+     */
+    suspend fun setExperimentalFeatures(enabled: Boolean) {
+        store.edit { prefs ->
+            prefs[Keys.EXPERIMENTAL_UNLOCKED] = enabled
+            if (!enabled) prefs[Keys.VOICE_RECORDER] = false
+        }
+    }
+
+    /** "Voice recorder" in Settings › Experimental features; turning it on while locked does nothing. */
+    suspend fun setVoiceRecorderEnabled(enabled: Boolean) {
+        store.edit { prefs ->
+            if (!enabled || prefs[Keys.EXPERIMENTAL_UNLOCKED] == true) prefs[Keys.VOICE_RECORDER] = enabled
+        }
+    }
+
+    /**
+     * The upgrade of an install made before Experimental features (D-1178), once per install: [recorderBound] (a
+     * recorder in `recorder/recorder.json` has a binding) unlocks them and turns "Voice recorder" on, so a paired
+     * recorder keeps syncing after the update. Later calls change nothing, so turning them off again sticks.
+     * Returns whether this call seeded them.
+     */
+    suspend fun migrateExperimental(recorderBound: suspend () -> Boolean): Boolean {
+        if (preferences.first()[Keys.EXPERIMENTAL_MIGRATED] == true) return false
+        val bound = recorderBound()
+        var seeded = false
+        store.edit { prefs ->
+            if (prefs[Keys.EXPERIMENTAL_MIGRATED] != true) {
+                prefs[Keys.EXPERIMENTAL_MIGRATED] = true
+                if (bound) {
+                    prefs[Keys.EXPERIMENTAL_UNLOCKED] = true
+                    prefs[Keys.VOICE_RECORDER] = true
+                    seeded = true
+                }
+            }
+        }
+        return seeded
+    }
+
     private fun <T> key(key: Preferences.Key<T>): Flow<T?> = preferences.map { it[key] }.distinctUntilChanged()
 
     private fun flag(key: Preferences.Key<Boolean>): Flow<Boolean> =
@@ -361,6 +421,9 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val LAST_PURGE_AT = longPreferencesKey("trash.lastPurgeAt")
         val PLAYBACK_SPEED = floatPreferencesKey("playback.speed")
         val LIBRARY_STARRED_ONLY = booleanPreferencesKey("library.starredOnly")
+        val EXPERIMENTAL_UNLOCKED = booleanPreferencesKey("experimental.unlocked")
+        val VOICE_RECORDER = booleanPreferencesKey("experimental.voiceRecorder")
+        val EXPERIMENTAL_MIGRATED = booleanPreferencesKey("experimental.recorderMigrated")
     }
 
     companion object {

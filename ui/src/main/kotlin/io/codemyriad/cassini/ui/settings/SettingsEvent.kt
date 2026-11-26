@@ -61,4 +61,13 @@ sealed interface SettingsEvent {
 
     /** The notifications banner's Turn on. */
     data object TurnOnNotifications : SettingsEvent
+
+    /** The eighth tap on the version in About (D-1178). */
+    data object UnlockExperimental : SettingsEvent
+
+    /** The "Experimental features" switch: off turns them all off and hides the page from the map again. */
+    data class ExperimentalFeatures(val enabled: Boolean) : SettingsEvent
+
+    /** "Voice recorder" in Experimental features. */
+    data class VoiceRecorder(val enabled: Boolean) : SettingsEvent
 }

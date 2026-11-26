@@ -510,4 +510,18 @@
     <string name="ui_recording_title_placeholder">Ajouter un titre</string>
     <string name="ui_settings_export_all">Exporter toutes les réunions</string>
     <string name="ui_voices_stale_body_each">La reconnaissance vocale a été mise à jour, et les voix mémorisées avant la mise à jour ne peuvent plus être reconnues. Nommez de nouveau chaque personne dans une réunion pour mémoriser sa voix.</string>
+    <!-- D-1178: Experimental features, unlocked by eight taps on the version in About. -->
+    <string name="ui_experimental_title">Fonctions expérimentales</string>
+    <string name="ui_experimental_subtitle">Aperçus susceptibles de changer ou de disparaître</string>
+    <string name="ui_experimental_note">Ces fonctions sont des aperçus. Elles peuvent changer, cesser de fonctionner ou disparaître dans une version ultérieure.</string>
+    <string name="ui_experimental_voice_recorder">Enregistreur vocal</string>
+    <string name="ui_experimental_voice_recorder_subtitle">Copie les enregistrements de votre enregistreur vocal Bluetooth et lui renvoie leurs transcriptions.</string>
+    <string name="ui_experimental_switch_subtitle">Désactivez-les pour masquer cette page et désactiver toutes les fonctions expérimentales. Vos réunions et l’historique de l’enregistreur sont conservés.</string>
+    <plurals name="ui_experimental_taps_away">
+        <item quantity="one">Encore %1$s appui pour les fonctions expérimentales</item>
+        <item quantity="many">Encore %1$s appuis pour les fonctions expérimentales</item>
+        <item quantity="other">Encore %1$s appuis pour les fonctions expérimentales</item>
+    </plurals>
+    <string name="ui_experimental_unlocked">Fonctions expérimentales déverrouillées</string>
+    <string name="ui_experimental_already_unlocked">Les fonctions expérimentales sont déjà déverrouillées</string>
 </resources>
