@@ -10,6 +10,7 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.content.IntentCompat
+import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.CassiniApplication
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -39,12 +40,7 @@ class RecorderCompanionService : CompanionDeviceService() {
     private fun wake(address: String?) {
         val graph = (application as? CassiniApplication)?.graph ?: return
         graph.appScope.launch(graph.dispatchers.io) {
-            val recorder = graph.enabledRecorder()
-            if (recorder == null) {
-                Log.i(TAG, "Voice recorder is off; ignoring companion_appeared for $address")
-            } else {
-                recorder.onDevicePresent(address, "companion_appeared")
-            }
+            wakeCompanionDevice(graph, address)
         }
     }
 
@@ -66,6 +62,22 @@ class RecorderCompanionService : CompanionDeviceService() {
 }
 
 /**
+ * Admits a companion presence wakeup through [AppGraph.wakeRecorderOnDevicePresent], rejecting stale wakeups if
+ * "Voice recorder" was turned off before admission completed.
+ */
+internal suspend fun wakeCompanionDevice(
+    graph: AppGraph,
+    address: String?,
+    afterEnabledCheck: suspend () -> Unit = {},
+): Boolean {
+    val admitted = graph.wakeRecorderOnDevicePresent(address, "companion_appeared", afterEnabledCheck)
+    if (!admitted) {
+        Log.i("RecorderCompanion", "Voice recorder is off; ignoring companion_appeared for $address")
+    }
+    return admitted
+}
+
+/**
  * Secondary zero-polling wakeup:
  * - [BluetoothDevice.ACTION_ACL_CONNECTED]: triggers a sync when the connected classic Bluetooth peer matches the bound
  *   recorder (covers pre-API 31 phones and devices bound without a companion association).
@@ -78,33 +90,24 @@ class RecorderBluetoothReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val action = intent?.action?.takeIf { it in ALLOWED_ACTIONS }
         val app = context.applicationContext as? CassiniApplication
-        if (action == null || app == null) return
+        val address = if (action == BluetoothDevice.ACTION_ACL_CONNECTED) {
+            IntentCompat.getParcelableExtra(
+                intent,
+                BluetoothDevice.EXTRA_DEVICE,
+                BluetoothDevice::class.java,
+            )?.address
+        } else {
+            null
+        }
+        val missingAddress = action == BluetoothDevice.ACTION_ACL_CONNECTED && address == null
+        if (action == null || app == null || missingAddress) return
         val pending = goAsync()
         val graph = app.graph
         graph.appScope.launch(graph.dispatchers.io) {
             try {
                 withTimeoutOrNull(RECEIVER_BUDGET_MS) {
                     // D-1178: with "Voice recorder" off no wakeup creates or starts the recorder sync.
-                    val recorder = graph.enabledRecorder()
-                    if (recorder == null) {
-                        Log.i(TAG, "Voice recorder is off; ignoring $action")
-                        return@withTimeoutOrNull
-                    }
-                    when (action) {
-                        BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                            val device = IntentCompat.getParcelableExtra(
-                                intent,
-                                BluetoothDevice.EXTRA_DEVICE,
-                                BluetoothDevice::class.java,
-                            )
-                            val address = device?.address ?: return@withTimeoutOrNull
-                            recorder.onDevicePresent(address, "acl_connected")
-                        }
-                        Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
-                            Log.i(TAG, "Refreshing recorder presence observation after $action")
-                            recorder.ensurePresenceObserved(action)
-                        }
-                    }
+                    handleAction(graph, action, address)
                 }
             } finally {
                 pending?.finish()
@@ -112,13 +115,40 @@ class RecorderBluetoothReceiver : BroadcastReceiver() {
         }
     }
 
-    private companion object {
-        const val TAG = "RecorderCompanion"
-        const val RECEIVER_BUDGET_MS = 8_000L
-        val ALLOWED_ACTIONS = setOf(
+    internal companion object {
+        private const val TAG = "RecorderCompanion"
+        private const val RECEIVER_BUDGET_MS = 8_000L
+        private val ALLOWED_ACTIONS = setOf(
             BluetoothDevice.ACTION_ACL_CONNECTED,
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED,
         )
+
+        internal suspend fun handleAction(
+            graph: AppGraph,
+            action: String,
+            address: String?,
+            afterEnabledCheck: suspend () -> Unit = {},
+        ): Boolean = when (action) {
+            BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                if (address == null) {
+                    false
+                } else {
+                    graph.wakeRecorderOnDevicePresent(address, "acl_connected", afterEnabledCheck).also { admitted ->
+                        if (!admitted) Log.i(TAG, "Voice recorder is off; ignoring $action")
+                    }
+                }
+            }
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                graph.refreshRecorderPresence(action, afterEnabledCheck).also { admitted ->
+                    if (!admitted) {
+                        Log.i(TAG, "Voice recorder is off; ignoring $action")
+                    } else {
+                        Log.i(TAG, "Refreshed recorder presence observation after $action")
+                    }
+                }
+            }
+            else -> false
+        }
     }
 }

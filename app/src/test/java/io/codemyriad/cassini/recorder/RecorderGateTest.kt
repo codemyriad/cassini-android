@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.recorder
 
+import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
@@ -13,8 +14,9 @@ import io.codemyriad.cassini.data.recorder.RecorderStore
 import io.codemyriad.cassini.data.settings.ExperimentalChoices
 import io.codemyriad.cassini.processing.AppVisibility
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -51,12 +53,13 @@ class RecorderGateTest {
     private val key = ByteArray(XrecAuth.KEY_BYTES) { 7 }
     private val radio = FakeRadio(FakeRecorder(key = key.copyOf()))
     private val created = AtomicInteger()
+    private val featureCreated = CompletableDeferred<RecorderFeature>()
     private val visible = MutableStateFlow(false)
     private val paths by lazy { AppPaths(folder.newFolder(), folder.newFolder(), modelRoot = folder.newFolder()) }
     private val recorderFile by lazy { File(File(paths.root, "recorder"), "recorder.json") }
     private var graph: AppGraph? = null
 
-    private fun graph(): AppGraph {
+    private fun graph(radioOverride: RecorderRadio = radio): AppGraph {
         val config = AppGraph.Config(
             paths = paths,
             dispatchers = CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined),
@@ -69,7 +72,9 @@ class RecorderGateTest {
             ),
             recorder = { ctx, graph ->
                 created.incrementAndGet()
-                RecorderFeature(ctx, graph, radio = radio, vault = FakeVault())
+                RecorderFeature(ctx, graph, radio = radioOverride, vault = FakeVault()).also {
+                    featureCreated.complete(it)
+                }
             },
         )
         return AppGraph(context, config).also { graph = it }
@@ -114,27 +119,141 @@ class RecorderGateTest {
         visible.value = true
         graph.settings.unlockExperimental()
         graph.settings.setVoiceRecorderEnabled(true)
-        val feature = awaitActive(graph, true)
+        val feature = awaitActive(true)
         feature.store.bound(key)
 
         graph.settings.setExperimentalFeatures(false)
-        awaitActive(graph, false)
+        awaitActive(false)
         assertNull(graph.enabledRecorder())
         assertTrue("recorder.json stays", recorderFile.isFile)
         assertNotNull(RecorderStore(recorderFile, Dispatchers.IO).read().binding)
 
         graph.settings.setExperimentalFeatures(true)
         graph.settings.setVoiceRecorderEnabled(true)
-        assertSame(feature, awaitActive(graph, true))
+        assertSame(feature, awaitActive(true))
         assertEquals(1, created.get())
     }
 
-    /** Waits until the graph started ([active]) or stopped the recorder; the switch is followed asynchronously. */
-    private suspend fun awaitActive(graph: AppGraph, active: Boolean): RecorderFeature = withTimeout(TIMEOUT_MS) {
-        while (created.get() == 0 || graph.recorder.active != active) {
-            delay(POLL_MS)
+    @Test fun pendingCompanionWakeupAfterShutdownStaysStopped() = runBlocking {
+        val graph = graph()
+        visible.value = true
+        graph.settings.unlockExperimental()
+        graph.settings.setVoiceRecorderEnabled(true)
+        val feature = awaitActive(true)
+        feature.store.bound(key)
+        feature.sync.setAutoSync(true)
+
+        val paused = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        val wakeup = async(Dispatchers.IO) {
+            wakeCompanionDevice(graph, DEVICE.address) {
+                paused.complete(Unit)
+                resume.await()
+            }
         }
-        graph.recorder
+
+        withTimeout(TIMEOUT_MS) { paused.await() }
+        graph.settings.setVoiceRecorderEnabled(false)
+        awaitActive(false)
+        feature.runner.awaitIdle()
+        val opensAfterShutdown = radio.opens
+
+        resume.complete(Unit)
+        assertFalse(withTimeout(TIMEOUT_MS) { wakeup.await() })
+        assertFalse(feature.active)
+        assertEquals(opensAfterShutdown, radio.opens)
+    }
+
+    @Test fun pendingAclReceiverWakeupAfterShutdownStaysStopped() = runBlocking {
+        val graph = graph()
+        visible.value = true
+        graph.settings.unlockExperimental()
+        graph.settings.setVoiceRecorderEnabled(true)
+        val feature = awaitActive(true)
+        feature.store.bound(key)
+        feature.sync.setAutoSync(true)
+
+        val paused = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        val wakeup = async(Dispatchers.IO) {
+            RecorderBluetoothReceiver.handleAction(
+                graph,
+                BluetoothDevice.ACTION_ACL_CONNECTED,
+                DEVICE.address,
+            ) {
+                paused.complete(Unit)
+                resume.await()
+            }
+        }
+
+        withTimeout(TIMEOUT_MS) { paused.await() }
+        graph.settings.setVoiceRecorderEnabled(false)
+        awaitActive(false)
+        feature.runner.awaitIdle()
+        val opensAfterShutdown = radio.opens
+
+        resume.complete(Unit)
+        assertFalse(withTimeout(TIMEOUT_MS) { wakeup.await() })
+        assertFalse(feature.active)
+        assertEquals(opensAfterShutdown, radio.opens)
+    }
+
+    @Test fun staleOnDevicePresentDoesNotRestartStoppedFeature() = runBlocking {
+        val graph = graph()
+        visible.value = true
+        graph.settings.unlockExperimental()
+        graph.settings.setVoiceRecorderEnabled(true)
+        val feature = assertNotNull(graph.enabledRecorder())
+        awaitActive(true)
+        feature.store.bound(key)
+        feature.sync.setAutoSync(true)
+
+        graph.settings.setVoiceRecorderEnabled(false)
+        awaitActive(false)
+        feature.runner.awaitIdle()
+        val opensAfterShutdown = radio.opens
+
+        assertFalse(feature.onDevicePresent(DEVICE.address, "companion_appeared"))
+        assertFalse(feature.active)
+        assertEquals(opensAfterShutdown, radio.opens)
+    }
+
+    @Test fun disablingVoiceRecorderPreservesAlreadyRunningTransfer() = runBlocking {
+        val transferStarted = CompletableDeferred<Unit>()
+        val allowFinish = CompletableDeferred<Unit>()
+        val gatedRadio = object : RecorderRadio by radio {
+            override suspend fun open(address: String): RecorderLink {
+                transferStarted.complete(Unit)
+                allowFinish.await()
+                return radio.open(address)
+            }
+        }
+        val graph = graph(radioOverride = gatedRadio)
+        visible.value = true
+        graph.settings.unlockExperimental()
+        graph.settings.setVoiceRecorderEnabled(true)
+        val feature = awaitActive(true)
+        feature.store.bound(key)
+
+        val transfer = feature.runner.syncNow()
+        withTimeout(TIMEOUT_MS) { transferStarted.await() }
+
+        graph.settings.setVoiceRecorderEnabled(false)
+        awaitActive(false)
+        assertFalse(feature.active)
+        assertFalse("In-flight transfer must not be cancelled on disable", transfer.isCompleted)
+
+        allowFinish.complete(Unit)
+        val outcome = withTimeout(TIMEOUT_MS) { transfer.await() }
+        assertTrue("Expected SyncOutcome.Done, got $outcome", outcome is SyncOutcome.Done)
+        assertFalse(feature.active)
+    }
+
+    /** Waits until the graph started ([active]) or stopped the recorder, event-gated without polling. */
+    private suspend fun awaitActive(active: Boolean): RecorderFeature = withTimeout(TIMEOUT_MS) {
+        val feature = featureCreated.await()
+        feature.activeFlow.first { it == active }
+        feature
     }
 
     private fun <T : Any> assertNotNull(value: T?): T {
@@ -144,6 +263,5 @@ class RecorderGateTest {
 
     private companion object {
         const val TIMEOUT_MS = 5_000L
-        const val POLL_MS = 10L
     }
 }

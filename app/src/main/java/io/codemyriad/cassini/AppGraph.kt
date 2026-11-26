@@ -120,6 +120,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -352,6 +354,13 @@ class AppGraph(context: Context, val config: Config) {
     }
 
     /**
+     * Serializes recorder activation/deactivation ([followRecorderSwitch]) with background wakeup admission
+     * ([enabledRecorder], [wakeRecorderOnDevicePresent], [refreshRecorderPresence]) so a pending wakeup cannot
+     * undo shutdown (D-1178).
+     */
+    private val recorderLifecycle = Mutex()
+
+    /**
      * The recorder sync (docs/recorder-sync.md), created and started on first use; "Auto sync" starts with it. Read
      * it only while [recorderEnabled] is true (D-1178): the app's screens and wakeups go through [enabledRecorder] or
      * check the flag first, and the graph starts and stops it as "Voice recorder" changes while the app is visible.
@@ -394,15 +403,61 @@ class AppGraph(context: Context, val config: Config) {
     }
 
     /** [recorder] when "Voice recorder" is on; null otherwise, without creating it. */
-    suspend fun enabledRecorder(): RecorderFeature? = if (recorderEnabled.first()) recorder else null
+    suspend fun enabledRecorder(): RecorderFeature? = recorderLifecycle.withLock {
+        if (recorderEnabled.first()) recorder.also(RecorderFeature::start) else null
+    }
+
+    /**
+     * Admits a Bluetooth/companion device-presence wakeup ([reason]) under [recorderLifecycle]. Rejects stale wakeups
+     * if "Voice recorder" turned off before admission completes, without creating or restarting [recorder].
+     */
+    internal suspend fun wakeRecorderOnDevicePresent(
+        address: String?,
+        reason: String,
+        afterEnabledCheck: suspend () -> Unit = {},
+    ): Boolean {
+        if (!recorderEnabled.first()) return false
+        afterEnabledCheck()
+        return recorderLifecycle.withLock {
+            if (!recorderEnabled.first()) {
+                false
+            } else {
+                val feature = recorder
+                feature.start()
+                feature.onDevicePresent(address, reason)
+                true
+            }
+        }
+    }
+
+    /**
+     * Refreshes companion presence observation after boot or package replace under [recorderLifecycle], rejecting
+     * stale wakeups if "Voice recorder" turned off before admission completes.
+     */
+    internal suspend fun refreshRecorderPresence(
+        reason: String,
+        afterEnabledCheck: suspend () -> Unit = {},
+    ): Boolean {
+        if (!recorderEnabled.first()) return false
+        afterEnabledCheck()
+        val feature = recorderLifecycle.withLock {
+            if (recorderEnabled.first()) recorder.also(RecorderFeature::start) else null
+        }
+        feature?.ensurePresenceObserved(reason)
+        return feature != null
+    }
 
     /** Starts [recorder] when "Voice recorder" turns on and stops it, if it exists, when it turns off. */
     private suspend fun followRecorderSwitch() {
         recorderEnabled.distinctUntilChanged().collect { enabled ->
-            when {
-                enabled -> recorder.start()
-                recorderHolder.isInitialized() -> recorder.stop()
-            }
+            applyRecorderEnabled(enabled)
+        }
+    }
+
+    private suspend fun applyRecorderEnabled(enabled: Boolean) = recorderLifecycle.withLock {
+        when {
+            enabled -> recorder.start()
+            recorderHolder.isInitialized() -> recorder.stop()
         }
     }
 
