@@ -8,6 +8,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ### Changed
 
+- The voice recorder integration is now an experimental feature. Settings shows it only after eight taps on the version in Settings › About unlock Experimental features and "Voice recorder" is turned on there. Installs with a bound recorder keep it on after the update.
 - The app icon is now the Saturn of cassini.talk on a dark background, the same icon as the other Cassini talk apps. Themed icons on Android 13 and later show its flat outline.
 
 ## [0.4.2-beta.3] - 2026-11-11

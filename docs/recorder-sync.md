@@ -18,7 +18,30 @@ The user interface is plain for now. Its strings are in English only (`app/src/m
 | `:app` | `recorder/` | `RecorderSync` (the engine), its ports, the Bluetooth, Keystore and library adapters, `RecorderRunner`, `RecorderAutoSync`, `RecorderTranscriptPush`, `RecorderSyncService`, and the Recorder screen. |
 
 `AppGraph.recorder` makes the parts. The app makes it when it is visible for the first time, and "Auto sync" and the
-transcript push start then.
+transcript push start then, but only while "Voice recorder" is on (see below).
+
+## Experimental features (D-1178)
+
+The recorder integration is an experimental feature. Settings shows neither "Experimental features" nor the Recorder
+row until the version line in Settings › About has been tapped eight times in a row (each tap within 3 s of the last;
+taps 5 to 7 count down, the eighth unlocks). Settings › Experimental features then has:
+
+- **Voice recorder**, off after the unlock. On, the page shows the Recorder row, which opens the Recorder screen.
+- **Experimental features**, which turns every experimental feature off and hides the page from the map again.
+
+The two choices are `experimental.unlocked` and `experimental.voiceRecorder` in `settings.preferences_pb`
+(`SettingsRepository.experimentalChoices`). While "Voice recorder" is off (`AppGraph.recorderEnabled` false):
+
+- the Library and Settings never read `AppGraph.recorder`, so the feature is not created, and the Library shows no
+  recorder banner;
+- `RecorderBluetoothReceiver` and `RecorderCompanionService` ignore their wakeups (`AppGraph.enabledRecorder`);
+- turning it off while the app runs calls `RecorderFeature.stop`: "Auto sync" and the transcript push end and the
+  companion presence observation stops. `recorder/recorder.json` (binding, sync history) and the imported notes stay,
+  and turning it on again resumes them. A sync already running finishes.
+
+Upgrade: once per install, before the first read of the switch, an install whose `recorder/recorder.json` has a
+binding gets both choices on (`experimental.recorderMigrated` records that the check ran), so a paired recorder keeps
+syncing after the update.
 
 ## The recorder
 

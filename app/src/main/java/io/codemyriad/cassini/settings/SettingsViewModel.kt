@@ -7,6 +7,7 @@ import androidx.navigation3.runtime.NavKey
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
+import io.codemyriad.cassini.data.settings.ExperimentalChoices
 import io.codemyriad.cassini.nav.LicenseDetailKey
 import io.codemyriad.cassini.nav.LicensesKey
 import io.codemyriad.cassini.nav.ModelDownloadKey
@@ -130,8 +131,19 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     ) { count, duration, rightAway ->
         Triple(count, duration.coerceAtLeast(0L), rightAway)
     }
-    val state: StateFlow<SettingsUiState> = combine(baseState, speakerState, totals) { base, speakers, totals ->
+    private val experimental = ports.experimental.onStart { emit(ExperimentalChoices()) }.catch { error ->
+        Log.w(TAG, "Cannot read the experimental features", error)
+        emit(ExperimentalChoices())
+    }
+    val state: StateFlow<SettingsUiState> = combine(
+        baseState,
+        speakerState,
+        totals,
+        experimental,
+    ) { base, speakers, totals, experimental ->
         base.copy(
+            experimentalUnlocked = experimental.unlocked,
+            voiceRecorderEnabled = experimental.voiceRecorder,
             tellSpeakersApart = speakers.first.tellApart,
             recogniseVoices = speakers.first.recognise,
             rememberVoices = speakers.first.remember,
@@ -170,15 +182,8 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             is SettingsEvent.SpeakerChoice -> speakerChoice(event)
             is SettingsEvent.RememberVoices -> saveSpeakerChoice { ports.setRememberVoices(event.enabled) }
             is SettingsEvent.AutoNameVoices -> saveSpeakerChoice { ports.setAutoNameVoices(event.enabled) }
-            is SettingsEvent.TranscribeRightAway -> viewModelScope.launch {
-                try {
-                    ports.setTranscribeRightAway(event.enabled)
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-                    Log.w(TAG, "Cannot save the transcribe right away choice", error)
-                }
-            }
+            is SettingsEvent.TranscribeRightAway ->
+                saveChoice("transcribe right away choice") { ports.setTranscribeRightAway(event.enabled) }
             SettingsEvent.OpenPrivacy -> emit(SettingsEffect.Open(LicenseDetailKey(LicenseEntry.PRIVACY.name)))
             SettingsEvent.OpenSources -> emit(SettingsEffect.Open(LicenseDetailKey(LicenseEntry.MODEL_SOURCES.name)))
             SettingsEvent.OpenHelp -> emit(SettingsEffect.OpenUrl(HELP_URL))
@@ -188,6 +193,23 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             SettingsEvent.OpenTrash -> emit(SettingsEffect.Open(TrashKey))
             SettingsEvent.OpenLicenses -> emit(SettingsEffect.Open(LicensesKey))
             SettingsEvent.TurnOnNotifications -> emit(SettingsEffect.OpenNotificationSettings)
+            SettingsEvent.UnlockExperimental -> saveChoice("experimental unlock") { ports.unlockExperimental() }
+            is SettingsEvent.ExperimentalFeatures ->
+                saveChoice("experimental features") { ports.setExperimentalFeatures(event.enabled) }
+            is SettingsEvent.VoiceRecorder -> saveChoice("voice recorder") { ports.setVoiceRecorder(event.enabled) }
+        }
+    }
+
+    /** Saves a choice that shows no saving state; a failure is only logged, and the switch shows the stored value. */
+    private fun saveChoice(what: String, save: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                save()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                Log.w(TAG, "Cannot save the $what", error)
+            }
         }
     }
 

@@ -11,18 +11,26 @@ import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.recorder.RecorderDevice
 import io.codemyriad.cassini.data.recorder.RecorderSettings
 import io.codemyriad.cassini.data.recorder.RecorderStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The recorder sync of the process (docs/recorder-sync.md), made by [AppGraph.recorder]: the store, the sync, its
- * runner, "Auto sync" and the transcript push. Both start with the feature, which the graph creates at the first ON_START.
+ * runner, "Auto sync" and the transcript push. Both start with the feature, which the graph creates at the first ON_START
+ * while "Voice recorder" is on (Settings › Experimental features, D-1178), and stop when it is turned off.
  */
 class RecorderFeature(
     context: Context,
@@ -64,31 +72,67 @@ class RecorderFeature(
         )
     }
 
-    private val started = AtomicBoolean(false)
-    private val autoSync = RecorderAutoSync(graph.appScope, store.settings, runner)
+    private val lifecycle = Any()
+    private val presence = Mutex()
+    private val activeState = MutableStateFlow(false)
 
-    private val push = RecorderTranscriptPush(
-        graph.appScope,
-        store.settings,
-        runner,
-        notes.map(RecorderNotes::pushable),
-        sync::pendingUploads,
-    )
+    /** The work of the running feature (auto sync, transcript push); null before [start] and after [stop]. */
+    private var running: Job? = null
 
+    /** Whether [start] ran and [stop] did not follow, observable without polling. */
+    val activeFlow: StateFlow<Boolean> = activeState.asStateFlow()
+
+    /** Whether [start] ran and [stop] did not follow. */
+    val active: Boolean get() = activeState.value
+
+    /** Starts "Auto sync", the transcript push and the companion presence observation; again after [stop]. */
     fun start() {
-        if (!started.compareAndSet(false, true)) return
-        autoSync.start()
-        push.start()
+        synchronized(lifecycle) {
+            if (running?.isActive == true) return
+            val job = SupervisorJob(graph.appScope.coroutineContext.job)
+            running = job
+            activeState.value = true
+            val scope = CoroutineScope(graph.appScope.coroutineContext + job)
+            RecorderAutoSync(scope, store.settings, runner).start()
+            RecorderTranscriptPush(
+                scope,
+                store.settings,
+                runner,
+                notes.map(RecorderNotes::pushable),
+                sync::pendingUploads,
+            ).start()
+        }
         graph.appScope.launch(graph.dispatchers.io) {
             ensurePresenceObserved("start")
         }
     }
 
-    /** Ensures companion presence observation matches the bound recorder and "Auto sync" state. */
-    suspend fun ensurePresenceObserved(reason: String) {
+    /**
+     * "Voice recorder" turned off (D-1178): ends "Auto sync" and the transcript push and stops the companion presence
+     * observation. `recorder/recorder.json`, the binding and the imported notes stay; [start] resumes them. Any
+     * transfer already running in [runner] continues on [AppGraph.appScope].
+     */
+    fun stop() {
+        val job = synchronized(lifecycle) {
+            running.also {
+                running = null
+                activeState.value = false
+            }
+        } ?: return
+        job.cancel()
+        graph.appScope.launch(graph.dispatchers.io) {
+            ensurePresenceObserved("stop")
+        }
+    }
+
+    /**
+     * Ensures companion presence observation matches the bound recorder, "Auto sync" and whether the feature runs
+     * ([active]). One change at a time, so the last call wins after a quick off and on.
+     */
+    suspend fun ensurePresenceObserved(reason: String) = presence.withLock {
         val settings = store.read()
-        val address = settings.binding?.device?.address ?: return
-        if (settings.autoSync && settings.current?.rebindNeeded != true) {
+        val address = settings.binding?.device?.address ?: return@withLock
+        if (active && settings.autoSync && settings.current?.rebindNeeded != true) {
             Log.i(TAG, "Ensuring companion presence observation for $address ($reason)")
             RecorderCompanion.observePresence(app, address)
         } else {
@@ -98,13 +142,16 @@ class RecorderFeature(
 
     /**
      * Woken when [address] (null: any associated recorder) connected over Bluetooth ([reason]: `companion_appeared` or
-     * `acl_connected`). Starts a full sync when [address] is the bound recorder and "Auto sync" is on.
+     * `acl_connected`). Starts a full sync when the feature is [active], [address] is the bound recorder and "Auto
+     * sync" is on. Never restarts a stopped feature; returns true if accepted for dispatch, false if ignored.
      */
-    fun onDevicePresent(address: String?, reason: String) {
-        start()
-        if (!sync.canAcceptFullSync()) return
-        graph.appScope.launch(graph.dispatchers.io) {
-            if (!sync.canAcceptFullSync()) return@launch
+    fun onDevicePresent(address: String?, reason: String): Boolean {
+        val scope = synchronized(lifecycle) {
+            running?.takeIf { it.isActive }?.let { CoroutineScope(graph.appScope.coroutineContext + it) }
+        }
+        if (scope == null || !sync.canAcceptFullSync()) return false
+        scope.launch(graph.dispatchers.io) {
+            if (!active || !sync.canAcceptFullSync()) return@launch
             val settings = store.read()
             val bound = settings.binding?.device?.address ?: return@launch
             if (address != null && !address.equals(bound, ignoreCase = true)) return@launch
@@ -112,9 +159,14 @@ class RecorderFeature(
                 Log.i(TAG, "Ignoring $reason for $bound (autoSync=${settings.autoSync})")
                 return@launch
             }
-            Log.i(TAG, "Recorder $bound present ($reason); starting wake sync")
-            runner.wakeAttempt().await()
+            val attempt = synchronized(lifecycle) {
+                if (running?.isActive != true) return@launch
+                Log.i(TAG, "Recorder $bound present ($reason); starting wake sync")
+                runner.wakeAttempt()
+            }
+            attempt.await()
         }
+        return true
     }
 
     private companion object {

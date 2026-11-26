@@ -39,7 +39,7 @@ import io.codemyriad.cassini.ui.theme.Glyph
 
 /** D103: a short map, the choices, then source and licence details. */
 @Composable
-@Suppress("LongParameterList") // The optional ZIP action and the extra row are owned by :app controllers.
+@Suppress("LongParameterList") // The optional ZIP action and the Recorder row are owned by :app controllers.
 fun SettingsScreen(
     state: SettingsUiState,
     onEvent: (SettingsEvent) -> Unit,
@@ -75,8 +75,7 @@ fun SettingsScreen(
             )
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
                 when (page) {
-                    SettingsPage.MAP ->
-                        SettingsMap(state, onEvent, exportEnabled, onExport, extraRow, onExtraRow) { page = it }
+                    SettingsPage.MAP -> SettingsMap(state, onEvent, exportEnabled, onExport) { page = it }
                     SettingsPage.TRANSCRIPTION -> TranscriptionSettings(state, onEvent)
                     SettingsPage.SPEAKERS -> SpeakerSettings(state, onEvent)
                     SettingsPage.BACKUP -> state.backup?.let {
@@ -84,6 +83,7 @@ fun SettingsScreen(
                     }
                     SettingsPage.BACKUP_DETAILS -> state.backup?.let { BackupDetails(it) }
                     SettingsPage.ABOUT -> AboutSettings(state, onEvent)
+                    SettingsPage.EXPERIMENTAL -> ExperimentalSettings(state, onEvent, extraRow, onExtraRow)
                 }
             }
         }
@@ -93,18 +93,16 @@ fun SettingsScreen(
 /**
  * The map (D103). QA 25 Nov: the line under Transcripts says only "Transcribed on this phone."; the backup wording sits
  * on the Backup row, so it no longer contradicts its "Off"; Your meetings gains "Export all meetings" (it left the
- * Library, Search and first run).
+ * Library, Search and first run). Experimental features (D-1178) have a row above About only once unlocked; the
+ * Recorder row lives on their page.
  */
 @Composable
-// One group per section of the map; export (main) and the recorder row (feat/recorder-sync) each add a pair.
-@Suppress("LongMethod", "LongParameterList")
+@Suppress("LongMethod") // One group per section of the map.
 private fun SettingsMap(
     state: SettingsUiState,
     onEvent: (SettingsEvent) -> Unit,
     exportEnabled: Boolean,
     onExport: () -> Unit,
-    extraRow: SettingsExtraRow?,
-    onExtraRow: () -> Unit,
     open: (SettingsPage) -> Unit,
 ) {
     SectionHeader(stringResource(R.string.ui_settings_transcripts), first = true)
@@ -161,7 +159,6 @@ private fun SettingsMap(
             libraryAudioDuration(state.audioDurationMs),
         ),
     )
-    if (extraRow != null) ExtraRow(extraRow, onExtraRow)
     SectionHeader(stringResource(R.string.ui_settings_app))
     LanguageSection(state.language, onEvent)
     if (state.notificationsOff) {
@@ -171,14 +168,8 @@ private fun SettingsMap(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
     }
+    if (state.experimentalUnlocked) ExperimentalRow(state) { open(SettingsPage.EXPERIMENTAL) }
     AboutRow(state.version) { open(SettingsPage.ABOUT) }
-}
-
-@Composable
-private fun ExtraRow(row: SettingsExtraRow, onClick: () -> Unit) {
-    SettingsGroup(Modifier.padding(top = 12.dp)) {
-        MapRow(row.title, row.answer, Glyph.PhoneTransfer, onClick = onClick)
-    }
 }
 
 @Composable
@@ -224,6 +215,7 @@ private val SettingsPage.title: Int
         SettingsPage.BACKUP -> R.string.ui_settings_backup
         SettingsPage.BACKUP_DETAILS -> R.string.ui_backup_more_detail
         SettingsPage.ABOUT -> R.string.ui_about_title
+        SettingsPage.EXPERIMENTAL -> R.string.ui_experimental_title
     }
 
 private val SettingsPage.backLabel: Int

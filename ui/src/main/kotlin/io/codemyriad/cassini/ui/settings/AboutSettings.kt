@@ -3,34 +3,43 @@
 package io.codemyriad.cassini.ui.settings
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.HelperText
+import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.licenses.SOURCE_CODE_URL
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun AboutSettings(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Image(painterResource(R.drawable.ui_saturn_mid), null, Modifier.size(80.dp, 56.dp))
         Text(stringResource(R.string.ui_brand), Modifier.padding(top = 16.dp), style = CassiniTheme.type.sheetTitle)
-        Text(
-            stringResource(R.string.ui_about_version, state.version),
-            style = CassiniTheme.type.body14,
-            color = CassiniTheme.colors.text2,
-        )
+        VersionLine(state, onEvent)
         Text(
             stringResource(R.string.ui_about_tagline),
             Modifier.padding(top = 12.dp),
@@ -57,6 +66,54 @@ internal fun AboutSettings(state: SettingsUiState, onEvent: (SettingsEvent) -> U
         }
     }
     HelperText(stringResource(R.string.ui_about_licence_line, state.copyrightYear))
+}
+
+/**
+ * "Version 0.4.2": eight taps in a row unlock Experimental features (D-1178, [ExperimentalTaps]). The streak ends
+ * after [ExperimentalTaps.TAP_RESET_MS] without a tap or when About is left (the state is not saved).
+ */
+@Composable
+private fun VersionLine(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit) {
+    var streak by remember { mutableIntStateOf(0) }
+    var taps by remember { mutableIntStateOf(0) }
+    var feedback by remember { mutableStateOf<ExperimentalTaps.Feedback>(ExperimentalTaps.Feedback.None) }
+    LaunchedEffect(taps) {
+        if (taps == 0) return@LaunchedEffect
+        delay(ExperimentalTaps.TAP_RESET_MS)
+        streak = 0
+        feedback = ExperimentalTaps.Feedback.None
+    }
+    Text(
+        stringResource(R.string.ui_about_version, state.version),
+        Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClickLabel = null,
+        ) {
+            val (next, shown) = ExperimentalTaps.tap(streak, state.experimentalUnlocked)
+            streak = next
+            feedback = shown
+            taps++
+            if (shown == ExperimentalTaps.Feedback.Unlocked) onEvent(SettingsEvent.UnlockExperimental)
+        },
+        style = CassiniTheme.type.body14,
+        color = CassiniTheme.colors.text2,
+    )
+    val message = when (val shown = feedback) {
+        ExperimentalTaps.Feedback.None -> null
+        is ExperimentalTaps.Feedback.TapsAway -> Counts.plural(R.plurals.ui_experimental_taps_away, shown.taps)
+        ExperimentalTaps.Feedback.Unlocked -> stringResource(R.string.ui_experimental_unlocked)
+        ExperimentalTaps.Feedback.AlreadyUnlocked -> stringResource(R.string.ui_experimental_already_unlocked)
+    }
+    if (message != null) {
+        Text(
+            message,
+            Modifier.padding(top = 4.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            style = CassiniTheme.type.caption,
+            color = CassiniTheme.colors.accentInk,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 @Composable

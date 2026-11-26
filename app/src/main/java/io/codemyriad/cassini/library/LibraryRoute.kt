@@ -21,8 +21,10 @@ import io.codemyriad.cassini.nav.RecorderKey
 import io.codemyriad.cassini.nav.SettingsKey
 import io.codemyriad.cassini.nav.TrashKey
 import io.codemyriad.cassini.recorder.RecorderActivity
+import io.codemyriad.cassini.recorder.RecorderFeature
 import io.codemyriad.cassini.recorder.RecorderTexts
 import io.codemyriad.cassini.ui.library.LibraryScreen
+import io.codemyriad.cassini.ui.library.RecorderBannerUi
 
 /**
  * The Library destination (architecture 6): collects [viewModel]'s state for [LibraryScreen] and carries out its
@@ -60,22 +62,25 @@ fun LibraryRoute(viewModel: LibraryViewModel, navigator: LibraryNavigator, modif
         viewModel.onResume()
         onPauseOrDispose { }
     }
-    val recorderFeature = (context.applicationContext as? CassiniApplication)?.graph?.recorder
-    val recorderSettings = recorderFeature?.store?.settings?.collectAsStateWithLifecycle(initialValue = null)?.value
-    val recorderActivity = recorderFeature?.sync?.activity
-        ?.collectAsStateWithLifecycle(initialValue = RecorderActivity.Idle)?.value ?: RecorderActivity.Idle
-    val recorderNotes = recorderFeature?.notes
-        ?.collectAsStateWithLifecycle(initialValue = emptyMap())?.value ?: emptyMap()
-    val recorderBanner = if (state.query.isBlank()) {
-        RecorderTexts.libraryBanner(context, recorderSettings, recorderActivity, recorderNotes)
-    } else {
-        null
-    }
+    // D-1178: with "Voice recorder" off the recorder feature is never created here and there is no banner.
+    val graph = (context.applicationContext as? CassiniApplication)?.graph
+    val recorderEnabled = graph?.recorderEnabled?.collectAsStateWithLifecycle(initialValue = false)?.value == true
+    val recorderBanner = if (graph != null && recorderEnabled) recorderBanner(graph.recorder) else null
     LibraryScreen(
-        state = if (recorderBanner != null) state.copy(recorder = recorderBanner) else state,
+        state = if (recorderBanner != null && state.query.isBlank()) state.copy(recorder = recorderBanner) else state,
         onEvent = viewModel::onEvent,
         modifier = modifier,
     )
+}
+
+/** The Library's recorder banner over [feature], or null when no recorder is bound. */
+@Composable
+private fun recorderBanner(feature: RecorderFeature): RecorderBannerUi? {
+    val context = LocalContext.current
+    val settings by feature.store.settings.collectAsStateWithLifecycle(initialValue = null)
+    val activity by feature.sync.activity.collectAsStateWithLifecycle(initialValue = RecorderActivity.Idle)
+    val notes by feature.notes.collectAsStateWithLifecycle(initialValue = emptyMap())
+    return RecorderTexts.libraryBanner(context, settings, activity, notes)
 }
 
 /** The app's notification settings (API 26+). */

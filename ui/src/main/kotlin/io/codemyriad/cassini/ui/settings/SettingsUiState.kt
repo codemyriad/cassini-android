@@ -34,6 +34,10 @@ data class SettingsUiState(
     val parakeetSuggestion: BannerSpec? = null,
     val parakeetNowDefault: Boolean = false,
     val backup: BackupSettingsUi? = null,
+    /** Eight taps on the version in About unlocked Experimental features (D-1178); until then the map hides them. */
+    val experimentalUnlocked: Boolean = false,
+    /** "Voice recorder" in Experimental features: the recorder integration and its Recorder row. */
+    val voiceRecorderEnabled: Boolean = false,
 )
 
 /**
@@ -123,11 +127,11 @@ data class BackupSettingsUi(
 }
 
 /** Second-layer Settings destinations. */
-enum class SettingsPage { MAP, TRANSCRIPTION, SPEAKERS, BACKUP, BACKUP_DETAILS, ABOUT }
+enum class SettingsPage { MAP, TRANSCRIPTION, SPEAKERS, BACKUP, BACKUP_DETAILS, ABOUT, EXPERIMENTAL }
 
 /**
- * A row of the Settings map that `:app` owns, with its text already localized: the recorder (docs/recorder-sync.md).
- * The fixtures of the screenshot tests have none.
+ * A row that `:app` owns, with its text already localized: the Recorder row of Settings › Experimental features
+ * (docs/recorder-sync.md, D-1178), shown while "Voice recorder" is on.
  */
 @Immutable
 data class SettingsExtraRow(val title: String, val answer: String)

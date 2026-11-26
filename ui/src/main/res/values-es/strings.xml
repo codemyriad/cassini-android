@@ -509,4 +509,18 @@
     <string name="ui_recording_title_placeholder">Añadir un título</string>
     <string name="ui_settings_export_all">Exportar todas las reuniones</string>
     <string name="ui_voices_stale_body_each">El reconocimiento de voz se ha actualizado y las voces guardadas antes de la actualización no se pueden reconocer. Vuelve a poner nombre a cada persona en una reunión para guardar su voz.</string>
+    <!-- D-1178: Experimental features, unlocked by eight taps on the version in About. -->
+    <string name="ui_experimental_title">Funciones experimentales</string>
+    <string name="ui_experimental_subtitle">Avances que pueden cambiar o desaparecer</string>
+    <string name="ui_experimental_note">Estas funciones son avances. Pueden cambiar, dejar de funcionar o desaparecer en una versión posterior.</string>
+    <string name="ui_experimental_voice_recorder">Grabadora de voz</string>
+    <string name="ui_experimental_voice_recorder_subtitle">Copia las grabaciones de tu grabadora de voz Bluetooth y le devuelve sus transcripciones.</string>
+    <string name="ui_experimental_switch_subtitle">Desactívalas para ocultar esta página y apagar todas las funciones experimentales. Tus reuniones y el historial de la grabadora se conservan.</string>
+    <plurals name="ui_experimental_taps_away">
+        <item quantity="one">Te falta %1$s toque para las funciones experimentales</item>
+        <item quantity="many">Te faltan %1$s toques para las funciones experimentales</item>
+        <item quantity="other">Te faltan %1$s toques para las funciones experimentales</item>
+    </plurals>
+    <string name="ui_experimental_unlocked">Funciones experimentales desbloqueadas</string>
+    <string name="ui_experimental_already_unlocked">Las funciones experimentales ya están desbloqueadas</string>
 </resources>

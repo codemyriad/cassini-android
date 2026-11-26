@@ -362,4 +362,57 @@ class SettingsRepositoryTest {
             assertEquals(42L, store.consentAt.first())
         }
     }
+
+    @Test fun experimentalFeaturesStartLockedAndTheRecorderNeedsTheUnlock() = runTest {
+        withStore { store ->
+            assertEquals(ExperimentalChoices(), store.experimentalChoices.first())
+            store.setVoiceRecorderEnabled(true)
+            assertFalse("Locked features cannot be turned on", store.voiceRecorderEnabled.first())
+            store.unlockExperimental()
+            assertEquals(ExperimentalChoices(unlocked = true, voiceRecorder = false), store.experimentalChoices.first())
+            store.setVoiceRecorderEnabled(true)
+        }
+        withStore { store ->
+            assertEquals(ExperimentalChoices(unlocked = true, voiceRecorder = true), store.experimentalChoices.first())
+            assertTrue(store.voiceRecorderEnabled.first())
+        }
+    }
+
+    @Test fun turningExperimentalFeaturesOffTurnsTheRecorderOffAndAReUnlockKeepsItOff() = runTest {
+        withStore { store ->
+            store.unlockExperimental()
+            store.setVoiceRecorderEnabled(true)
+            store.setExperimentalFeatures(false)
+            assertEquals(ExperimentalChoices(), store.experimentalChoices.first())
+            store.setExperimentalFeatures(true)
+            assertEquals(ExperimentalChoices(unlocked = true, voiceRecorder = false), store.experimentalChoices.first())
+        }
+    }
+
+    @Test fun aBoundRecorderSeedsExperimentalFeaturesOnceAcrossUpgrade() = runTest {
+        withStore { store ->
+            assertTrue(store.migrateExperimental { true })
+            assertEquals(ExperimentalChoices(unlocked = true, voiceRecorder = true), store.experimentalChoices.first())
+            store.setExperimentalFeatures(false)
+        }
+        withStore { store ->
+            var asked = false
+            val seeded = store.migrateExperimental {
+                asked = true
+                true
+            }
+            assertFalse(seeded)
+            assertFalse("The migration runs once per install", asked)
+            assertEquals(ExperimentalChoices(), store.experimentalChoices.first())
+        }
+    }
+
+    @Test fun aFreshInstallWithoutARecorderStaysLocked() = runTest {
+        withStore { store ->
+            assertFalse(store.migrateExperimental { false })
+            assertEquals(ExperimentalChoices(), store.experimentalChoices.first())
+            assertFalse(store.migrateExperimental { true })
+            assertEquals(ExperimentalChoices(), store.experimentalChoices.first())
+        }
+    }
 }

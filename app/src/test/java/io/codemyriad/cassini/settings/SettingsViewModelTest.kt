@@ -8,6 +8,7 @@ import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.models.ModelStatus.Missing
+import io.codemyriad.cassini.data.settings.ExperimentalChoices
 import io.codemyriad.cassini.data.settings.SpeakerChoices
 import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.nav.LicensesKey
@@ -542,7 +543,49 @@ class SettingsViewModelTest {
         assertFalse(viewModel.now().transcribeRightAway)
     }
 
+    @Test fun experimentalFeaturesStartLockedAndTheSwitchesReachThePorts() = runTest(dispatcher) {
+        val vm = viewModel()
+        assertFalse(vm.now().experimentalUnlocked)
+        assertFalse(vm.now().voiceRecorderEnabled)
+
+        vm.onEvent(SettingsEvent.UnlockExperimental)
+        advanceUntilIdle()
+        assertTrue(vm.now().experimentalUnlocked)
+        assertFalse("Voice recorder stays off after the unlock", vm.now().voiceRecorderEnabled)
+
+        vm.onEvent(SettingsEvent.VoiceRecorder(true))
+        advanceUntilIdle()
+        assertTrue(vm.now().voiceRecorderEnabled)
+
+        vm.onEvent(SettingsEvent.ExperimentalFeatures(false))
+        advanceUntilIdle()
+        assertFalse(vm.now().experimentalUnlocked)
+        assertFalse(vm.now().voiceRecorderEnabled)
+        assertTrue(effects.isEmpty())
+    }
+
+    @Test fun aFailedExperimentalReadLeavesThemLocked() = runTest(dispatcher) {
+        ports.experimentalFailure = true
+        val vm = viewModel()
+        assertFalse(vm.now().experimentalUnlocked)
+        assertEquals("9.9.9", vm.now().version)
+    }
+
     private class FakeSettingsPorts : SettingsPorts {
+        val experimentalChoices = MutableStateFlow(ExperimentalChoices())
+        var experimentalFailure = false
+        override val experimental: Flow<ExperimentalChoices>
+            get() = if (experimentalFailure) flow { throw IOException("read failed") } else experimentalChoices
+        override suspend fun unlockExperimental() {
+            experimentalChoices.value = experimentalChoices.value.copy(unlocked = true)
+        }
+        override suspend fun setExperimentalFeatures(enabled: Boolean) {
+            experimentalChoices.value = ExperimentalChoices(unlocked = enabled, voiceRecorder = false)
+        }
+        override suspend fun setVoiceRecorder(enabled: Boolean) {
+            val now = experimentalChoices.value
+            experimentalChoices.value = now.copy(voiceRecorder = now.unlocked && enabled)
+        }
         override val speakers = MutableStateFlow(SpeakerChoices())
         override val transcribeRightAway = MutableStateFlow(true)
         var speakerFailure = false
