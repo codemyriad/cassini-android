@@ -45,6 +45,12 @@ import java.time.LocalTime
  */
 class SetDateTimeScreenshotTest : BoardTest() {
     private val prefill = SetDateTimeUi("n", LocalDate.of(2026, 11, 23), LocalTime.of(14, 36))
+
+    /**
+     * The date picker opens on a month that is already over: Material marks the real today with a ring, so a month
+     * that can hold today makes the golden change with the wall clock (bug class 17).
+     */
+    private val pickerDate = LocalDate.of(2025, 11, 23)
     private val saved = prefill.copy(fromFileSaved = true)
 
     @Test fun actionsLight() = actions(dark = false)
@@ -171,7 +177,7 @@ class SetDateTimeScreenshotTest : BoardTest() {
         show(dark) {
             NoteScreen(BoardFixtures.readAndListen, {})
             when (kind) {
-                StartPicker.DATE -> StartDatePicker(prefill.date, onPick = {}, onDismiss = {})
+                StartPicker.DATE -> StartDatePicker(pickerDate, onPick = {}, onDismiss = {})
                 StartPicker.TIME -> StartTimePicker(prefill.time, onPick = {}, onDismiss = {})
             }
         }
