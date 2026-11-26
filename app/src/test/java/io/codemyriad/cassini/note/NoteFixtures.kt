@@ -26,6 +26,7 @@ import io.codemyriad.cassini.data.notes.TranscriptExport
 import io.codemyriad.cassini.data.voices.SavedVoice
 import io.codemyriad.cassini.data.voices.SavedVoices
 import io.codemyriad.cassini.data.voices.UnenrolOutcome
+import io.codemyriad.cassini.data.voices.UnenrolRollback
 import io.codemyriad.cassini.data.voices.VoiceEdit
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.library.daysAgo
@@ -130,7 +131,7 @@ internal fun voice(id: String, name: String) = Voice(
 
 /** A [NotePorts] over flows the test sets; it records every action. */
 @Suppress("TooManyFunctions") // one fake per port function
-internal class FakeNotePorts : NotePorts {
+internal open class FakeNotePorts : NotePorts {
     val details = MutableStateFlow<NoteDetails?>(documentNote())
     val wordRows = MutableStateFlow(WORDS)
     val printRows = MutableStateFlow<Map<String, SpeakerPrint>>(
@@ -160,10 +161,14 @@ internal class FakeNotePorts : NotePorts {
     var draft: DraftTranscript? = null
 
     val calls = mutableListOf<String>()
+    val voiceOps = mutableListOf<String>()
+    val restoredRollbacks = mutableListOf<UnenrolRollback>()
+    var nextUnenrolRollback: UnenrolRollback? = null
 
     /** When set, openPlayer waits for it (a long file that prepares). */
     var openGate: CompletableDeferred<Unit>? = null
     val relabels = mutableListOf<Map<String, String>>()
+    val backgrounds = mutableListOf<Map<String, Boolean>>()
     val exports = mutableListOf<TranscriptExport>()
     val undo = mutableListOf<TrashedNote>()
     var transcribeOutcome: TranscribeOutcome = TranscribeOutcome.Queued(changed = true)
@@ -319,8 +324,9 @@ internal class FakeNotePorts : NotePorts {
         calls += "acknowledge"
     }
 
-    override suspend fun relabel(id: String, labels: Map<String, String>): EditOutcome {
-        relabels += labels
+    override suspend fun relabel(id: String, labels: Map<String, String>, background: Map<String, Boolean>): EditOutcome {
+        if (labels.isNotEmpty() || background.isEmpty()) relabels += labels
+        if (background.isNotEmpty()) backgrounds += background
         return if (details.value?.job != null) EditOutcome.JobPending else EditOutcome.Done()
     }
 
@@ -336,16 +342,36 @@ internal class FakeNotePorts : NotePorts {
 
     override suspend fun enrol(id: String, variantId: String, speakerId: String, voiceId: String?, name: String): Voice? {
         calls += "enrol:$speakerId:$voiceId:$name"
+        voiceOps += "enrol:$variantId:$speakerId:$voiceId:$name"
         return voice(voiceId ?: "new", name)
     }
 
     override suspend fun unenrol(id: String, variantId: String, speakerId: String): UnenrolOutcome {
         calls += "unenrol:$speakerId"
+        voiceOps += "unenrol:$variantId:$speakerId"
         return UnenrolOutcome.Unenrolled
+    }
+
+    override suspend fun unenrolWithRollback(
+        id: String,
+        variantId: String,
+        speakerId: String,
+    ): Pair<UnenrolOutcome, UnenrolRollback?> {
+        calls += "unenrol:$speakerId"
+        voiceOps += "unenrolWithRollback:$variantId:$speakerId"
+        val rollback = nextUnenrolRollback
+        return (if (rollback?.forgotten == true) UnenrolOutcome.Forgotten else UnenrolOutcome.Unenrolled) to rollback
+    }
+
+    override suspend fun restoreUnenrol(rollback: UnenrolRollback): Boolean {
+        voiceOps += "restoreUnenrol:${rollback.variantId}:${rollback.speakerId}:${rollback.voice?.id}"
+        restoredRollbacks += rollback
+        return true
     }
 
     override suspend fun setMatch(id: String, variantId: String, speakerId: String, match: Match?): Boolean {
         calls += "setMatch:$speakerId:${match?.state}"
+        voiceOps += "setMatch:$variantId:$speakerId:${match?.state}"
         return true
     }
 

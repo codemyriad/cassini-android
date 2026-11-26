@@ -377,6 +377,33 @@ class NoteTranscriptsTest {
         }
     }
 
+    @Test fun backgroundVoicesFlagTheirTurnsAndLeaveTheHeaderNamesAndTheSearch() {
+        val words = listOf(
+            Word("a", 0, 900, "Allora partiamo."),
+            Word("b", 2_000, 2_900, "End of the month."),
+            Word("x", 4_000, 4_900, "by the window"),
+            Word("y", 6_000, 6_900, "the other one"),
+            Word("c", 8_000, 8_900, "Then the window."),
+        )
+        val speakers = listOf(
+            speaker("a", 0, "Silvio", false),
+            speaker("b", 1, "Ruurd", false),
+            speaker("x", 2, "Speaker 3", true, 3).copy(background = true),
+            speaker("y", 3, "Speaker 4", true, 4).copy(background = true),
+            speaker("c", 4, "Marta", false),
+        )
+        val transcript = NoteTranscripts.sealed(words, speakers, emptyMap(), emptyList())
+        assertEquals(listOf(false, false, true, true, false), transcript.turns.map { it.background })
+        assertEquals(listOf("a", "b", "c"), transcript.meetingSpeakers.map { it.id })
+        // The Name sheet's row keeps every speaker, in the same order, with its flag.
+        assertEquals(listOf("a", "b", "x", "y", "c"), transcript.rowSpeakers.map { it.speakerId })
+        assertEquals(listOf("x", "y"), transcript.rowSpeakers.filter { it.background }.map { it.speakerId })
+        // Find in the transcript skips them; playback still knows their words.
+        val hits = TranscriptSearch.matches(transcript.turns, "window")
+        assertEquals(listOf(transcript.turns.last().id), hits.map { it.turnId })
+        assertTrue(transcript.activeWord(4_100) != null)
+    }
+
     private val vectorSpeakers = listOf(speaker("ada", 0, "Ada", false), speaker("ben", 1, "Ben", false))
     private fun vectorFile(name: String): String =
         java.io.File(checkNotNull(System.getProperty("cassini.interjections")), name).readText()

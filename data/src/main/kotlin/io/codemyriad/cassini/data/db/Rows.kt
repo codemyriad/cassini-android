@@ -28,7 +28,10 @@ internal object Sql {
             "n.origin, n.recorded_at, n.capture_started_at, n.started_at, " +
             "COALESCE(n.preview, NULLIF(substr(t.body, 1, 160), '')) AS preview, " +
             "j.state AS job_state, j.kind AS job_kind, j.pause_reason, j.failure, j.done_ms, j.total_ms, " +
-            "v.variant_id AS selected_variant, v.word_count, v.speaker_count, v.word_ends_bounded_by_audio, " +
+            "v.variant_id AS selected_variant, v.word_count, " +
+            // Background voices (D112 / L-86) are not counted on the Library row.
+            "(SELECT COUNT(*) FROM speakers sp WHERE sp.note_id = n.id AND sp.variant_id = v.variant_id " +
+            "AND sp.background = 0) AS speaker_count, v.word_ends_bounded_by_audio, " +
             "EXISTS (SELECT 1 FROM note_stars st WHERE st.note_id = n.id) AS starred"
 
     /** The joins [LIBRARY_COLUMNS] needs, after `FROM notes n` or a join that names `n`. */

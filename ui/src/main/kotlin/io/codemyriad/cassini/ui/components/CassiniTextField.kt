@@ -59,6 +59,7 @@ fun CassiniTextField(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     maxLength: Int = Int.MAX_VALUE,
     containerColor: Color = CassiniTheme.colors.surface,
+    placeholder: String? = null,
 ) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
@@ -99,6 +100,9 @@ fun CassiniTextField(
                         .padding(horizontal = 16.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
+                    if (placeholder != null && text.value.text.isEmpty()) {
+                        Text(text = placeholder, style = t.field, color = c.text3, maxLines = 1)
+                    }
                     inner()
                 }
                 if (error != null) {

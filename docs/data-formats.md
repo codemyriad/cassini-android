@@ -77,7 +77,7 @@ A note with a valid checkpoint comes back paused.
 
 ## Room catalogue
 
-The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 5. The schemas are in `data/schemas/`. Room stores the enums as `TEXT` with stable names, never as ordinals.
+The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 6. The schemas are in `data/schemas/`. Room stores the enums as `TEXT` with stable names, never as ordinals.
 
 | Table | Key | Content |
 |---|---|---|
@@ -90,7 +90,7 @@ The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 5. The 
 | `note_voice_links` | `note_id`, `variant_id`, `speaker_id` | A copy of the matches in `voices/notes/<id>.json`: voice ID, state, score, seconds. No embeddings. |
 | `note_stars` | `note_id` | A starred note and when it was starred (L-34). Per-device Library state only: never in a Cassini file, an export or a ZIP archive. |
 
-Schema 2 added recording-time metadata. Schema 3 adds the derived `speakers.colour_index` column. Its explicit migration preserves notes and jobs, invalidating document signatures so startup re-derives the speaker cache from files. Variant-specific display ordinals remain separate from stored colour indices. Schema 4 adds the empty `note_stars` table and changes no existing row. Schema 5 adds two nullable `notes` columns and changes no existing row: `started_at`, the start a person set in "Set date and time" (D112, below), and `source_modified_at`, an import's last-saved time as its provider reported it, which only prefills that sheet.
+Schema 2 added recording-time metadata. Schema 3 adds the derived `speakers.colour_index` column. Its explicit migration preserves notes and jobs, invalidating document signatures so startup re-derives the speaker cache from files. Variant-specific display ordinals remain separate from stored colour indices. Schema 4 adds the empty `note_stars` table and changes no existing row. Schema 5 adds two nullable `notes` columns and changes no existing row: `started_at`, the start a person set in "Set date and time" (D112, below), and `source_modified_at`, an import's last-saved time as its provider reported it, which only prefills that sheet. Schema 6 adds the derived `speakers.background` column (background voices, below); its migration starts it false and clears the document signatures, so startup derives the speakers, the searchable body and the preview from the files again.
 
 The tables `variants`, `speakers`, `note_text`, `jobs`, `note_voice_links` and `note_stars` cascade from `notes`. A catalogue rebuilt from the files has no stars. Each later schema version needs a written `Migration` and a `MigrationTestHelper` test. The code does not use `fallbackToDestructiveMigration`. If the database does not open, the app renames it `cassini.db.corrupt-<epoch>` and makes the catalogue again.
 
@@ -176,6 +176,14 @@ A Cassini document is an Ogg Opus file at 48 kHz. Any audio player plays it. The
 - A JSON manifest (`application/vnd.cassini.portable-meeting+json`) and the transcript bodies (`application/vnd.cassini.transcript-words+json`, format `cassini.words.v1`). They are compressed and split across numbered tags.
 
 Speaker records can carry the optional `colourIndex` hint (L-41): a zero-based safe JSON integer (`0..9007199254740991`) in original first-speech order, including speakers not named yet. First speech means the earliest start time per speaker, with word-file order breaking ties; transcript items themselves keep their canonical turn order. New seals store it, draft merges keep the target's original slot, and later naming, merging or transcript variants retain valid stored slots. Missing legacy slots come from the first readable variant, with manifest order as a fallback when no body can be read. Reads and imports never rewrite a file; a later explicit document edit persists missing slots. Malformed hints are nonfatal: strings, fractions and out-of-range values use a derived fallback and are repaired on a later explicit speaker/transcript write. Valid slots retain their full precision. Fresh-run speaker IDs carry a known note-local or unambiguous saved-voice identity’s slot; a first separation of an undifferentiated transcript starts at zero, and unmatched speakers otherwise append slots before draft merges. This metadata is independent of the renderer's palette and assignment policy.
+
+### Background voices
+
+A speaker can be marked as a background voice: a voice the microphone picked up that is not part of the conversation (cassini-ux D112 / L-86, `meeting.schema.json` `speakers[].background`). The flag is `background: true`; absent means not a background voice, and switching it off removes the key, never `false`. The label, `colourIndex`, the merges and the transcript bodies stay as they are, so switching back restores the speaker as it was. The Name a speaker sheet writes the flag, with the names, in one document edit (`CassiniDocument.relabel`); no voiceprint is enrolled for a background voice.
+
+Android stores the flag on the manifest speaker record, beside `colourIndex`. This differs from the desktop and the other apps, which read it from `x["codemyriad.io"].meeting.speakers` (`library-v2/MAPPING.md`): Android has no `meeting.json` and never creates `x["codemyriad.io"]`, because the desktop validates that object against `x-schema.json` before an edit and a partial one would break it. When a file already carries `x["codemyriad.io"]` at schema 1 and lists the speaker there, Android writes the flag in both places, and on reading that shared copy wins for every speaker it lists (`SpeakerBackground`). The cassini-ux round-trip vector `background-voice.opus` is in `core/src/test/resources/cross-app/`.
+
+A background voice stays in the manifest `speakers[]` with its label, and `CASSINI_SPEAKER_COUNT` does not change. Android leaves it out of the names under the meeting title, the speaker count of the Library row, the speaker filter, Library search, find in the transcript, the preview and the TXT, Markdown, SRT and VTT exports. Its turns fold into "{n} background voices hidden" in the transcript. Playback, the timeline, the audio and the `.opus` copy keep everything.
 
 Each transcription adds a transcript version (a variant). The document keeps the earlier versions. "Save a copy" copies the document byte for byte, together with the versions, extensions and attachments that Android does not use.
 

@@ -81,6 +81,7 @@ class CassiniDatabaseOpener(
                 CassiniDatabase.MIGRATION_2_3,
                 CassiniDatabase.MIGRATION_3_4,
                 CassiniDatabase.MIGRATION_4_5,
+                CassiniDatabase.MIGRATION_5_6,
             )
             .openHelperFactory(
                 SetAsideOnCorruption(FrameworkSQLiteOpenHelperFactory()) { path ->

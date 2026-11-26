@@ -160,6 +160,7 @@ private fun BoxScope.NoteFloating(state: NoteUiState, onEvent: (NoteEvent) -> Un
     CassiniSnackbarHost(
         spec = state.snackbar,
         onTimeout = { onEvent(NoteEvent.SnackbarTimeout) },
+        onUndo = { onEvent(NoteEvent.SnackbarUndo) },
         // Without the player the box reaches the bottom of the window, so it keeps clear of the navigation bar.
         // Over the chip, the snackbar sits 8 dp above the chip's 48 dp layout (the host adds 24 dp of its own).
         modifier = Modifier

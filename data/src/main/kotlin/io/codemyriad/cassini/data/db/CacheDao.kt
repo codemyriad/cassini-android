@@ -159,4 +159,8 @@ abstract class CacheDao {
 
     @Query("SELECT * FROM speakers WHERE note_id = :noteId AND variant_id = :variantId ORDER BY ordinal")
     abstract suspend fun speakers(noteId: String, variantId: String): List<SpeakerEntity>
+
+    /** The background voices of one variant (D112 / L-86), for the text exports. */
+    @Query("SELECT speaker_id FROM speakers WHERE note_id = :noteId AND variant_id = :variantId AND background = 1")
+    abstract fun backgroundSpeakersBlocking(noteId: String, variantId: String): List<String>
 }

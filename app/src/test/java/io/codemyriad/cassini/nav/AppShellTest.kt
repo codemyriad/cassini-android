@@ -166,10 +166,10 @@ class AppShellTest {
         rule.onNode(hasSetTextAction()).performTextInput("so")
         waitFor(SPEAKER_2)
         rule.onNode(SPEAKER_2).performClick()
-        waitFor(hasText("Save name"))
+        waitFor(hasText("Save"))
 
         Espresso.pressBack()
-        waitGone(hasText("Save name"))
+        waitGone(hasText("Save"))
         rule.onNodeWithContentDescription("Close search").assertExists()
 
         Espresso.pressBack()

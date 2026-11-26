@@ -265,17 +265,26 @@ class DocumentRepository(
         }
     }
 
-    /** Renames speakers in the document ([labels] by speaker id). Refused while a job row exists or unless OK. */
-    suspend fun relabel(noteId: String, labels: Map<String, String>): EditOutcome = edit(noteId) { _, document ->
+    /**
+     * Renames speakers in the document ([labels] by speaker id) and switches background voices on or off
+     * ([background] by speaker id; cassini-ux D112 / L-86), in one write. Refused while a job row exists or unless OK.
+     */
+    suspend fun relabel(
+        noteId: String,
+        labels: Map<String, String>,
+        background: Map<String, Boolean> = emptyMap(),
+    ): EditOutcome = edit(noteId) { _, document ->
         val known = document.manifest?.optJSONArray("speakers")?.let { list ->
             (0 until list.length()).map { list.getJSONObject(it).optString("id") }.toSet()
         }.orEmpty()
         when {
-            labels.isEmpty() -> EditOutcome.Done()
-            !known.containsAll(labels.keys) -> EditOutcome.Invalid("unknown speaker")
+            labels.isEmpty() && background.isEmpty() -> EditOutcome.Done()
+            !known.containsAll(labels.keys + background.keys) -> EditOutcome.Invalid("unknown speaker")
             labels.values.any { it.isBlank() } -> EditOutcome.Invalid("blank label")
             else -> {
-                rewrite(noteId) { source, target -> CassiniDocument.relabel(source, document, labels, target) }
+                rewrite(noteId) { source, target ->
+                    CassiniDocument.relabel(source, document, labels, target, background)
+                }
                 EditOutcome.Done()
             }
         }
@@ -437,7 +446,8 @@ class DocumentRepository(
 
     /**
      * A TXT, Markdown, SRT or VTT export of one variant with the :core writers. The words come from the word cache (refreshed
-     * first), the title and duration from the row. The text is staged under `cacheDir/exports/`, which is cleaned
+     * first), without the background voices; the title and duration from the row. The text is staged under
+     * `cacheDir/exports/`, which is cleaned
      * after the write. Not available for plain notes and for UNREADABLE or UNKNOWN_FORMAT documents.
      */
     suspend fun exportTranscript(noteId: String, request: TranscriptExport, dest: Uri): ExportOutcome {
@@ -454,9 +464,11 @@ class DocumentRepository(
                 request.format == TranscriptFormat.MARKDOWN && request.markdown == null -> ExportOutcome.NotAvailable
                 variantId == null || variants.none { it.variantId == variantId } -> ExportOutcome.NotAvailable
                 else -> {
-                    val words = cache.wordsBlocking(noteId, variantId).map {
-                        Word(it.speaker, it.startMs, it.endMs, it.text)
-                    }
+                    // Background voices (D112 / L-86) are left out of the text exports; the .opus copy keeps them.
+                    val background = cache.backgroundSpeakersBlocking(noteId, variantId).toSet()
+                    val words = cache.wordsBlocking(noteId, variantId)
+                        .filter { it.speaker !in background }
+                        .map { Word(it.speaker, it.startMs, it.endMs, it.text) }
                     val transcript = ExportTranscript(
                         row.title,
                         row.durationMs,

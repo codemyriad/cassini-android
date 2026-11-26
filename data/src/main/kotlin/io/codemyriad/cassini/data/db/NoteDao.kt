@@ -40,6 +40,7 @@ abstract class NoteDao {
     @Query(
         "SELECT s.label FROM speakers s JOIN notes n ON s.note_id = n.id " +
             "WHERE n.trashed_at IS NULL AND s.variant_id = ${Sql.SELECTED_VARIANT} AND NOT s.is_placeholder " +
+            "AND NOT s.background " +
             "ORDER BY n.created_at DESC, n.id, s.ordinal",
     )
     abstract fun namedSpeakersFlow(): Flow<List<String>>

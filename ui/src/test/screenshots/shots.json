@@ -367,5 +367,21 @@
   {"screen": "set-date-time-library-after", "label": "Set date and time · Library after Save", "scheme": "light", "lang": "en", "device": "phone", "path": "light/set-date-time-library-after.png"},
   {"screen": "set-date-time-library-after", "label": "Set date and time · Library after Save", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/set-date-time-library-after.png"},
   {"screen": "unfolded-set-date-time", "label": "Set date and time · unfolded, beside the Library", "scheme": "light", "lang": "en", "device": "phone", "path": "foldable-unfolded/set-date-time.png"},
-  {"screen": "unfolded-set-date-time", "label": "Set date and time · unfolded, beside the Library", "scheme": "dark", "lang": "en", "device": "phone", "path": "foldable-unfolded-dark/set-date-time.png"}
+  {"screen": "unfolded-set-date-time", "label": "Set date and time · unfolded, beside the Library", "scheme": "dark", "lang": "en", "device": "phone", "path": "foldable-unfolded-dark/set-date-time.png"},
+  {"screen": "d112-name-row", "label": "Name a speaker — speaker row (D112)", "scheme": "light", "lang": "en", "device": "phone", "path": "light/d112-name-row.png"},
+  {"screen": "d112-name-row", "label": "Name a speaker — speaker row (D112)", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/d112-name-row.png"},
+  {"screen": "d112-name-background", "label": "Name a speaker — background voice on (D112)", "scheme": "light", "lang": "en", "device": "phone", "path": "light/d112-name-background.png"},
+  {"screen": "d112-name-background", "label": "Name a speaker — background voice on (D112)", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/d112-name-background.png"},
+  {"screen": "d112-transcript-folded", "label": "Background voices folded (D112)", "scheme": "light", "lang": "en", "device": "phone", "path": "light/d112-transcript-folded.png"},
+  {"screen": "d112-transcript-folded", "label": "Background voices folded (D112)", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/d112-transcript-folded.png"},
+  {"screen": "d112-transcript-opened", "label": "Background voices opened (D112)", "scheme": "light", "lang": "en", "device": "phone", "path": "light/d112-transcript-opened.png"},
+  {"screen": "d112-transcript-opened", "label": "Background voices opened (D112)", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/d112-transcript-opened.png"},
+  {"screen": "d112-snackbar", "label": "Speakers saved — Undo snackbar (D112)", "scheme": "light", "lang": "en", "device": "phone", "path": "light/d112-snackbar.png"},
+  {"screen": "d112-snackbar", "label": "Speakers saved — Undo snackbar (D112)", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/d112-snackbar.png"},
+  {"screen": "d112-unfolded-name-background", "label": "Unfolded — background voice on (D112)", "scheme": "light", "lang": "en", "device": "phone", "path": "d112-unfolded/name-background.png"},
+  {"screen": "d112-unfolded-name-background", "label": "Unfolded — background voice on (D112)", "scheme": "dark", "lang": "en", "device": "phone", "path": "d112-unfolded-dark/name-background.png"},
+  {"screen": "d112-unfolded-transcript-opened", "label": "Unfolded — background voices opened (D112)", "scheme": "light", "lang": "en", "device": "phone", "path": "d112-unfolded/transcript-opened.png"},
+  {"screen": "d112-unfolded-transcript-opened", "label": "Unfolded — background voices opened (D112)", "scheme": "dark", "lang": "en", "device": "phone", "path": "d112-unfolded-dark/transcript-opened.png"},
+  {"screen": "d112-unfolded-snackbar", "label": "Unfolded — Undo snackbar (D112)", "scheme": "light", "lang": "en", "device": "phone", "path": "d112-unfolded/snackbar.png"},
+  {"screen": "d112-unfolded-snackbar", "label": "Unfolded — Undo snackbar (D112)", "scheme": "dark", "lang": "en", "device": "phone", "path": "d112-unfolded-dark/snackbar.png"}
 ]}

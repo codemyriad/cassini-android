@@ -606,4 +606,92 @@ class VoiceRepositoryTest {
         val refused = runCatching { voices.adoptPending("../people") }.exceptionOrNull()
         assertTrue(refused is IllegalArgumentException)
     }
+
+    @Test fun unenrolWithRollbackRestoresSoleEnrolmentVoiceColourAndMatchesInOtherNotes() = runTest {
+        // Luca takes colourIndex 0; Bea is a sole-enrolment voice on sealedId with colourIndex 1.
+        writePeople(luca)
+        writeSealed(sealedId, mapOf("v1/S1" to print(10)))
+        val bea = checkNotNull(voices.enrol(sealedId, "v1", "S1", null, "Bea"))
+        assertEquals(1, bea.colourIndex)
+
+        // Another sealed note (draftId) has an AUTO match to Bea, and a draft references Bea in live/automatic/remember.
+        val autoInOther = Match(bea.id, 0.82f, Match.State.AUTO)
+        writeSealed(draftId, mapOf("v1/S2" to print(11, match = autoInOther)))
+        voices.syncLinks()
+        checkpoints.names.mutate(draftId) {
+            it.applyLive(mapOf("S2" to autoInOther), mapOf(bea.id to "Bea"))
+                .remember("S2", bea.id, 0)
+        }
+
+        // Unenrol Bea's sole enrolment: Bea is forgotten and matches in the other note and draft are scrubbed.
+        val (outcome, rollback) = voices.unenrolWithRollback(sealedId, "v1", "S1")
+        assertEquals(UnenrolOutcome.Forgotten, outcome)
+        assertNotNull(rollback)
+        assertTrue(people().voices.none { it.id == bea.id })
+        assertNull(voices.prints(sealedId, "v1").getValue("S1").match)
+        assertNull(voices.prints(draftId, "v1").getValue("S2").match)
+        assertNull(links(draftId)["v1/S2"])
+        assertNull(checkpoints.names.current(draftId).live["S2"])
+
+        // Restore via the dedicated operation: original id, colour, mean, links and matches across notes/drafts return.
+        assertTrue(voices.restoreUnenrol(rollback!!))
+        val restored = people().voices.single { it.id == bea.id }.voice
+        assertEquals(bea.id, restored.id)
+        assertEquals(bea.name, restored.name)
+        assertEquals(bea.colourIndex, restored.colourIndex)
+        assertEquals(bea.count, restored.count)
+        assertArrayEquals(bea.mean, restored.mean, 0f)
+        assertEquals(Match.State.CONFIRMED, voices.prints(sealedId, "v1").getValue("S1").match?.state)
+        assertEquals(bea.id, voices.prints(sealedId, "v1").getValue("S1").match?.voiceId)
+        assertEquals(autoInOther, voices.prints(draftId, "v1").getValue("S2").match)
+        assertEquals(bea.id, links(draftId)["v1/S2"])
+        val draftRestored = checkpoints.names.current(draftId)
+        assertEquals(autoInOther, draftRestored.live["S2"])
+        assertEquals("Bea", draftRestored.automatic["S2"])
+        assertEquals(bea.id, draftRestored.remembered["S2"])
+    }
+
+    @Test fun reverseOrderUndoPreservesSharedVoiceCountAndExternalMatchesAcrossMultiSpeakerSave() = runTest {
+        writeSealed(sealedId, mapOf("v1/S1" to print(10), "v1/S2" to print(11)))
+        val alice = checkNotNull(voices.enrol(sealedId, "v1", "S1", null, "Alice"))
+        val bob = checkNotNull(voices.enrol(sealedId, "v1", "S2", null, "Bob"))
+
+        val bobInOther = Match(bob.id, 0.85f, Match.State.AUTO)
+        writeSealed(draftId, mapOf("v1/S2" to print(12, match = bobInOther)))
+        voices.syncLinks()
+        checkpoints.names.mutate(draftId) {
+            it.applyLive(mapOf("S2" to bobInOther), mapOf(bob.id to "Bob"))
+                .remember("S2", bob.id, 0)
+        }
+
+        // One Save: A (Alice) -> Bob, B (Bob) -> new Carol.
+        val (_, rollbackA) = voices.unenrolWithRollback(sealedId, "v1", "S1")
+        assertNotNull(voices.enrol(sealedId, "v1", "S1", bob.id, "Bob"))
+        val (_, rollbackB) = voices.unenrolWithRollback(sealedId, "v1", "S2")
+        val carol = checkNotNull(voices.enrol(sealedId, "v1", "S2", null, "Carol"))
+        assertEquals(1, people().voices.single { it.voice.id == bob.id }.voice.count)
+        assertEquals(1, people().voices.single { it.voice.id == carol.id }.voice.count)
+
+        // Strict reverse order Undo: unenrol B (Carol) -> restore B (Bob) -> unenrol A (Bob) -> restore A (Alice).
+        assertEquals(UnenrolOutcome.Forgotten, voices.unenrol(sealedId, "v1", "S2"))
+        assertTrue(voices.restoreUnenrol(checkNotNull(rollbackB)))
+        assertEquals(UnenrolOutcome.Unenrolled, voices.unenrol(sealedId, "v1", "S1"))
+        assertTrue(voices.restoreUnenrol(checkNotNull(rollbackA)))
+
+        val saved = people().voices.associate { it.voice.id to it.voice }
+        assertNull(saved[carol.id])
+        assertEquals(1, saved[alice.id]?.count)
+        assertEquals(1, saved[bob.id]?.count)
+        assertEquals(bob.colourIndex, saved[bob.id]?.colourIndex)
+        assertEquals(alice.id, voices.prints(sealedId, "v1").getValue("S1").match?.voiceId)
+        assertEquals(Match.State.CONFIRMED, voices.prints(sealedId, "v1").getValue("S1").match?.state)
+        assertEquals(bob.id, voices.prints(sealedId, "v1").getValue("S2").match?.voiceId)
+        assertEquals(Match.State.CONFIRMED, voices.prints(sealedId, "v1").getValue("S2").match?.state)
+        assertEquals(bobInOther, voices.prints(draftId, "v1").getValue("S2").match)
+        assertEquals(bob.id, links(draftId)["v1/S2"])
+        val draftAfter = checkpoints.names.current(draftId)
+        assertEquals(bobInOther, draftAfter.live["S2"])
+        assertEquals("Bob", draftAfter.automatic["S2"])
+        assertEquals(bob.id, draftAfter.remembered["S2"])
+    }
 }

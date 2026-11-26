@@ -64,7 +64,7 @@ import kotlin.math.abs
  * The device follow-ups 3 and 4 of docs/ui-fidelity.md, on an edge-to-edge window as in MainActivity:
  *
  * - With the keyboard open, the Name a speaker sheet stays below the status bar and above the keyboard, and at font
- *   scale 1.3 its Cancel and Save name buttons stay fully above the keyboard.
+ *   scale 1.3 its Cancel and Save buttons stay fully above the keyboard.
  * - New draft text on Transcribing scrolls only the draft, so the progress card stays in view.
  *
  * Each test saves a screenshot to `files/device-checks/` for a reviewer. The sheet tests set

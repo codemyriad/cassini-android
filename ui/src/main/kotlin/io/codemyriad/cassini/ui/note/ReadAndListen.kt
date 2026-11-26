@@ -23,11 +23,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -184,6 +188,11 @@ private class ActiveLine {
  * pauses following ([NoteEvent.PauseFollowing]) and, while [followPaused], 4 s without scrolling resume it
  * ([NoteEvent.FollowPlayback]). The current search match scrolls into view. With [noWords] and no turns, the pane
  * shows the empty state ("No speech").
+ *
+ * Background voices (D112 / L-86): each run of consecutive background turns folds into one row, "2 background voices
+ * hidden" ([BackgroundFold]); a tap opens the run in place, its turns greyed, and a tap on a greyed name opens the
+ * Name sheet. Every turn keeps its own item (a folded turn draws nothing), so the follow and search scrolls still
+ * find a turn by its index.
  */
 @Composable
 @Suppress("LongParameterList") // The transcript inputs and the follow state.
@@ -207,7 +216,10 @@ internal fun TranscriptPane(
     val onLine = remember { { top: Float -> active.top = top } }
     val onPlaced = remember { { coordinates: LayoutCoordinates -> active.paragraph = coordinates } }
     val headerItems = if (header == null) 0 else 1
-    FollowEffects(turns, playingWord, following, followPaused, listState, active, onEvent, headerItems)
+    val runs = remember(turns) { backgroundRuns(turns) }
+    var open by rememberSaveable { mutableStateOf(listOf<String>()) }
+    val followed = followed(playingWord, runs, open)
+    FollowEffects(turns, followed, following, followPaused, listState, active, onEvent, headerItems)
     SearchScroll(turns, search, listState, headerItems)
     LazyColumn(
         modifier = modifier
@@ -228,19 +240,55 @@ internal fun TranscriptPane(
         }
         items(turns, key = { it.id }) { turn ->
             val activeIndex = playingWord?.takeIf { it.turnId == turn.id }?.index
-            Box(Modifier.padding(horizontal = 20.dp).testTag("transcript-turn-${turn.id}")) {
-                Turn(
-                    turn = turn,
-                    activeIndex = activeIndex,
-                    matches = matches[turn.id] ?: TurnMatches.None,
-                    onEvent = onEvent,
-                    onActiveLine = if (activeIndex != null) onLine else null,
-                    onParagraphPlaced = if (activeIndex != null) onPlaced else null,
-                )
+            val run = runs[turn.id]
+            TranscriptItem(
+                turn = turn,
+                run = run,
+                open = run == null || run.key in open,
+                onToggle = { key -> open = if (key in open) open - key else open + key },
+                activeIndex = activeIndex,
+                matches = matches[turn.id] ?: TurnMatches.None,
+                onEvent = onEvent,
+                onActiveLine = if (activeIndex != null) onLine else null,
+                onParagraphPlaced = if (activeIndex != null) onPlaced else null,
+            )
+        }
+    }
+}
+
+/**
+ * One item of the transcript: a turn, or a turn of a run of background voices ([run]): the run's first turn carries
+ * the folded row, and the run's turns show greyed only while [open].
+ */
+@Composable
+@Suppress("LongParameterList") // The turn, its run, its active word and matches, the events and the follow hooks.
+private fun TranscriptItem(
+    turn: TurnUi,
+    run: BackgroundRun?,
+    open: Boolean,
+    onToggle: (String) -> Unit,
+    activeIndex: Int?,
+    matches: TurnMatches,
+    onEvent: (NoteEvent) -> Unit,
+    onActiveLine: ((Float) -> Unit)?,
+    onParagraphPlaced: ((LayoutCoordinates) -> Unit)?,
+) {
+    Column(Modifier.padding(horizontal = 20.dp)) {
+        if (run != null && run.first) BackgroundFold(run, open = open) { onToggle(run.key) }
+        if (open) {
+            Box(
+                Modifier
+                    .testTag("transcript-turn-${turn.id}")
+                    .then(if (run != null) Modifier.alpha(BACKGROUND_TURN_ALPHA) else Modifier),
+            ) {
+                Turn(turn, activeIndex, matches, onEvent, onActiveLine, onParagraphPlaced)
             }
         }
     }
 }
+
+/** An opened background turn is greyed (D112 / L-86). */
+private const val BACKGROUND_TURN_ALPHA = 0.5f
 
 /**
  * The empty transcript: a document with no words (the Library row says "· No speech"). A plain card, 16 dp below

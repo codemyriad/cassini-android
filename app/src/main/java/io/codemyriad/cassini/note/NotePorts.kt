@@ -34,6 +34,7 @@ import io.codemyriad.cassini.data.notes.RenameOutcome
 import io.codemyriad.cassini.data.notes.TranscriptExport
 import io.codemyriad.cassini.data.voices.SavedVoices
 import io.codemyriad.cassini.data.voices.UnenrolOutcome
+import io.codemyriad.cassini.data.voices.UnenrolRollback
 import io.codemyriad.cassini.data.voices.VoiceEdit
 import io.codemyriad.cassini.engine.job.JobFailure
 import io.codemyriad.cassini.inAppLanguage
@@ -190,7 +191,10 @@ interface NotePorts {
 
     suspend fun acknowledgeTrust(id: String)
 
-    suspend fun relabel(id: String, labels: Map<String, String>): EditOutcome
+    suspend fun relabel(id: String, labels: Map<String, String>): EditOutcome = relabel(id, labels, emptyMap())
+
+    /** Renames speakers and switches background voices ([background] by speaker id, D112 / L-86) in one write. */
+    suspend fun relabel(id: String, labels: Map<String, String>, background: Map<String, Boolean>): EditOutcome
 
     suspend fun mergeSpeakers(id: String, variantId: String, source: String, target: String): EditOutcome
 
@@ -199,6 +203,14 @@ interface NotePorts {
     suspend fun enrol(id: String, variantId: String, speakerId: String, voiceId: String?, name: String): Voice?
 
     suspend fun unenrol(id: String, variantId: String, speakerId: String): UnenrolOutcome
+
+    suspend fun unenrolWithRollback(
+        id: String,
+        variantId: String,
+        speakerId: String,
+    ): Pair<UnenrolOutcome, UnenrolRollback?> = unenrol(id, variantId, speakerId) to null
+
+    suspend fun restoreUnenrol(rollback: UnenrolRollback): Boolean = false
 
     suspend fun setMatch(id: String, variantId: String, speakerId: String, match: Match?): Boolean
 
@@ -385,8 +397,8 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
         graph.awaitCatalogue().notes.acknowledgeTrust(id)
     }
 
-    override suspend fun relabel(id: String, labels: Map<String, String>): EditOutcome =
-        graph.awaitCatalogue().documents.relabel(id, labels)
+    override suspend fun relabel(id: String, labels: Map<String, String>, background: Map<String, Boolean>): EditOutcome =
+        graph.awaitCatalogue().documents.relabel(id, labels, background)
 
     override suspend fun mergeSpeakers(id: String, variantId: String, source: String, target: String): EditOutcome =
         graph.awaitCatalogue().documents.mergeSpeakers(id, variantId, source, target)
@@ -399,6 +411,16 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override suspend fun unenrol(id: String, variantId: String, speakerId: String): UnenrolOutcome =
         graph.awaitCatalogue().voices.unenrol(id, variantId, speakerId)
+
+    override suspend fun unenrolWithRollback(
+        id: String,
+        variantId: String,
+        speakerId: String,
+    ): Pair<UnenrolOutcome, UnenrolRollback?> =
+        graph.awaitCatalogue().voices.unenrolWithRollback(id, variantId, speakerId)
+
+    override suspend fun restoreUnenrol(rollback: UnenrolRollback): Boolean =
+        graph.awaitCatalogue().voices.restoreUnenrol(rollback)
 
     override suspend fun setMatch(id: String, variantId: String, speakerId: String, match: Match?): Boolean =
         graph.awaitCatalogue().voices.setMatch(id, variantId, speakerId, match)

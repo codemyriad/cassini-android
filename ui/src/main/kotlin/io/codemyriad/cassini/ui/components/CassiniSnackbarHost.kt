@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -34,6 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
+import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import kotlinx.coroutines.delay
 
@@ -92,6 +94,15 @@ fun CassiniSnackbarHost(
             SnackbarKind.SAVE_FAILED -> stringResource(R.string.ui_actions_save_failed)
             SnackbarKind.SHARE_FAILED -> stringResource(R.string.ui_actions_share_failed)
             SnackbarKind.PLAYBACK_FAILED -> stringResource(R.string.ui_status_unplayable)
+            SnackbarKind.BACKGROUND_VOICE -> stringResource(R.string.ui_bg_toast_single, it.text.orEmpty())
+            SnackbarKind.BACKGROUND_VOICES -> Counts.plural(R.plurals.ui_bg_toast_count, it.count)
+            SnackbarKind.NAMED_AND_BACKGROUND ->
+                pluralStringResource(
+                    R.plurals.ui_bg_toast_named,
+                    it.count,
+                    it.text.orEmpty(),
+                    Counts.number(it.count.toLong()),
+                )
         }
     }
     CassiniSnackbarHost(

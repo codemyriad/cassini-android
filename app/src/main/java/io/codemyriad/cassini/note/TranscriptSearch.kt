@@ -6,9 +6,12 @@ import io.codemyriad.cassini.ui.note.TranscriptMatch
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 
-/** Adapts UI turns to the plain-JVM search and its source character ranges. */
+/**
+ * Adapts UI turns to the plain-JVM search and its source character ranges. Background voices' turns are not searched
+ * (D112 / L-86).
+ */
 object TranscriptSearch {
     fun matches(turns: List<TurnUi>, query: String): ImmutableList<TranscriptMatch> =
-        TextSearch.matches(turns, query, { it.id }, { turnText(it.words) })
+        TextSearch.matches(turns.filterNot { it.background }, query, { it.id }, { turnText(it.words) })
             .map { TranscriptMatch(it.turnId, it.range) }.toImmutableList()
 }

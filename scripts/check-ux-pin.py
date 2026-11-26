@@ -13,7 +13,9 @@ VENDOR = Path('third_party/cassini-ux')
 # contract/import-types.json (D-1030) has its own contract pin. The bundle itself moved for L-10 (D-1035).
 # vectors/head-start/* (D-1119 / D-1124) carry the D109 head-start transcription
 # policy and mobile prefix checkpoint vectors.
+# d112/strings.json (D-1168) carries the D112 Background voices and speaker row copy (cassini-ux D-1171).
 OWN_COMMIT = {
+    'd112/strings.json',
     'wave5/strings.json',
     'contract/import-types.json',
     'phase2/strings.json',

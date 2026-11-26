@@ -24,6 +24,7 @@ import io.codemyriad.cassini.data.notes.EditOutcome
 import io.codemyriad.cassini.data.notes.ExportOutcome
 import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.data.voices.SavedVoices
+import io.codemyriad.cassini.data.voices.VoiceEdit
 import io.codemyriad.cassini.engine.job.DraftState
 import io.codemyriad.cassini.engine.job.JobFailure
 import io.codemyriad.cassini.engine.job.JobPhase
@@ -45,6 +46,7 @@ import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.banner.BannerSpec
 import io.codemyriad.cassini.ui.components.SnackbarKind
 import io.codemyriad.cassini.ui.components.SnackbarSpec
+import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.SuggestionUi
 import io.codemyriad.cassini.ui.components.WordRef
 import io.codemyriad.cassini.ui.note.ExportKind
@@ -170,6 +172,9 @@ class NoteViewModel(
     private val firstTurnsShown = CompletableDeferred<Unit>()
     private val visible = MutableStateFlow(false)
     private var snackbarCount = 0L
+
+    /** What Undo on the speakers' snackbar puts back (D112 / L-86); null once that snackbar is gone. */
+    private var pendingUndo: SpeakerUndo? = null
     private var closing = false
 
     // Sources. -------------------------------------------------------------------------------------------------------
@@ -343,7 +348,7 @@ class NoteViewModel(
         val trustToggled: Boolean = false,
         val dismissed: Set<String> = emptySet(),
         val sheet: SheetKind? = null,
-        val naming: NamingState? = null,
+        val naming: NamingSession? = null,
         val info: DocumentFacts? = null,
         val actionsBytes: Long? = null,
         val dialog: NoteDialog? = null,
@@ -661,7 +666,11 @@ class NoteViewModel(
             is NoteEvent.VoicesAnswer -> answerVoicesQuestion(event.remember)
             NoteEvent.DismissSheet -> dismissSheet()
             NoteEvent.DismissDialog -> local.update { it.copy(dialog = null) }
-            NoteEvent.SnackbarTimeout -> local.update { it.copy(snackbar = null) }
+            NoteEvent.SnackbarTimeout -> {
+                pendingUndo = null
+                local.update { it.copy(snackbar = null) }
+            }
+            NoteEvent.SnackbarUndo -> undoSpeakers()
         }
     }
 
@@ -1248,6 +1257,7 @@ class NoteViewModel(
     }
 
     private fun snackbar(kind: SnackbarKind, text: String?) {
+        pendingUndo = null
         val snackbar = SnackbarSpec(
             kind = kind,
             text = text,
@@ -1263,13 +1273,8 @@ class NoteViewModel(
     private suspend fun openNaming(speakerId: String, restoring: Boolean = false) {
         val core = core.filterNotNull().first { !restoring || it.details != null && it.shownLoaded }
         val details = core.details ?: return
-        val mode = core.mode
-        NoteMapping.readOnly(details, mode, core.namingOpen)?.let { return showReadOnly(it) }
-        val input = if (NoteMapping.showsDraft(mode)) {
-            draftInput(core, speakerId)
-        } else {
-            sealedInput(core, details, speakerId)
-        }
+        NoteMapping.readOnly(details, core.mode, core.namingOpen)?.let { return showReadOnly(it) }
+        val input = namingInput(core, details, speakerId)
         if (input == null) {
             saved[KEY_NAME_SHEET] = null
             return
@@ -1280,7 +1285,29 @@ class NoteViewModel(
         }
         saved[KEY_NAME_SHEET] = speakerId
         saved[KEY_NAME_TEXT] = naming.name
-        local.update { it.copy(sheet = SheetKind.NAME, naming = naming) }
+        val session = NamingSession.of(naming, core.shown().rowSpeakers)
+        local.update { it.copy(sheet = SheetKind.NAME, naming = session) }
+    }
+
+    private suspend fun namingInput(core: Core, details: NoteDetails, speakerId: String): NamingInput? =
+        if (NoteMapping.showsDraft(core.mode)) draftInput(core, speakerId) else sealedInput(core, details, speakerId)
+
+    /**
+     * A chip of the speaker row (D112 / L-86): the form of [speakerId], kept as it was left, or a new one. The
+     * changes made in the other forms stay.
+     */
+    private suspend fun selectSpeaker(speakerId: String) {
+        val session = local.value.naming ?: return
+        if (session.active == speakerId) return
+        val next = session.forms[speakerId]?.let(session::show) ?: run {
+            val core = core.filterNotNull().first()
+            val details = core.details ?: return
+            val input = namingInput(core, details, speakerId) ?: return
+            local.value.naming?.show(SpeakerNaming.open(input)) ?: return
+        }
+        saved[KEY_NAME_SHEET] = speakerId
+        saved[KEY_NAME_TEXT] = next.form.name
+        local.update { it.copy(naming = next) }
     }
 
     private suspend fun sealedInput(core: Core, details: NoteDetails, speakerId: String): NamingInput? {
@@ -1315,6 +1342,8 @@ class NoteViewModel(
             mergeTargets = targets,
             sealedVersions = MergeVersionsUi(shown = variant.ordinal + 1, added = details.variants.size + 1),
             canSample = live,
+            background = speaker.background,
+            canBackground = true,
         )
     }
 
@@ -1351,7 +1380,7 @@ class NoteViewModel(
 
     @Suppress("CyclomaticComplexMethod") // one branch per Name sheet event
     private fun nameSheet(event: NameSheetEvent) {
-        val naming = local.value.naming ?: return
+        val naming = local.value.naming?.form ?: return
         if (event == NameSheetEvent.OpenSettings) {
             // The sheet stays in the state: it shows again when the user comes back from Settings.
             emit(NoteEffect.OpenSettings)
@@ -1372,6 +1401,11 @@ class NoteViewModel(
             NameSheetEvent.NotName -> NamingEvent.NotThisPerson
             is NameSheetEvent.RememberChanged -> NamingEvent.RememberToggled(event.remember)
             NameSheetEvent.MergeInto -> NamingEvent.MergeInto
+            is NameSheetEvent.BackgroundChanged -> NamingEvent.BackgroundToggled(event.background)
+            is NameSheetEvent.SelectSpeaker -> {
+                launch { selectSpeaker(event.speakerId) }
+                return
+            }
             NameSheetEvent.Cancel -> NamingEvent.Cancel
             NameSheetEvent.Save, NameSheetEvent.SaveBlocked -> NamingEvent.Save
             NameSheetEvent.OpenSettings -> return
@@ -1390,54 +1424,150 @@ class NoteViewModel(
     private fun naming(event: NamingEvent) {
         val naming = local.value.naming ?: return
         val result = SpeakerNaming.reduce(naming, event)
-        val next = result.state
+        val next = result.session
         if (next == null) {
             closeSheet()
         } else {
-            saved[KEY_NAME_TEXT] = next.name
+            saved[KEY_NAME_SHEET] = next.active
+            saved[KEY_NAME_TEXT] = next.form.name
             local.update { it.copy(naming = next) }
         }
         val effects = result.effects.filter { it != NamingEffect.Close && it != NamingEffect.FocusQuestion }
-        if (effects.isNotEmpty()) launch { apply(effects) }
+        if (effects.isNotEmpty()) launch { apply(effects, naming.takeIf { event == NamingEvent.Save }) }
     }
 
-    /** Carries out the sheet's effects in order; a refused sealed edit shows why. */
-    private suspend fun apply(effects: List<NamingEffect>) {
+    /**
+     * Carries out the sheet's effects in order; a refused sealed edit shows why. The names and background voices of
+     * every speaker go into the document in one write, before the voice effects. After a Save ([saved] is the
+     * session that was saved) that switched a background voice on, one snackbar sums the change up with Undo.
+     */
+    private suspend fun apply(effects: List<NamingEffect>, saved: NamingSession? = null) {
         val details = details.value?.details ?: return
         val variant = NoteMapping.selected(details)?.variantId
         val draft = ports.draft(noteId)
-        for (effect in effects) {
-            val refused = when (effect) {
-                is NamingEffect.Relabel -> refusal(ports.relabel(noteId, mapOf(effect.speakerId to effect.label)))
-                is NamingEffect.Reject -> reject(effect, details, variant, draft)
-                is NamingEffect.MergeSealed -> mergeSealed(effect, variant)
-                else -> {
-                    applyOther(effect, variant, draft)
-                    null
-                }
+        val labels = effects.filterIsInstance<NamingEffect.Relabel>().associate { it.speakerId to it.label }
+        val background = effects.filterIsInstance<NamingEffect.Background>().associate { it.speakerId to it.background }
+        val undo = saved?.let { SpeakerUndo.of(it, effects, variant, ::speakerName) }
+        val recorder = saved?.let(SpeakerUndo::Recorder)
+        if (labels.isNotEmpty() || background.isNotEmpty()) {
+            refusal(ports.relabel(noteId, labels, background))?.let {
+                showReadOnly(it)
+                return
             }
+        }
+        for (effect in effects) {
+            val refused = applyEffect(effect, details, variant, draft, recorder)
             if (refused != null) {
                 showReadOnly(refused)
                 break
             }
         }
         printsVersion.update { it + 1 }
+        undo?.copy(voiceOps = recorder?.ops().orEmpty())?.takeIf { it.summary != null }?.let(::offerUndo)
+    }
+
+    private suspend fun applyEffect(
+        effect: NamingEffect,
+        details: NoteDetails,
+        variant: String?,
+        draft: DraftNaming,
+        recorder: SpeakerUndo.Recorder?,
+    ): ReadOnlyReason? = when (effect) {
+        is NamingEffect.Relabel, is NamingEffect.Background -> null
+        is NamingEffect.Reject -> reject(effect, details, variant, draft)
+        is NamingEffect.MergeSealed -> mergeSealed(effect, variant)
+        else -> {
+            applyOther(effect, variant, draft, recorder)
+            null
+        }
+    }
+
+    /** How [name] reads in the snackbar: a placeholder without a stored label is "Speaker N" in the UI language. */
+    private fun speakerName(name: SpeakerNameUi): String = when (name) {
+        is SpeakerNameUi.Named -> name.text
+        is SpeakerNameUi.Placeholder -> name.stored ?: ports.placeholderLabel(name.number)
+    }
+
+    /** The speakers' Undo snackbar (D112 / L-86), reusing the trash snackbar. */
+    private fun offerUndo(undo: SpeakerUndo) {
+        val summary = undo.summary ?: return
+        pendingUndo = undo
+        val snackbar = SnackbarSpec(
+            kind = summary.kind,
+            text = summary.name,
+            count = summary.count,
+            undo = true,
+            durationMs = ports.snackbarTimeoutMs(),
+            id = ++snackbarCount,
+        )
+        local.update { it.copy(snackbar = snackbar) }
+    }
+
+    /** Undo: every speaker of that Save goes back to its name and background state, and its voice changes back. */
+    private fun undoSpeakers() {
+        val undo = pendingUndo ?: return
+        pendingUndo = null
+        local.update { it.copy(snackbar = null) }
+        launch {
+            refusal(ports.relabel(noteId, undo.labels, undo.background))?.let { return@launch showReadOnly(it) }
+            val variant = undo.variantId
+            if (variant != null) {
+                undo.voiceOps.asReversed().forEach { replayVoiceUndo(variant, it) }
+            }
+            printsVersion.update { it + 1 }
+        }
+    }
+
+    private suspend fun replayVoiceUndo(variant: String, op: VoiceUndoOp) {
+        when (op) {
+            is VoiceUndoOp.Unenrol -> {
+                ports.unenrol(noteId, variant, op.speakerId)
+                op.previousMatch?.let { ports.setMatch(noteId, variant, op.speakerId, it) }
+            }
+            is VoiceUndoOp.RestoreUnenrol -> ports.restoreUnenrol(op.rollback)
+            is VoiceUndoOp.RestoreMatch -> ports.setMatch(noteId, variant, op.speakerId, op.match)
+            is VoiceUndoOp.RenameVoice -> ports.renameVoice(op.voiceId, op.previousName)
+        }
     }
 
     /** The effects that never refuse: voice files, draft names and the sample. */
-    private suspend fun applyOther(effect: NamingEffect, variant: String?, draft: DraftNaming) {
+    private suspend fun applyOther(
+        effect: NamingEffect,
+        variant: String?,
+        draft: DraftNaming,
+        recorder: SpeakerUndo.Recorder?,
+    ) {
         when (effect) {
-            is NamingEffect.RememberVoice -> variant?.let {
-                ports.enrol(noteId, it, effect.speakerId, effect.voiceId, effect.name)
+            is NamingEffect.RememberVoice -> applyRemember(effect, variant, recorder)
+            is NamingEffect.RenameVoice -> {
+                if (ports.renameVoice(effect.voiceId, effect.name) == VoiceEdit.Done) {
+                    recorder?.onRenamedVoice(effect.voiceId, effect.name)
+                }
             }
-            is NamingEffect.RenameVoice -> ports.renameVoice(effect.voiceId, effect.name)
-            is NamingEffect.ClearMatch -> variant?.let { ports.setMatch(noteId, it, effect.speakerId, null) }
-            is NamingEffect.Unenrol -> variant?.let { ports.unenrol(noteId, it, effect.speakerId) }
+            is NamingEffect.ClearMatch -> variant?.let {
+                if (ports.setMatch(noteId, it, effect.speakerId, null)) recorder?.onClearedMatch(effect.speakerId)
+            }
+            is NamingEffect.Unenrol -> variant?.let {
+                ports.unenrolWithRollback(noteId, it, effect.speakerId).second?.let { rollback ->
+                    recorder?.onUnenrolled(effect.speakerId, rollback)
+                }
+            }
             is NamingEffect.MergeDraft -> draft.merge(effect.source, effect.target, effect.targetLabel)
             is NamingEffect.DraftName -> draftName(effect, draft)
             is NamingEffect.PlayRange -> ports.playRange(noteId, effect.startMs, effect.endMs)
-            is NamingEffect.Relabel, is NamingEffect.Reject, is NamingEffect.MergeSealed,
+            is NamingEffect.Relabel, is NamingEffect.Reject, is NamingEffect.MergeSealed, is NamingEffect.Background,
             NamingEffect.FocusQuestion, NamingEffect.Close -> Unit
+        }
+    }
+
+    private suspend fun applyRemember(
+        effect: NamingEffect.RememberVoice,
+        variant: String?,
+        recorder: SpeakerUndo.Recorder?,
+    ) {
+        val target = variant ?: return
+        if (ports.enrol(noteId, target, effect.speakerId, effect.voiceId, effect.name) != null) {
+            recorder?.onEnrolled(effect.speakerId)
         }
     }
 

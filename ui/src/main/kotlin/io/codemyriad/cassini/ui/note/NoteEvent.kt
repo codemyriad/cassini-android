@@ -113,4 +113,7 @@ sealed interface NoteEvent {
     data object DismissDialog : NoteEvent
 
     data object SnackbarTimeout : NoteEvent
+
+    /** Undo on the snackbar after the speakers were saved (D112 / L-86): every change of that Save goes back. */
+    data object SnackbarUndo : NoteEvent
 }
