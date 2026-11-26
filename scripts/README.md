@@ -27,7 +27,7 @@ never committed.
 | `check-ux-pin.py` | The vendored cassini-ux contracts against their byte pins in `third_party/cassini-ux/`. |
 | `check-import-types.py` | Manifest Open with and Share filters against the vendored import-types contract. |
 | `check-brand-color-literals.py` | No authored colour values in production sources. |
-| `check-nav-mark.py` | The Saturn mark sources and their density exports (`nav-mark.json`, `mid-mark.json`). |
+| `check-nav-mark.py` | The Saturn mark sources and their density exports (`nav-mark.json`, `mid-mark.json`, `launcher-mark.json`). |
 | `check-resource-collisions.py` | No resource name in both `:app` and `:ui`. |
 | `check-native-paths.py` | The path triggers of `native.yml` list exactly the native build scripts. |
 | `check-runner-selection.py` | The `CM_RUNNER` variable moves jobs to self-hosted runners only safely. |

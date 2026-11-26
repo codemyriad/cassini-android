@@ -74,7 +74,8 @@ def generated_files(root):
     for mode, qualifier in [('light', 'values'), ('dark', 'values-night')]:
         values = {'ui_window_bg': roles['ground'][mode], 'ui_logo_ink': roles['ink'][mode]}
         if mode == 'light':
-            values.update(ui_launcher_background=roles['ground']['light'], ui_launcher_ink=roles['ink']['light'])
+            # D-1175: one app icon for every Cassini talk app, the Saturn on the dark ground.
+            values['ui_launcher_background'] = roles['ground']['dark']
         if mode == 'light':
             values['ui_brand_on_record'] = roles['on-record']['light']
         lines = ['<?xml version="1.0" encoding="utf-8"?>',

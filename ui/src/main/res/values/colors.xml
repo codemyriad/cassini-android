@@ -3,7 +3,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <color name="ui_window_bg">#F4F5F7</color>
     <color name="ui_logo_ink" tools:ignore="UnusedResources">#191B1F</color>
-    <color name="ui_launcher_background">#F4F5F7</color>
-    <color name="ui_launcher_ink">#191B1F</color>
+    <color name="ui_launcher_background">#0D1015</color>
     <color name="ui_brand_on_record">#FFFFFF</color>
 </resources>

@@ -1,0 +1,43 @@
+{
+  "source_sha256": "38b639fe49123ee236239a523183815505c33b826b135f63b65d691df7caf61e",
+  "decision": "D-1175 (one app icon, approved by Alex on 2026-11-26)",
+  "placement": "saturn-nav 184x120 box at x 27.33, y 36.1, 55.356 x 36.102 on the 108 dp canvas: the drawn outline (x 0.1 to 177.2, y 11 to 108) is 53.3 dp wide, 74% of the visible 72 dp, centred; transparent outside the Saturn",
+  "images": [
+    {
+      "density": "mdpi",
+      "width": 108,
+      "height": 108,
+      "sha256": "7679b59155e5e34781c08abbf00eac6ee0272a960be2e3f3864ce20f5249aab2",
+      "path": "ui/src/main/res/mipmap-mdpi/ui_ic_launcher_foreground.png"
+    },
+    {
+      "density": "hdpi",
+      "width": 162,
+      "height": 162,
+      "sha256": "b382e192b78c77fe1078e7835ff890412a5c4dc4689a50ce9b26887c226b893e",
+      "path": "ui/src/main/res/mipmap-hdpi/ui_ic_launcher_foreground.png"
+    },
+    {
+      "density": "xhdpi",
+      "width": 216,
+      "height": 216,
+      "sha256": "1c3557918ede2fc7905d7899b7b9fc1b39be0ba9733d346dbfb39f7e5842c0c0",
+      "path": "ui/src/main/res/mipmap-xhdpi/ui_ic_launcher_foreground.png"
+    },
+    {
+      "density": "xxhdpi",
+      "width": 324,
+      "height": 324,
+      "sha256": "6d922e5fb93aabd2904db2994ec86a5677ed150092b81681b68427b378dffd13",
+      "path": "ui/src/main/res/mipmap-xxhdpi/ui_ic_launcher_foreground.png"
+    },
+    {
+      "density": "xxxhdpi",
+      "width": 432,
+      "height": 432,
+      "sha256": "0f235853fd3cefd48a51906d4d4b87877f0fe7eab5c620bd7f8b7a55600aaa94",
+      "path": "ui/src/main/res/mipmap-xxxhdpi/ui_ic_launcher_foreground.png"
+    }
+  ],
+  "renderer": "Attached to Linear D-1175 as cassini-app-icon-android.zip (ic_launcher_foreground-108.svg embeds saturn-nav.svg byte for byte), rendered from the approved mock by alignment-canvas-tools/gen/app_icon_refs.py; committed unchanged"
+}
