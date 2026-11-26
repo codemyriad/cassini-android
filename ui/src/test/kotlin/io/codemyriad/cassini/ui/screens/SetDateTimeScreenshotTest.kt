@@ -35,7 +35,6 @@ import kotlinx.collections.immutable.persistentListOf
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.robolectric.annotation.Config
-import java.time.LocalDate
 import java.time.LocalTime
 
 /**
@@ -44,7 +43,9 @@ import java.time.LocalTime
  * and the sheet beside the Library on an unfolded foldable, rising from the bottom of the right pane.
  */
 class SetDateTimeScreenshotTest : BoardTest() {
-    private val prefill = SetDateTimeUi("n", LocalDate.of(2026, 11, 23), LocalTime.of(14, 36))
+    // Yesterday relative to BoardTest.FIXED_NOW (2026-10-09). Must stay in a past month (D88): Material 3's
+    // DatePicker outlines LocalDate.now() whenever the displayed month matches the host wall clock.
+    private val prefill = SetDateTimeUi("n", FIXED_NOW.toLocalDate().minusDays(1), LocalTime.of(14, 36))
     private val saved = prefill.copy(fromFileSaved = true)
 
     @Test fun actionsLight() = actions(dark = false)
@@ -184,7 +185,7 @@ class SetDateTimeScreenshotTest : BoardTest() {
         show(dark) { NoteScreen(BoardFixtures.readAndListen.copy(dialog = NoteDialog.SetDateTime(ui)), {}) }
         settle()
         rule.onNodeWithText("When was this recorded?").assertIsDisplayed()
-        rule.onNodeWithText("23 Nov 2026").assertIsDisplayed()
+        rule.onNodeWithText("8 Oct 2026").assertIsDisplayed()
         rule.onNodeWithText("14:36").assertIsDisplayed()
         val hint = "Filled in from when the file was saved. Change it if it’s wrong."
         assertEquals(
