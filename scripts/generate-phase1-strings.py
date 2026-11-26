@@ -60,9 +60,8 @@ LABELS = {
     'sp_remember_body': ('speakers.rememberVoice.cardBody.phone', 'name'),
     'sp_remember_unnamed': ('speakers.rememberVoice.cardBody.phone.unnamed', None),
     'sp_remember_too_short': ('speakers.rememberVoice.tooShort', None),
-    'sp_remember_models': ('speakers.rememberVoice.modelsNeeded', None),
     'sp_merge': ('speakers.mergeInto', None),
-    'sp_save': ('speakers.saveName', None),
+    # 'sp_save' (speakers.saveName) moved to d112.xml with D112 ("Save name" became "Save").
     'tx_eta_minutes': ('transcribing.eta.minutes', 'n'),
     'tx_details': ('transcribing.details.a11y', None),
     'tx_stop': ('common.stop', None),

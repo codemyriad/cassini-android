@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.theme.SpeakerTone
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 /**
  * The Name a speaker sheet (board 04, features.md section 4; ui.md section 7), as the `SpeakerNaming` reducer
@@ -20,7 +21,13 @@ import kotlinx.collections.immutable.ImmutableList
  *   "Also rename the saved voice?" question, [notName] the voice name of the "Not <name>?" button; null hides each.
  * - [quote] is the selected speaker’s bounded speech excerpt.
  * - [remember] is the native switch; [rememberEnabled] false disables it with [rememberReason].
- * - [canMerge] shows "Merge into…"; [save] is the Save name state; [draft] is true while the job runs.
+ * - [canMerge] shows "Merge into…"; [save] is the Save state (it applies the changes of every speaker); [draft] is
+ *   true while the job runs.
+ * - [speakers] is the speaker row across the top (D112 / L-86), in the order of the names under the meeting title;
+ *   empty hides it. The row's selected chip is [speakerId].
+ * - [background] is the Background voice switch; [canBackground] false hides its card (a running job's draft
+ *   names). While [background] is on the name field, the saved voices and "Merge into…" are disabled and Remember is
+ *   hidden.
  *
  * [name] is the text of a field. The field keeps its own copy and sends each change as [NameSheetEvent.NameChanged]; it
  * takes a different text from the state only when that text is not one it sent (SyncedText). Thus the
@@ -49,6 +56,21 @@ data class NameSheetUi(
     val nameFieldFocused: Boolean = false,
     val draft: Boolean = false,
     val quote: String = "",
+    val speakers: ImmutableList<SpeakerChipUi> = persistentListOf(),
+    val background: Boolean = false,
+    val canBackground: Boolean = false,
+)
+
+/**
+ * One chip of the speaker row: [label] with its colour dot ([tone]); a [background] voice has a hollow dot and a grey
+ * name.
+ */
+@Immutable
+data class SpeakerChipUi(
+    val speakerId: String,
+    val label: SpeakerNameUi,
+    val tone: SpeakerTone,
+    val background: Boolean = false,
 )
 
 /** A saved voice in the Name sheet list; [likely] adds a neutral tag; [tone] comes from its stored colour slot. */
@@ -69,7 +91,7 @@ enum class RememberReason {
     NO_MODEL,
 }
 
-/** The Save name button (features.md section 4, item 8; ui.md section 11, item 12). */
+/** The Save button (features.md section 4, item 8; ui.md section 11, item 12); "Save name" before D112. */
 enum class SaveState {
     ENABLED,
 
@@ -106,9 +128,20 @@ sealed interface NameSheetEvent {
 
     data object MergeInto : NameSheetEvent
 
+    /** A chip of the speaker row: show that speaker's form, keeping every change made so far. */
+    @Immutable
+    data class SelectSpeaker(val speakerId: String) : NameSheetEvent
+
+    /** The Background voice card (the whole card toggles). */
+    @Immutable
+    data class BackgroundChanged(val background: Boolean) : NameSheetEvent
+
     data object Cancel : NameSheetEvent
 
     data object Save : NameSheetEvent
+
+    /** The Settings link of "Voice recognition is off. Turn it on in Settings to remember voices." (QA 25 Nov). */
+    data object OpenSettings : NameSheetEvent
 
     /**
      * Save was pressed while [SaveState.BLOCKED_BY_QUESTION]: the screen moves accessibility focus to the question

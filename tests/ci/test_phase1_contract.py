@@ -96,10 +96,9 @@ class Phase1ContractTest(unittest.TestCase):
             'ui_sp_remember_body': ('speakers.rememberVoice.cardBody.phone', 'name'),
             'ui_sp_remember_unnamed': ('speakers.rememberVoice.cardBody.phone.unnamed', None),
             'ui_sp_remember_too_short': ('speakers.rememberVoice.tooShort', None),
-            'ui_sp_remember_models': ('speakers.rememberVoice.modelsNeeded', None),
             'ui_sp_merge': ('speakers.mergeInto', None),
-            'ui_sp_save': ('speakers.saveName', None),
         }
+        # 'ui_sp_save' moved to d112.xml (D112: "Save"); tests/ci/test_d112_strings.py checks it.
         retired_handwritten = (
             'ui_name_speaks_for',
             'ui_name_play_sample',

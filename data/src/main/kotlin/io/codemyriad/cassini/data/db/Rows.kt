@@ -25,10 +25,13 @@ internal object Sql {
     /** The [LibraryRow] columns. */
     const val LIBRARY_COLUMNS =
         "n.id, n.title, n.created_at, n.duration_ms, n.audio_kind, n.document_state, " +
-            "n.origin, n.recorded_at, n.capture_started_at, " +
+            "n.origin, n.recorded_at, n.capture_started_at, n.started_at, " +
             "COALESCE(n.preview, NULLIF(substr(t.body, 1, 160), '')) AS preview, " +
             "j.state AS job_state, j.kind AS job_kind, j.pause_reason, j.failure, j.done_ms, j.total_ms, " +
-            "v.variant_id AS selected_variant, v.word_count, v.speaker_count, v.word_ends_bounded_by_audio, " +
+            "v.variant_id AS selected_variant, v.word_count, " +
+            // Background voices (D112 / L-86) are not counted on the Library row.
+            "(SELECT COUNT(*) FROM speakers sp WHERE sp.note_id = n.id AND sp.variant_id = v.variant_id " +
+            "AND sp.background = 0) AS speaker_count, v.word_ends_bounded_by_audio, " +
             "EXISTS (SELECT 1 FROM note_stars st WHERE st.note_id = n.id) AS starred"
 
     /** The joins [LIBRARY_COLUMNS] needs, after `FROM notes n` or a join that names `n`. */
@@ -63,6 +66,8 @@ data class LibraryRow(
     val origin: Origin = Origin.RECORDED,
     @ColumnInfo(name = "recorded_at") val recordedAt: String? = null,
     @ColumnInfo(name = "capture_started_at") val captureStartedAt: Long? = null,
+    /** D112: the start the person set (`notes.started_at`). */
+    @ColumnInfo(name = "started_at") val startedAt: String? = null,
     @ColumnInfo(name = "word_ends_bounded_by_audio") val wordEndsBoundedByAudio: Boolean? = null,
     /** The note is starred on this device (L-34, `note_stars`). */
     val starred: Boolean = false,

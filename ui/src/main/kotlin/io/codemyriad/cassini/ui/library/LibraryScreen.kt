@@ -80,23 +80,23 @@ private val BarTopPadding = LibraryActionBarMetrics.topPadding
  * Search filters scroll with results; at rest the All / Starred row (L-34) takes their place. Snippets belong only
  * to search. Recording and import notices remain,
  * while transcription is represented by its own row. The process-owned transfer dialogs stay in LibraryRoute.
- * Import/Record and the snackbar float above the measured list bottom inset. Empty search also handles Back.
+ * Import/Record and the snackbar float above the measured list bottom inset; Import/Record hide while searching (QA
+ * 25 Nov). Empty search also handles Back.
  */
 @Composable
 fun LibraryScreen(
     state: LibraryUiState,
     onEvent: (LibraryEvent) -> Unit,
     modifier: Modifier = Modifier,
-    tools: (@Composable () -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     var barPx by remember { mutableIntStateOf(0) }
     var noticePx by remember { mutableIntStateOf(0) }
     val showBackup = state.backupCard && state.snackbar == null
-    val bar: Dp = max(
-        with(density) { barPx.toDp() },
-        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BottomBarHeight,
-    )
+    // QA 25 Nov: Import audio and Record hide while searching; the results use the room.
+    val searching = state.query.isNotEmpty() || state.results != null
+    val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bar: Dp = if (searching) navigationBar else max(with(density) { barPx.toDp() }, navigationBar + BottomBarHeight)
     // The keyboard covers the bottom bar: the results end above whichever is taller (ui.md section 9).
     val noticeHeight = if (showBackup) with(density) { noticePx.toDp() } + 8.dp else 0.dp
     val listBottom = max(bar + noticeHeight, WindowInsets.ime.asPaddingValues().calculateBottomPadding())
@@ -107,8 +107,8 @@ fun LibraryScreen(
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .screenContentWidth(),
     ) {
-        LibraryList(state, onEvent, listBottom, tools)
-        LibraryActions(state, onEvent) { barPx = it }
+        LibraryList(state, onEvent, listBottom)
+        if (!searching) LibraryActions(state, onEvent) { barPx = it }
         if (showBackup) {
             BackupCard(
                 onEvent,
@@ -122,13 +122,17 @@ fun LibraryScreen(
             onTimeout = { onEvent(LibraryEvent.SnackbarTimeout(it.id)) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = bar - BarTopPadding),
+                .padding(bottom = if (searching) bar else bar - BarTopPadding),
             onUndo = { onEvent(LibraryEvent.Undo) },
         )
     }
     state.sheet?.let { LibrarySheetWindow(it, onEvent) }
     state.dialog?.let { LibraryDialogWindow(it, onEvent) }
 }
+
+/** The empty Library before the first meeting, with the first-run hero and no search. */
+private val LibraryUiState.firstRun: Boolean
+    get() = hero != null && query.isEmpty()
 
 private val LibraryUiState.heroAtBottom: Boolean
     get() = hero != null && !loading && results == null && sections.isEmpty() &&
@@ -139,7 +143,6 @@ private fun LibraryList(
     state: LibraryUiState,
     onEvent: (LibraryEvent) -> Unit,
     listBottom: Dp,
-    tools: (@Composable () -> Unit)?,
 ) {
     Column(Modifier.fillMaxSize()) {
         LibraryPinnedHeader(state, onEvent)
@@ -149,7 +152,6 @@ private fun LibraryList(
             contentPadding = PaddingValues(bottom = listBottom),
             verticalArrangement = if (state.heroAtBottom) Arrangement.Bottom else Arrangement.Top,
         ) {
-            if (tools != null) item(key = "transfers", contentType = "transfers") { tools() }
             if (state.query.isNotBlank()) {
                 item(key = "filters", contentType = "filters") {
                     Column(Modifier.padding(horizontal = 16.dp)) { SearchFiltersBar(state.searchFilters, onEvent) }
@@ -284,6 +286,14 @@ private fun LibraryPinnedHeader(
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val heading = stringResource(R.string.ui_all_meetings)
+    if (state.firstRun) {
+        // Before the first meeting there is nothing to search (QA 25 Nov): only Settings, at the top right.
+        FirstRunTopBar(
+            onSettings = { onEvent(LibraryEvent.OpenSettings) },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        return
+    }
     Column(
         Modifier.fillMaxWidth()
             .background(CassiniTheme.colors.bg)
@@ -300,7 +310,6 @@ private fun LibraryPinnedHeader(
             onClear = { onEvent(LibraryEvent.ClearQuery) },
             onClose = { onEvent(LibraryEvent.ClearQuery) },
             onSearch = { keyboard?.hide() },
-            onTrash = { onEvent(LibraryEvent.OpenTrash) },
             onSettings = { onEvent(LibraryEvent.OpenSettings) },
         )
     }

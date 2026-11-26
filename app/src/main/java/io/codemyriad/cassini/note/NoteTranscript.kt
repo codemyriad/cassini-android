@@ -23,8 +23,16 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import java.util.Arrays
 
-/** Naming metadata for every speaker, including speakers shown only inside a chip. */
-data class TranscriptSpeaker(val name: SpeakerNameUi, val tone: SpeakerTone, val auto: Boolean = false)
+/**
+ * Naming metadata for every speaker, including speakers shown only inside a chip. [background] marks a background
+ * voice (cassini-ux D112 / L-86).
+ */
+data class TranscriptSpeaker(
+    val name: SpeakerNameUi,
+    val tone: SpeakerTone,
+    val auto: Boolean = false,
+    val background: Boolean = false,
+)
 
 /**
  * The transcript the Note screen shows: its [turns] (one LazyColumn item each) and an [index] from audio time to
@@ -51,7 +59,10 @@ class NoteTranscript(
         turn.words.map { it.speakerId.ifEmpty { turn.speakerId } }
     }.distinct()
 
-    /** Built once with the transcript, including speakers occurring only in an inline overlap. */
+    /**
+     * The names under the meeting title, built once with the transcript, including speakers occurring only in an
+     * inline overlap. Background voices are left out (D112 / L-86).
+     */
     val meetingSpeakers: ImmutableList<MeetingSpeakerUi> = run {
         val firstStarts = HashMap<String, Long>()
         turns.forEach { turn ->
@@ -61,10 +72,15 @@ class NoteTranscript(
             }
         }
         speakers.mapNotNull { id ->
-            speakerMetadata[id]?.let { metadata ->
+            speakerMetadata[id]?.takeIf { !it.background }?.let { metadata ->
                 MeetingSpeakerUi(id, metadata.name, metadata.tone, metadata.auto, firstStarts.getValue(id))
             }
         }.toImmutableList()
+    }
+
+    /** Every speaker in the order of the names under the title, background voices included: the Name sheet's row. */
+    val rowSpeakers: List<SessionChip> get() = speakers.mapNotNull { id ->
+        speakerMetadata[id]?.let { SessionChip(id, it.name, it.tone, it.background) }
     }
 
     companion object {
@@ -147,7 +163,7 @@ object NoteTranscripts {
             val suggestion = match?.takeIf { it.state == Match.State.SUGGESTED && first }
                 ?.takeIf { name is SpeakerNameUi.Placeholder && voiceName != null && suggested.add(speaker) }
                 ?.let { SuggestionUi(it.voiceId, voiceName.orEmpty()) }
-            TurnTemplate(name, tone(tints.getValue(speaker)), auto, suggestion)
+            TurnTemplate(name, tone(tints.getValue(speaker)), auto, suggestion, byId[speaker]?.background == true)
         }
     }
 
@@ -225,6 +241,7 @@ object NoteTranscripts {
         val tone: SpeakerTone,
         val auto: Boolean = false,
         val suggestion: SuggestionUi? = null,
+        val background: Boolean = false,
     )
 
     /** Build rows and explicit canonical-to-display references; a rejoined row need not own a contiguous range. */
@@ -289,6 +306,7 @@ object NoteTranscripts {
                 over = over,
                 crosstalk = row.crosstalk,
                 inlineSuggestions = inline.toImmutableList(),
+                background = speaker.background,
             )
         }
         val chronological = words.indices.sortedWith(compareBy<Int> { words[it].startMs }.thenBy { it })
@@ -296,7 +314,7 @@ object NoteTranscripts {
         val turnIds = chronological.map { checkNotNull(refs[it]).turnId }.toTypedArray()
         val inTurn = chronological.map { checkNotNull(refs[it]).index }.toIntArray()
         val metadata = words.map { it.speaker }.distinct().associateWith { id ->
-            made(id).let { TranscriptSpeaker(it.name, it.tone, it.auto) }
+            made(id).let { TranscriptSpeaker(it.name, it.tone, it.auto, it.background) }
         }
         return NoteTranscript(turns.toImmutableList(), WordIndex(starts, turnIds, inTurn), metadata)
     }

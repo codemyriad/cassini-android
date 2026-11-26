@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -34,6 +35,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -46,7 +48,6 @@ import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.banner.BannerAction
 import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.components.Banner
-import io.codemyriad.cassini.ui.components.FormatBadge
 import io.codemyriad.cassini.ui.components.IconButton44
 import io.codemyriad.cassini.ui.components.RecordingControls
 import io.codemyriad.cassini.ui.components.RecordingStatus
@@ -55,7 +56,6 @@ import io.codemyriad.cassini.ui.components.TITLE_MAX_LENGTH
 import io.codemyriad.cassini.ui.components.Waveform
 import io.codemyriad.cassini.ui.components.rememberSyncedText
 import io.codemyriad.cassini.ui.components.screenContentWidth
-import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.theme.CassiniColors
 import io.codemyriad.cassini.ui.theme.CassiniIcon
@@ -69,7 +69,7 @@ import io.codemyriad.cassini.ui.theme.LightColors
  * colour comes from `CassiniTheme.recording`. Banners keep their light tones, except "Microphone access is off",
  * which uses its dark tones (D104 §3, see [recordingBannerColors]).
  *
- * The editable title follows the status/format header inside the scrolling middle viewport. Title, banners,
+ * The editable title follows the status header inside the scrolling middle viewport. Title, banners,
  * timer, waveform and space hint scroll together so the pinned header and capture controls remain visible. Stop is the centre action,
  * All meetings is on the left and labelled Pause/Resume is on the right (L-48/L-49).
  *
@@ -182,8 +182,8 @@ internal fun recordingBannerColors(kind: BannerKind): CassiniColors =
 
 /**
  * The header row, 48 dp: Minimise (a 44 dp visual; the 48 dp layout overlaps 2 dp on each side, so the space
- * between the items is the board's), the status and the format badge ("Opus 48 kHz"), spaced between as the board
- * draws them.
+ * between the items is the board's) and the status, centred. There is no format badge (QA 25 Nov: "Opus 48 kHz" lives
+ * in Document info, as on iPhone); an empty 44 dp slot balances Minimise.
  */
 @Composable
 private fun RecordingHeader(state: RecordingUiState, onEvent: (RecordingEvent) -> Unit) {
@@ -211,11 +211,14 @@ private fun RecordingHeader(state: RecordingUiState, onEvent: (RecordingEvent) -
             RecordingPhase.Paused -> RecordingStatus(paused = true)
             else -> Box(Modifier)
         }
-        FormatBadge(Counts.captureFormat(state.format == CaptureFormat.M4A, state.sampleRateHz))
+        Spacer(Modifier.width(44.dp))
     }
 }
 
-/** The native editable title and pencil; its spoken label remains after removing the redundant visible label. */
+/**
+ * The native editable title and pencil; its spoken label remains after removing the redundant visible label. An empty
+ * title shows "Add a title" (QA 25 Nov).
+ */
 @Composable
 private fun TitleField(title: String, onTitle: (String) -> Unit) {
     val rec = CassiniTheme.recording
@@ -257,7 +260,18 @@ private fun TitleField(title: String, onTitle: (String) -> Unit) {
                         Modifier
                             .weight(1f)
                             .padding(vertical = 4.dp),
-                    ) { inner() }
+                    ) {
+                        if (text.value.text.isEmpty()) {
+                            Text(
+                                stringResource(R.string.ui_recording_title_placeholder),
+                                style = t.screenTitle.copy(fontSize = 20.sp),
+                                color = rec.text2,
+                                maxLines = 1,
+                                modifier = Modifier.testTag("recording-title-placeholder"),
+                            )
+                        }
+                        inner()
+                    }
                     CassiniIcon(Glyph.Pencil, 18.dp, 1.8f, rec.text2, null)
                 }
             }

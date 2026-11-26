@@ -61,9 +61,7 @@
     <string name="ui_sp_remember_body">La prossima volta Cassini darà automaticamente il nome %1$s.\nL’impronta vocale resta su questo telefono.</string>
     <string name="ui_sp_remember_unnamed">La prossima volta Cassini darà automaticamente un nome a questa persona.\nL’impronta vocale resta su questo telefono.</string>
     <string name="ui_sp_remember_too_short">Cassini ha bisogno di almeno 4 secondi di questa voce per ricordarla.</string>
-    <string name="ui_sp_remember_models">Per ricordare le voci, scarica e attiva “Distingui le voci” e “Riconosci le voci salvate” nelle impostazioni.</string>
     <string name="ui_sp_merge">Unisci a…</string>
-    <string name="ui_sp_save">Salva il nome</string>
     <plurals name="ui_tx_eta_minutes">
         <item quantity="one">circa %1$s min rimanente</item>
         <item quantity="many">circa %1$s min rimanenti</item>

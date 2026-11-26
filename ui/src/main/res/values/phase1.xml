@@ -58,9 +58,7 @@
     <string name="ui_sp_remember_body">%1$s is named automatically next time.\nThe voiceprint stays on this phone.</string>
     <string name="ui_sp_remember_unnamed">This person is named automatically next time.\nThe voiceprint stays on this phone.</string>
     <string name="ui_sp_remember_too_short">Cassini needs at least 4 seconds of this voice to remember it.</string>
-    <string name="ui_sp_remember_models">To remember voices, download and turn on Tell speakers apart and Recognise saved voices in Settings.</string>
     <string name="ui_sp_merge">Merge into…</string>
-    <string name="ui_sp_save">Save name</string>
     <plurals name="ui_tx_eta_minutes">
         <item quantity="one">about %1$s min left</item>
         <item quantity="other">about %1$s min left</item>

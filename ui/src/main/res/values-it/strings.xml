@@ -114,7 +114,6 @@
     </plurals>
 
     <!-- Libreria. -->
-    <string name="ui_library_trash">Cestino</string>
     <string name="ui_library_settings">Impostazioni</string>
     <string name="ui_search_clear">Cancella la ricerca</string>
     <string name="ui_library_recording_card">Registrazione · %1$s</string>
@@ -496,4 +495,10 @@
     <string name="ui_progress_downloading_models">Download dei modelli</string>
     <string name="ui_progress_getting_ready">Preparazione per trascrivere %1$s</string>
     <string name="ui_transcription_after_recording">Dopo la registrazione</string>
+    <string name="ui_actions_export">Esporta…</string>
+    <string name="ui_actions_export_body">File Cassini, Markdown e altro</string>
+    <string name="ui_name_voices_off">Il riconoscimento vocale è disattivato. Attivalo nelle %1$s per ricordare le voci.</string>
+    <string name="ui_recording_title_placeholder">Aggiungi un titolo</string>
+    <string name="ui_settings_export_all">Esporta tutte le riunioni</string>
+    <string name="ui_voices_stale_body_each">Il riconoscimento vocale è stato aggiornato e le voci salvate prima dell’aggiornamento non possono essere riconosciute. Dai di nuovo un nome a ogni persona in una riunione per salvare la sua voce.</string>
 </resources>

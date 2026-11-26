@@ -17,25 +17,41 @@ fun NoteEntity.knownCaptureStart(): Instant? = if (origin == Origin.RECORDED) {
     null
 }
 
-fun NoteEntity.recordingTime(): MeetingTime? = when {
+/** D112 (L-87): the start the person set; it wins over every other start (LIBRARY-RULES R6.2). */
+fun NoteEntity.userStart(): MeetingTime? = MeetingTime.started(startedAt)
+
+fun NoteEntity.recordingTime(): MeetingTime? = userStart() ?: when {
     audioKind == AudioKind.DOCUMENT && !readableTime(documentState) -> null
     else -> MeetingTime.cached(recordedAt) ?: knownCaptureStart()?.let(MeetingTime::utc)
 }
 
-/** A supported, verified own file may omit its start; keep the independently captured UTC instead of seal time. */
+/**
+ * The start [document] carries (the `recorded_at` cache). A supported, verified own file may omit its start; keep the
+ * independently captured UTC instead of seal time, but never over a start the file states (`startedAt`, D112).
+ */
 internal fun NoteEntity.recordingTime(
     document: CassiniDocument,
     capture: Instant? = knownCaptureStart(),
 ): MeetingTime? {
     val time = document.meetingTime
-    return if (document.documentState == DocumentState.OK && time?.source != MeetingTime.UTC && capture != null) {
+    val stated = time?.source == MeetingTime.UTC || time?.source == MeetingTime.STARTED
+    return if (document.documentState == DocumentState.OK && !stated && capture != null) {
         MeetingTime.utc(capture)
     } else {
         time
     }
 }
 
-fun LibraryRow.recordingTime(): MeetingTime? = when {
+/**
+ * An OK document that does not carry the start the person set yet (D112): a write after a job, a failed write, or a
+ * write that never ran. Its `recorded_at` cache holds what the file states, so no file is read to tell.
+ */
+fun NoteEntity.startNotInDocument(): Boolean {
+    val user = userStart() ?: return false
+    return audioKind == AudioKind.DOCUMENT && documentState == DocumentState.OK && MeetingTime.cached(recordedAt) != user
+}
+
+fun LibraryRow.recordingTime(): MeetingTime? = MeetingTime.started(startedAt) ?: when {
     audioKind == AudioKind.DOCUMENT && !readableTime(documentState) -> null
     else -> MeetingTime.cached(recordedAt) ?: if (origin == Origin.RECORDED) {
         val start = captureStartedAt ?: createdAt.takeIf { audioKind != AudioKind.DOCUMENT }

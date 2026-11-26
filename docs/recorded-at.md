@@ -1,5 +1,11 @@
 # Recording time (D95)
 
+D112 (L-87) puts two starts before the D95 order below: a start the person set (Room `notes.started_at`, or
+`x["codemyriad.io"].meeting.startedAt` with `startedAtSource: "user"`) wins over everything, then the A4
+`meeting.startedAt`. A Library v2 file with `namePrefixSource: import-time` has no known start of its own; its
+`meeting.startedAt`, DATE and `recordedAtLocal` are ignored. [`data-formats.md`](data-formats.md), "A start the
+person set", gives the writer.
+
 Format conformance is pinned to cassini-format 32f37a6200c88bdd4d23c1f44497f1761f3401da,
 including vectors 027–029. Recording time is `recordedAtUtc`, then an offset-bearing
 DATE that differs from the packaging instant, then the literal `recordedAtLocal` label.

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 671abcd26e77d012583adc25f971e0d6b3742f7f; do not edit. -->
+<!-- Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Voix mémorisées</string>
     <string name="ui_settings_trash">Corbeille</string>
@@ -172,7 +172,6 @@
         <item quantity="many">%1$s voix à renommer</item>
         <item quantity="other">%1$s voix à renommer</item>
     </plurals>
-    <string name="ui_voices_stale_body">La reconnaissance vocale a été mise à jour, et les voix mémorisées avant la mise à jour ne peuvent plus être reconnues. Nommez %1$s dans une réunion pour mémoriser à nouveau sa voix.</string>
     <string name="ui_voices_needs_naming">À renommer</string>
     <string name="ui_voices_caption">Pour ajouter quelqu’un, nommez un intervenant dans une réunion et laissez « Mémoriser cette voix » activé.</string>
     <string name="ui_voices_empty">Aucune voix mémorisée pour l’instant</string>
@@ -180,4 +179,9 @@
     <string name="ui_voices_forget_title">Oublier la voix de %1$s ?</string>
     <string name="ui_voices_forget_body">Cassini ne reconnaîtra plus %1$s dans les nouvelles réunions. Les noms déjà présents dans les transcriptions sont conservés.</string>
     <string name="ui_voices_forget_action">Oublier</string>
+    <string name="ui_meeting_set_date_time">Définir la date et l’heure</string>
+    <string name="ui_meeting_set_date_time_title">Quand cela a-t-il été enregistré ?</string>
+    <string name="ui_meeting_set_date_time_date">Date</string>
+    <string name="ui_meeting_set_date_time_time">Début à</string>
+    <string name="ui_meeting_set_date_time_saved_hint">Prérempli à partir de la date d’enregistrement du fichier. Modifiez-le s’il est inexact.</string>
 </resources>

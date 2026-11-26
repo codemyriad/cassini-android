@@ -1,7 +1,8 @@
 package io.codemyriad.cassini.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import io.codemyriad.cassini.ui.BoardTest
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.note.NoteScreen
@@ -26,7 +27,8 @@ class DarkScreenshotTest : BoardTest() {
 
     @Test fun sevenSpeakers() {
         board("dark", "11-seven-speakers", dark = true) { NoteScreen(BoardFixtures.sevenSpeakers, onEvent = {}) }
-        rule.onNodeWithText("Speaker 7", useUnmergedTree = true).assertIsDisplayed()
+        // The header's name; with its close lines (QA 25 Nov) the transcript's own Speaker 7 is on screen too.
+        rule.onAllNodesWithText("Speaker 7", useUnmergedTree = true).onFirst().assertIsDisplayed()
         assertSevenSpeakerWordsInk(dark = true)
     }
 

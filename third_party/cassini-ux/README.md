@@ -37,3 +37,8 @@ resources in all six languages. See `docs/design/phase2-d1048.md` and, for the D
 `c28b724`), `docs/design/phase2-d1086.md`. D-1075 moved the Phase 1 and Wave 5 catalog pins to the same reviewed
 `c28b724` catalog, and D-1090 moved all four catalog copies to `dd06a62` together, so every generated string resource
 still comes from one catalog revision.
+
+`d112/strings.json` (D-1168) is the catalog at cassini-ux `60ac93da94ce433412c93d8e96a76c68503dcec3` (D-1171, D112 /
+L-86), pinned in its own `UPSTREAM.json` entry. `scripts/generate-d112-strings.py` generates `d112.xml` in all six
+languages: the Background voice switch, its folded transcript row and snackbars, and the speaker dialog's "Save"
+(was "Save name", so `ui_sp_save` left `phase1.xml`).

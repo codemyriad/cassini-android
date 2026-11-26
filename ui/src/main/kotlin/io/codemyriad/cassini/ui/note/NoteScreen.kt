@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -99,22 +101,28 @@ fun NoteScreen(
             }
             NoteFloating(state, onEvent)
         }
-        val playback = state.playback
-        if (playback != null) {
-            PlaybackBar(
-                positionMs = playback.positionMs,
-                durationMs = playback.durationMs,
-                playing = playback.playing,
-                onSeek = { onEvent(NoteEvent.Seek(it)) },
-                onSkipBack = { onEvent(NoteEvent.Skip(forward = false)) },
-                onSkipForward = { onEvent(NoteEvent.Skip(forward = true)) },
-                onPlayPause = { onEvent(NoteEvent.PlayPause) },
-                onSeekFinished = { onEvent(NoteEvent.SeekFinished) },
-                speed = SpeedControl(playback.speed) { onEvent(NoteEvent.NextSpeed) },
-            )
-        }
+        NotePlayer(state, onEvent)
     }
     NoteOverlays(state, onEvent)
+}
+
+/** The player at the bottom. QA 25 Nov, as on iPhone: while Find has the keyboard up, it hides for the matches. */
+@OptIn(ExperimentalLayoutApi::class) // WindowInsets.isImeVisible
+@Composable
+private fun NotePlayer(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
+    val playback = state.playback ?: return
+    if (state.search != null && WindowInsets.isImeVisible) return
+    PlaybackBar(
+        positionMs = playback.positionMs,
+        durationMs = playback.durationMs,
+        playing = playback.playing,
+        onSeek = { onEvent(NoteEvent.Seek(it)) },
+        onSkipBack = { onEvent(NoteEvent.Skip(forward = false)) },
+        onSkipForward = { onEvent(NoteEvent.Skip(forward = true)) },
+        onPlayPause = { onEvent(NoteEvent.PlayPause) },
+        onSeekFinished = { onEvent(NoteEvent.SeekFinished) },
+        speed = SpeedControl(playback.speed) { onEvent(NoteEvent.NextSpeed) },
+    )
 }
 
 /** Native header actions stay fixed; scrolling a draft removes its date and retains the divider. */
@@ -152,6 +160,7 @@ private fun BoxScope.NoteFloating(state: NoteUiState, onEvent: (NoteEvent) -> Un
     CassiniSnackbarHost(
         spec = state.snackbar,
         onTimeout = { onEvent(NoteEvent.SnackbarTimeout) },
+        onUndo = { onEvent(NoteEvent.SnackbarUndo) },
         // Without the player the box reaches the bottom of the window, so it keeps clear of the navigation bar.
         // Over the chip, the snackbar sits 8 dp above the chip's 48 dp layout (the host adds 24 dp of its own).
         modifier = Modifier

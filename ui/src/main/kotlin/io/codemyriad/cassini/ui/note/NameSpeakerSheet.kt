@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -27,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,8 +41,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
 import io.codemyriad.cassini.ui.R
@@ -93,10 +100,13 @@ fun NameSpeakerSheet(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, onDismi
 
 /**
  * The sheet's content, also drawn inline in screenshots (`SheetBoardFrame`): padding 16 (below the handle) / 20 /
- * 24 with a 16 dp gap. The header (title, speaking time, Play sample), the quote, the Name field and its question,
- * the saved voices card, "Not <name>?", Remember, and the footer (Merge into…, Cancel, Save
- * name). When the content does not fit above the keyboard, the part above the footer scrolls and the footer stays
- * in view.
+ * 24 with a 16 dp gap. The speaker row (D112 / L-86, with more than one speaker), the header (title, speaking time,
+ * Play sample), the quote, the Name field and its question, the saved voices card, "Not <name>?", Remember, Background
+ * voice, and the footer (Merge into…, Cancel, Save). When the content does not fit above the keyboard, the part above
+ * the footer scrolls and the footer stays in view.
+ *
+ * With Background voice on, the Name field shows "Not needed for a background voice" and is disabled, as are the
+ * saved voices and "Merge into…"; Remember, the questions and "Not <name>?" are hidden, so no voiceprint is kept.
  *
  * Save with a question open ([SaveState.BLOCKED_BY_QUESTION]) looks enabled. A press (or IME Done) sends
  * [NameSheetEvent.SaveBlocked], moves focus to the question, which then reports "Answer the question above first"
@@ -123,9 +133,17 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
             SaveState.DISABLED -> Unit
         }
     }
-    // The footer stays below the scrolling part, so Cancel and Save name stay above the keyboard also when the
+    // The footer stays below the scrolling part, so Cancel and Save stay above the keyboard also when the
     // content is taller than the space above it (large font scales). When everything fits, the layout is board 04's.
     Column(modifier) {
+        if (ui.speakers.isNotEmpty()) {
+            SpeakerRow(
+                ui.speakers,
+                ui.speakerId,
+                onSelect = { onEvent(NameSheetEvent.SelectSpeaker(it)) },
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
         Column(
             Modifier
                 .weight(1f, fill = false)
@@ -133,36 +151,8 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
                 .padding(start = 20.dp, end = 20.dp, top = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            SheetHeader(ui, onEvent)
-            if (ui.quote.isNotBlank()) SpeakerQuote(ui.quote)
-            CassiniTextField(
-                value = ui.name,
-                onValueChange = { onEvent(NameSheetEvent.NameChanged(it)) },
-                label = stringResource(R.string.ui_sp_name),
-                showFocus = if (ui.nameFieldFocused) true else null,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    imeAction = ImeAction.Done,
-                ),
-                // Board 04 sets the 13 sp label in a 16 px line box (19.5 dp): 3 dp more than Android's own line.
-                modifier = Modifier.padding(top = 3.dp),
-                keyboardActions = KeyboardActions(onDone = { save() }),
-                maxLength = NAME_MAX_LENGTH,
-                containerColor = CassiniTheme.colors.field,
-            )
-            if (question != null) {
-                QuestionCard(question, pulses, onEvent, Modifier.focusRequester(questionFocus))
-            }
-            if (ui.voices.isNotEmpty()) VoicesCard(ui, onEvent)
-            ui.notName?.let { name ->
-                // The text button's 14 dp padding hangs into the sheet padding, so its text starts at the content edge.
-                TextButton(
-                    text = stringResource(R.string.ui_name_not, name),
-                    onClick = { onEvent(NameSheetEvent.NotName) },
-                    modifier = Modifier.offset(x = (-14).dp),
-                )
-            }
-            RememberVoiceCard(ui, rememberSubtitle(ui), onEvent)
+            // Each speaker of the row has its own form: a fresh field, so text typed for one never reaches another.
+            key(ui.speakerId) { FormFields(ui, onEvent, question, pulses, questionFocus, save) }
         }
         // Bottom 25: board 04's Cancel is 50 dp tall (a content-box border) and centres Save in its row. Top 16: the
         // gap of the column above.
@@ -174,6 +164,56 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 25.dp),
         )
     }
+}
+
+/**
+ * The fields of one speaker's form, top to bottom (see [NameSpeakerSheetContent]): header, quote, Name, the question,
+ * saved voices, "Not <name>?", Remember and Background voice.
+ */
+@Composable
+@Suppress("LongParameterList", "LongMethod") // The form with its question hooks and Save from IME Done.
+private fun FormFields(
+    ui: NameSheetUi,
+    onEvent: (NameSheetEvent) -> Unit,
+    question: Question?,
+    pulses: Int,
+    questionFocus: FocusRequester,
+    save: () -> Unit,
+) {
+    val background = ui.canBackground && ui.background
+    SheetHeader(ui, onEvent)
+    if (ui.quote.isNotBlank()) SpeakerQuote(ui.quote)
+    CassiniTextField(
+        value = if (background) "" else ui.name,
+        onValueChange = { onEvent(NameSheetEvent.NameChanged(it)) },
+        label = stringResource(R.string.ui_sp_name),
+        enabled = !background,
+        placeholder = if (background) stringResource(R.string.ui_bg_name_placeholder) else null,
+        showFocus = if (ui.nameFieldFocused && !background) true else null,
+        keyboardOptions = KeyboardOptions(
+            capitalization = KeyboardCapitalization.Words,
+            imeAction = ImeAction.Done,
+        ),
+        // Board 04 sets the 13 sp label in a 16 px line box (19.5 dp): 3 dp more than Android's own line.
+        modifier = Modifier.padding(top = 3.dp).alpha(if (background) BACKGROUND_FIELD_ALPHA else 1f),
+        keyboardActions = KeyboardActions(onDone = { save() }),
+        maxLength = NAME_MAX_LENGTH,
+        containerColor = CassiniTheme.colors.field,
+    )
+    if (question != null && !background) {
+        QuestionCard(question, pulses, onEvent, Modifier.focusRequester(questionFocus))
+    }
+    if (ui.voices.isNotEmpty()) VoicesCard(ui, onEvent, enabled = !background)
+    ui.notName?.takeIf { !background }?.let { name ->
+        // The text button's 14 dp padding hangs into the sheet padding, so its text starts at the content edge.
+        TextButton(
+            text = stringResource(R.string.ui_name_not, name),
+            onClick = { onEvent(NameSheetEvent.NotName) },
+            modifier = Modifier.offset(x = (-14).dp),
+        )
+    }
+    if (!background) RememberVoiceCard(ui, rememberSubtitle(ui, onEvent), onEvent)
+    if (ui.canBackground) BackgroundVoiceCard(ui, onEvent)
 }
 
 /** The speaker in ink and speaking time precede the field; sampling keeps its existing action. */
@@ -238,10 +278,10 @@ private fun PlaySampleButton(sampling: Boolean, enabled: Boolean, onClick: () ->
  * line dividers; then "Show all" in accentInk when more voices exist.
  */
 @Composable
-private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
+private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, enabled: Boolean = true) {
     val c = CassiniTheme.colors
     val shape = CassiniTheme.shapes.row
-    Column {
+    Column(Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA)) {
         Text(
             text = stringResource(if (ui.ranked) R.string.ui_sp_voices_ranked else R.string.ui_sp_voices),
             modifier = Modifier
@@ -264,6 +304,7 @@ private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
                     onClick = { onEvent(NameSheetEvent.PickVoice(voice.id)) },
                     likely = voice.likely,
                     tone = voice.tone,
+                    enabled = enabled,
                 )
             }
             if (ui.showAll) {
@@ -272,6 +313,7 @@ private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
                     text = stringResource(R.string.ui_name_show_all),
                     onClick = { onEvent(NameSheetEvent.ShowAll) },
                     accent = true,
+                    enabled = enabled,
                 )
             }
         }
@@ -279,19 +321,21 @@ private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
 }
 
 @Composable
+@Suppress("LongParameterList") // A voice row and the Show all row share it; disabled behind Background voice.
 private fun VoiceRow(
     text: String,
     onClick: () -> Unit,
     likely: Boolean = false,
     accent: Boolean = false,
     tone: SpeakerTone? = null,
+    enabled: Boolean = true,
 ) {
     val c = CassiniTheme.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -307,37 +351,57 @@ private fun VoiceRow(
     }
 }
 
+/**
+ * "Future notes will name Anna automatically. …", or why Remember is disabled. With voice recognition off it is the
+ * short "Voice recognition is off. Turn it on in Settings to remember voices.", where Settings is a link that opens
+ * Settings (QA 25 Nov, [NameSheetEvent.OpenSettings]).
+ */
 @Composable
-private fun RowDivider() {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(CassiniTheme.colors.lineSoft),
-    )
-}
-
-/** "Future notes will name Anna automatically. …", or why Remember is disabled. */
-@Composable
-private fun rememberSubtitle(ui: NameSheetUi): String {
+private fun rememberSubtitle(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit): AnnotatedString {
     val reason = ui.rememberReason
     if (!ui.rememberEnabled && reason != null) {
         return when (reason) {
-            RememberReason.NO_MODEL -> stringResource(R.string.ui_sp_remember_models)
-            RememberReason.TOO_LITTLE_SPEECH -> stringResource(R.string.ui_sp_remember_too_short)
+            RememberReason.NO_MODEL -> voicesOffLine(onEvent)
+            RememberReason.TOO_LITTLE_SPEECH -> AnnotatedString(stringResource(R.string.ui_sp_remember_too_short))
         }
     }
     val name = ui.name.trim()
-    return if (name.isEmpty()) {
-        stringResource(R.string.ui_sp_remember_unnamed)
-    } else {
-        stringResource(R.string.ui_sp_remember_body, name)
+    return AnnotatedString(
+        if (name.isEmpty()) {
+            stringResource(R.string.ui_sp_remember_unnamed)
+        } else {
+            stringResource(R.string.ui_sp_remember_body, name)
+        },
+    )
+}
+
+@Composable
+private fun voicesOffLine(onEvent: (NameSheetEvent) -> Unit): AnnotatedString {
+    val c = CassiniTheme.colors
+    val link = stringResource(R.string.ui_settings_title)
+    val line = stringResource(R.string.ui_name_voices_off, LINK_MARK)
+    val at = line.indexOf(LINK_MARK)
+    return buildAnnotatedString {
+        append(line.substring(0, at.coerceAtLeast(0)))
+        withLink(
+            LinkAnnotation.Clickable(
+                tag = "settings",
+                styles = TextLinkStyles(SpanStyle(color = c.accentInk, fontWeight = FontWeight.SemiBold)),
+            ) { onEvent(NameSheetEvent.OpenSettings) },
+        ) { append(link) }
+        if (at >= 0) append(line.substring(at + LINK_MARK.length))
     }
 }
 
+/** The Name field of a background voice: board 2F's 0.6, a little stronger than the disabled buttons. */
+private const val BACKGROUND_FIELD_ALPHA = 0.6f
+
+/** Stands for the Settings link in `ui_name_voices_off` while the line is split around it. */
+private const val LINK_MARK = "\u0000"
+
 /**
  * The footer, 4 dp below the gap: "Merge into…" at the start (its text 14 dp in, as on the board), then Cancel and
- * Save name 8 dp apart at the end. Save is disabled only for [SaveState.DISABLED].
+ * Save 8 dp apart at the end. Save is disabled only for [SaveState.DISABLED].
  */
 @Composable
 private fun Footer(
@@ -348,7 +412,7 @@ private fun Footer(
     modifier: Modifier = Modifier,
 ) {
     // Flow rows: at large font scales Cancel and Save go below "Merge into…", and then below each other, instead
-    // of squeezing "Save name" into a column of letters.
+    // of squeezing "Save" into a column of letters.
     FlowRow(
         modifier = modifier
             .fillMaxWidth()
@@ -358,9 +422,14 @@ private fun Footer(
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         if (ui.canMerge) {
+            val mergeable = !(ui.canBackground && ui.background)
             androidx.compose.material3.TextButton(
                 onClick = { onEvent(NameSheetEvent.MergeInto) },
-                modifier = Modifier.offset(x = (-12).dp).heightIn(min = 48.dp),
+                enabled = mergeable,
+                modifier = Modifier
+                    .offset(x = (-12).dp)
+                    .heightIn(min = 48.dp)
+                    .alpha(if (mergeable) 1f else DISABLED_ALPHA),
             ) {
                 Text(
                     stringResource(R.string.ui_sp_merge),

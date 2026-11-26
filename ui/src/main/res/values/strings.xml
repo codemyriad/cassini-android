@@ -138,7 +138,6 @@
     </plurals>
 
     <!-- Library (board 00, features.md section 1). -->
-    <string name="ui_library_trash">Trash</string>
     <string name="ui_library_settings">Settings</string>
     <string name="ui_search_clear">Clear search</string>
     <string name="ui_library_recording_card">Recording · %1$s</string>
@@ -528,4 +527,10 @@
     <string name="ui_progress_downloading_models">Downloading models</string>
     <string name="ui_progress_getting_ready">Getting ready to transcribe %1$s</string>
     <string name="ui_transcription_after_recording">After recording</string>
+    <string name="ui_actions_export">Export…</string>
+    <string name="ui_actions_export_body">Cassini file, Markdown and more</string>
+    <string name="ui_name_voices_off">Voice recognition is off. Turn it on in %1$s to remember voices.</string>
+    <string name="ui_recording_title_placeholder">Add a title</string>
+    <string name="ui_settings_export_all">Export all meetings</string>
+    <string name="ui_voices_stale_body_each">Voice recognition was updated, and voices saved before the update can’t be recognised. Name each person again in a meeting to save their voice.</string>
 </resources>

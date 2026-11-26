@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -41,7 +42,8 @@ import io.codemyriad.cassini.ui.components.Banner
 import io.codemyriad.cassini.ui.components.CassiniMenu
 import io.codemyriad.cassini.ui.components.CassiniMenuItem
 import io.codemyriad.cassini.ui.components.CassiniTopBar
-import io.codemyriad.cassini.ui.components.DestructiveOutlineButton
+import io.codemyriad.cassini.ui.components.DestructiveTextButton
+import io.codemyriad.cassini.ui.components.DestructiveTextButtonSize
 import io.codemyriad.cassini.ui.components.GroupCard
 import io.codemyriad.cassini.ui.components.IconButton44
 import io.codemyriad.cassini.ui.components.firstGrapheme
@@ -109,10 +111,13 @@ fun SavedVoicesScreen(
             ),
         )
         if (state.people.isNotEmpty()) {
-            DestructiveOutlineButton(
+            // QA 25 Nov: a quiet red text button, as on iPhone and Mac; its text starts at the 16 dp content edge.
+            DestructiveTextButton(
                 text = stringResource(R.string.ui_voices_forget_everyone),
                 onClick = { onEvent(SavedVoicesEvent.ForgetEveryone) },
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp),
+                modifier = Modifier.padding(start = 2.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)
+                    .testTag("forget-everyone"),
+                size = DestructiveTextButtonSize.Header,
                 enabled = !state.readOnly,
             )
         }
@@ -140,7 +145,7 @@ private fun SavedVoicesContent(state: SavedVoicesUiState, onEvent: (SavedVoicesE
     if (stale.isNotEmpty()) {
         // The pinned catalog defines {name} as one person (translations such as Italian keep singular grammar);
         // the heading carries the total and every affected row carries the stale pill.
-        StaleVoicesNotice(count = stale.size, name = stale.first().name)
+        StaleVoicesNotice(count = stale.size)
     }
     Text(
         text = Counts.plural(R.plurals.ui_settings_people, state.people.size),
@@ -183,7 +188,7 @@ private fun SavedVoicesContent(state: SavedVoicesUiState, onEvent: (SavedVoicesE
 
 /** One amber notice above the list when one or more voices are stale (D106 §5). */
 @Composable
-private fun StaleVoicesNotice(count: Int, name: String) {
+private fun StaleVoicesNotice(count: Int) {
     val c = CassiniTheme.colors
     Column(
         modifier = Modifier
@@ -201,7 +206,8 @@ private fun StaleVoicesNotice(count: Int, name: String) {
             color = c.amberInk,
         )
         Text(
-            text = stringResource(R.string.ui_voices_stale_body, name),
+            // QA 25 Nov: "Name each person again…", not one name; the tags on the rows already show who.
+            text = stringResource(R.string.ui_voices_stale_body_each),
             style = CassiniTheme.type.body14,
             color = c.ink,
         )

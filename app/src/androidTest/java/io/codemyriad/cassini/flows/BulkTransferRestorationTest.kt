@@ -1,5 +1,7 @@
 package io.codemyriad.cassini.flows
 
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,7 +17,6 @@ import androidx.compose.ui.test.performClick
 import io.codemyriad.cassini.R
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.test.CiSmoke
-import io.codemyriad.cassini.transfer.BulkExportButton
 import io.codemyriad.cassini.transfer.BulkTransferControls
 import io.codemyriad.cassini.transfer.BulkTransfers
 import io.codemyriad.cassini.ui.theme.CassiniTheme
@@ -42,7 +43,7 @@ class BulkTransferRestorationTest {
                     BulkTransfers.TransferState(),
                     loaded.value,
                 ) { enabled, open ->
-                    BulkExportButton(enabled, open)
+                    TextButton(onClick = open, enabled = enabled) { Text(context.getString(R.string.export_zip_all)) }
                 }
             }
         }

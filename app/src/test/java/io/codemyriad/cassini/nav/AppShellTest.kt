@@ -19,8 +19,10 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -164,10 +166,10 @@ class AppShellTest {
         rule.onNode(hasSetTextAction()).performTextInput("so")
         waitFor(SPEAKER_2)
         rule.onNode(SPEAKER_2).performClick()
-        waitFor(hasText("Save name"))
+        waitFor(hasText("Save"))
 
         Espresso.pressBack()
-        waitGone(hasText("Save name"))
+        waitGone(hasText("Save"))
         rule.onNodeWithContentDescription("Close search").assertExists()
 
         Espresso.pressBack()
@@ -213,7 +215,7 @@ class AppShellTest {
         Espresso.pressBack()
         waitFor(hasContentDescription("Settings"))
         rule.onNode(hasSetTextAction()).assertIsNotFocused()
-        rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Settings").assertIsDisplayed()
         rule.onNodeWithContentDescription("Close search").assertDoesNotExist()
     }
 
@@ -224,9 +226,9 @@ class AppShellTest {
         val dispatcher = rule.activity.onBackPressedDispatcher
         // The root takes no back, so the system animates back to home.
         rule.runOnIdle { assertFalse(dispatcher.hasEnabledCallbacks()) }
-        // Navigation3 entering the Library must not focus Search or hide its two navigation actions.
-        rule.onNode(hasSetTextAction()).assertIsNotFocused()
-        rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
+        // Navigation3 entering the Library must not focus Search (the empty Library has none once it has loaded, QA
+        // 25 Nov) or hide Settings.
+        rule.onAllNodes(hasSetTextAction() and isFocused()).assertCountEquals(0)
         rule.onNodeWithContentDescription("Settings").assertIsDisplayed().performClick()
         rule.onNode(hasText("Language", ignoreCase = true)).assertExists()
         rule.runOnIdle { assertTrue("NavDisplay takes back above the root", dispatcher.hasEnabledCallbacks()) }
@@ -405,6 +407,33 @@ class AppShellTest {
         waitGone(FIND_BUTTON)
         rule.onNodeWithContentDescription("Settings").assertExists()
         rule.onNodeWithText(TITLE).assertExists()
+    }
+
+    /**
+     * QA 25 Nov, unfolded (a foldable's inner screen): the Library stays on the left and what it opens shows in the
+     * right pane: the meeting (also while it transcribes: Transcribing is a mode of the same screen), then Settings in
+     * its place. Back from Settings leaves the Library alone, not the meeting under it.
+     */
+    @Config(qualifiers = "w841dp-h701dp-xhdpi")
+    @Test
+    fun aWideWindowShowsTheLibraryBesideWhatItOpens() {
+        importDocument()
+        rule.onNodeWithText(TITLE).performClick()
+        waitFor(FIND_BUTTON)
+        rule.onNodeWithTag("list-pane").assertExists()
+        rule.onNodeWithTag("detail-pane").assertExists()
+        rule.onNodeWithTag("meeting-title").assertExists()
+        // The Library is still there, placed and usable, beside the meeting.
+        rule.onNodeWithContentDescription("Record a new meeting").assertExists()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        waitGone(FIND_BUTTON)
+        waitFor(hasText("Export all meetings"))
+        rule.onNodeWithContentDescription("Record a new meeting").assertExists()
+
+        Espresso.pressBack()
+        waitGone(hasText("Export all meetings"))
+        rule.onNodeWithTag("meeting-title").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Record a new meeting").assertExists()
     }
 
     @Test fun closingANoteMovesTheLibraryBackInsteadOfComposingItAgain() {

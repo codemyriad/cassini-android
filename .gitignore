@@ -21,6 +21,9 @@ app/src/main/jniLibs/
 *.opus
 # The shared cross-app vectors are CC0 conformance files without speech (core/src/test/resources/cross-app/README.md).
 !core/src/test/resources/cross-app/*.opus
+# The D112 round-trip vectors of cassini-ux (D-1171): deterministic CC0 files from its build.py, no speech, pinned in
+# third_party/cassini-ux/UPSTREAM.json.
+!third_party/cassini-ux/vectors/library-vectors/round-trip/*.opus
 dist
 play/
 **/.cxx

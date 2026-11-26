@@ -319,6 +319,47 @@ data class CassiniDocument(
             return copyTimeMetadata(source, existing, manifest, target, start.toString())
         }
 
+        /**
+         * D112 (L-87): writes the meeting start a person set ([startedAt], RFC 3339 with their offset, [StartedAt]) into
+         * the file, so it travels with the `.opus` and every Cassini app reads it (MAPPING.md): manifest
+         * `meeting.startedAt` (A4), `meeting.recordedAtUtc` (the same instant, which the pinned reader takes first),
+         * `meeting.recordedAtLocal` (its wall-clock part), the DATE tag and the `CASSINI_RECORDED_AT_*` mirrors. A
+         * Library v2 `x["codemyriad.io"].meeting` already in the file gets `startedAt` and `startedAtSource: "user"`;
+         * Android, which keeps no Library v2 session, never creates that object. `createdAtUtc`, the meeting id, the
+         * title, the audio and every transcript body stay as they are.
+         */
+        fun withStartedAt(source: File, existing: CassiniDocument, startedAt: String, target: File): CassiniDocument {
+            require(existing.documentState == DocumentState.OK && existing.manifest != null)
+            val start = requireNotNull(StartedAt.parse(startedAt)) { "Invalid start" }
+            val value = StartedAt.format(start)
+            val utc = start.toInstant().toString()
+            val local = StartedAt.localPart(start)
+            val manifest = JSONObject(existing.manifest.toString())
+            manifest.getJSONObject("meeting").put(MeetingTime.STARTED, value).put("recordedAtUtc", utc)
+                .put("recordedAtLocal", local)
+            manifest.optJSONObject("x")?.optJSONObject(MeetingTime.UX_NAMESPACE)?.optJSONObject("meeting")
+                ?.put(MeetingTime.STARTED, value)?.put("startedAtSource", "user")
+            val timeTags = setOf("DATE", "CASSINI_RECORDED_AT_UTC", "CASSINI_RECORDED_AT_LOCAL", "CASSINI_STARTED_AT")
+            val kept = existing.comments.filterNot {
+                isManifestComment(it) || it.substringBefore('=').uppercase(Locale.ROOT) in timeTags
+            }
+            val tags = kept + listOf("DATE=$value", "CASSINI_RECORDED_AT_UTC=$utc", "CASSINI_RECORDED_AT_LOCAL=$local")
+            val comments = tags + CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
+            var written = false
+            try {
+                val digest = manifest.getJSONObject("integrity").getString("opusAudioSha256")
+                writeWithTags(source, comments, digest, target)
+                val sealed = read(target)
+                require(sealed.state == existing.state && same(sealed.manifest, manifest)) { "Dated manifest differs" }
+                require(sealed.variants.map { it.id to it.body } == existing.variants.map { it.id to it.body })
+                require(sealed.meetingTime == MeetingTime(MeetingTime.STARTED, value)) { "Start does not read back" }
+                written = true
+                return sealed
+            } finally {
+                if (!written) target.delete()
+            }
+        }
+
         private fun copyTimeMetadata(
             source: File,
             existing: CassiniDocument,
@@ -364,9 +405,16 @@ data class CassiniDocument(
 
         /**
          * Renames speakers, fixing any legacy missing colour slots before the edit and clearing an explicit
-         * unnamed marker on the renamed speaker. Bodies, variants and unrelated metadata/tags are retained.
+         * unnamed marker on the renamed speaker. [background] sets or clears background voices ([SpeakerBackground],
+         * D112). Bodies, variants and unrelated metadata/tags are retained.
          */
-        fun relabel(source: File, existing: CassiniDocument, labels: Map<String, String>, target: File): CassiniDocument {
+        fun relabel(
+            source: File,
+            existing: CassiniDocument,
+            labels: Map<String, String>,
+            target: File,
+            background: Map<String, Boolean> = emptyMap(),
+        ): CassiniDocument {
             require(existing.state == "ok" && existing.manifest != null)
             val manifest = JSONObject(existing.manifest.toString())
             val speakers = manifest.getJSONArray("speakers")
@@ -378,6 +426,8 @@ data class CassiniDocument(
                 speaker.put("label", label.trim())
                 if (speaker.optString("provenance") == "unnamed") speaker.remove("provenance")
             }
+            background.keys.forEach { id -> require(id in byId) { "Unknown speaker $id" } }
+            SpeakerBackground.apply(manifest, background)
             val digest = manifest.getJSONObject("integrity").getString("opusAudioSha256")
             val comments = existing.comments.filterNot { isManifestTag(it.substringBefore('=').uppercase(Locale.ROOT)) } +
                 CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
@@ -520,7 +570,9 @@ data class CassiniDocument(
                     .put("sampleRate", 48000).put("channels", stream.channels).put("sampleCount", stream.sampleCount).put("durationMs", stream.durationMs))
                 .put("speakers", JSONArray()).put("transcripts", JSONArray())
                 .apply { if (extensions != null) put("x", JSONObject(extensions.toString())) }
-            if (recordedAtUtc != null && existing?.meetingTime?.source != MeetingTime.UTC) {
+            // A start the person set (D112) is never replaced by the capture clock.
+            val keptStart = existing?.meetingTime?.source
+            if (recordedAtUtc != null && keptStart != MeetingTime.UTC && keptStart != MeetingTime.STARTED) {
                 manifest.getJSONObject("meeting").put("recordedAtUtc", recordedAtUtc.toString())
             }
             val descriptors = manifest.getJSONArray("transcripts")
@@ -588,12 +640,15 @@ data class CassiniDocument(
             if (existing == null && comments.none { it.substringBefore('=').equals("TITLE", true) }) comments += "TITLE=${manifest.getJSONObject("meeting").getString("title")}" 
             val meeting = manifest.getJSONObject("meeting")
             val start = MeetingTime.resolve(manifest, existing?.comments.orEmpty())
+            val started = start?.takeIf { it.source == MeetingTime.STARTED }?.value
             val utc = start?.takeIf { it.source == MeetingTime.UTC }?.value
+                ?: (meeting.opt("recordedAtUtc") as? String)?.takeIf { started != null }
             if (utc != null) comments += "CASSINI_RECORDED_AT_UTC=$utc"
             (meeting.opt("recordedAtLocal") as? String)?.takeIf { it.isNotEmpty() }?.let {
                 comments += "CASSINI_RECORDED_AT_LOCAL=$it"
             }
-            comments += "DATE=${utc ?: start?.takeIf { it.source == MeetingTime.DATE }?.value ?: meeting.getString("createdAtUtc")}"
+            val date = started ?: utc ?: start?.takeIf { it.source == MeetingTime.DATE }?.value
+            comments += "DATE=${date ?: meeting.getString("createdAtUtc")}"
             comments += bodyTags
             comments += CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
             return comments to digest

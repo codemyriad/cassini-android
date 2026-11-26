@@ -3,6 +3,7 @@ package io.codemyriad.cassini.data.notes
 import androidx.annotation.WorkerThread
 import io.codemyriad.cassini.core.export.ReadingText
 import io.codemyriad.cassini.core.format.DocumentState
+import io.codemyriad.cassini.core.format.MeetingTime
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
@@ -220,8 +221,30 @@ class NoteRepository(
     }
 
     /**
+     * D112 (L-87, "Set date and time"): stores [startedAt] (RFC 3339 with the person's offset, `StartedAt`) as the
+     * meeting's start in `notes.started_at`, which wins over every other start, and orders the note by it
+     * (`created_at`), so it moves to its day in the Library and Search at once and "Date unknown" empties. An OK
+     * document with no job row gets it in the background (`DocumentRepository.writeStart`); otherwise adopt, the
+     * startup pass or "Save a copy" writes it, and a document that is not OK keeps it in Room only. The file is
+     * never renamed and the import or copy time is never stored as the start. False without a row or for an
+     * invalid value.
+     */
+    suspend fun setStartedAt(id: String, startedAt: String): Boolean {
+        val start = MeetingTime.started(startedAt)
+        val at = start?.instant
+        val row = notes.note(id)
+        val stored = start != null && at != null && row != null &&
+            notes.setStartedAt(id, start.value, at.toEpochMilli(), clock())
+        val writable = row?.audioKind == AudioKind.DOCUMENT && row.documentState == DocumentState.OK
+        if (stored && writable && jobs.job(id) == null) {
+            background.launch(dispatchers.io) { documents.writeStart(id) }
+        }
+        return stored
+    }
+
+    /**
      * Saves the playback position. With [final] (on pause and on leaving the note) it also stores the Library preview
-     * excerpt, `PreviewText` at [positionMs] over the selected variant's cached words.
+     * excerpt, `PreviewText` at [positionMs] over the selected variant's cached words, leaving out background voices.
      */
     suspend fun setPosition(id: String, positionMs: Long, final: Boolean = false) {
         if (!final) {
@@ -229,8 +252,8 @@ class NoteRepository(
             return
         }
         val selected = selectedVariant(id)
-        val words = selected?.let { cache.words(id, it.variantId).map(::word) }.orEmpty()
-        val labels = selected?.let { speakerLabels(id, it.variantId) }.orEmpty()
+        val (words, labels) = selected?.let { heardWordsAndLabels(id, it.variantId) }
+            ?: (emptyList<Word>() to emptyMap())
         val preview = PreviewText.of(words, positionMs, labels, selected?.wordEndsBoundedByAudio == true)?.display
         notes.setPositionAndPreview(id, positionMs, preview)
     }
@@ -248,9 +271,8 @@ class NoteRepository(
         val row = notes.note(id)
         val readable = cache.variants(id).any { it.variantId == variantId && it.readable }
         if (!recorded || row == null || !readable) return false
-        val words = cache.words(id, variantId).map(::word)
         val selected = cache.variants(id).first { it.variantId == variantId }
-        val labels = speakerLabels(id, variantId)
+        val (words, labels) = heardWordsAndLabels(id, variantId)
         val preview = PreviewText.of(words, row.positionMs, labels, selected.wordEndsBoundedByAudio)?.display
         val body = ReadingText.body(words, { labels[it] ?: it }, selected.wordEndsBoundedByAudio)
         return notes.selectVariant(id, variantId, body, preview, clock())
@@ -349,11 +371,18 @@ class NoteRepository(
             ?: variants.firstOrNull { it.isDefault } ?: variants.firstOrNull()
     }
 
-    private suspend fun speakerLabels(id: String, variantId: String): Map<String, String> =
-        cache.speakers(id, variantId).associate { speaker ->
+    /** Words of [variantId] leaving out background voices (D112 / L-86), and the speakers' display labels. */
+    private suspend fun heardWordsAndLabels(id: String, variantId: String): Pair<List<Word>, Map<String, String>> {
+        val speakers = cache.speakers(id, variantId)
+        val background = speakers.filter { it.background }.mapTo(HashSet()) { it.speakerId }
+        val words = cache.words(id, variantId).map(::word)
+        val heard = if (background.isEmpty()) words else words.filter { it.speaker !in background }
+        val labels = speakers.associate { speaker ->
             val stored = DefaultLabels.stored(speaker.speakerId, speaker.label)
             speaker.speakerId to (stored ?: "Speaker ${speaker.placeholderNumber ?: (speaker.ordinal + 1)}")
         }
+        return heard to labels
+    }
 
     private fun word(row: WordEntity) = Word(row.speaker, row.startMs, row.endMs, row.text)
 

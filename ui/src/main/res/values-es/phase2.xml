@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 671abcd26e77d012583adc25f971e0d6b3742f7f; do not edit. -->
+<!-- Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3; do not edit. -->
 <resources>
     <string name="ui_settings_voices">Voces guardadas</string>
     <string name="ui_settings_trash">Papelera</string>
@@ -172,7 +172,6 @@
         <item quantity="many">%1$s voces necesitan un nombre de nuevo</item>
         <item quantity="other">%1$s voces necesitan un nombre de nuevo</item>
     </plurals>
-    <string name="ui_voices_stale_body">El reconocimiento de voz se ha actualizado y las voces guardadas antes de la actualización no se pueden reconocer. Pon nombre a %1$s en una reunión para volver a guardar su voz.</string>
     <string name="ui_voices_needs_naming">Necesita un nombre de nuevo</string>
     <string name="ui_voices_caption">Para añadir a alguien, pon nombre a un hablante en una reunión y deja activado «Recordar esta voz».</string>
     <string name="ui_voices_empty">Aún no hay voces guardadas</string>
@@ -180,4 +179,9 @@
     <string name="ui_voices_forget_title">¿Olvidar la voz de %1$s?</string>
     <string name="ui_voices_forget_body">Cassini ya no reconocerá a %1$s en las reuniones nuevas. Los nombres que ya están en las transcripciones se mantienen.</string>
     <string name="ui_voices_forget_action">Olvidar</string>
+    <string name="ui_meeting_set_date_time">Establecer fecha y hora</string>
+    <string name="ui_meeting_set_date_time_title">¿Cuándo se grabó?</string>
+    <string name="ui_meeting_set_date_time_date">Fecha</string>
+    <string name="ui_meeting_set_date_time_time">Empezó a las</string>
+    <string name="ui_meeting_set_date_time_saved_hint">Rellenado según cuándo se guardó el archivo. Cámbialo si no es correcto.</string>
 </resources>

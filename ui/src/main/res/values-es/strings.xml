@@ -115,7 +115,6 @@
     </plurals>
 
     <!-- Library. -->
-    <string name="ui_library_trash">Papelera</string>
     <string name="ui_library_settings">Ajustes</string>
     <string name="ui_search_clear">Borrar búsqueda</string>
     <string name="ui_library_recording_card">Grabando · %1$s</string>
@@ -504,4 +503,10 @@
     <string name="ui_progress_downloading_models">Descargando modelos</string>
     <string name="ui_progress_getting_ready">Preparando la transcripción de %1$s</string>
     <string name="ui_transcription_after_recording">Después de grabar</string>
+    <string name="ui_actions_export">Exportar…</string>
+    <string name="ui_actions_export_body">Archivo Cassini, Markdown y más</string>
+    <string name="ui_name_voices_off">El reconocimiento de voz está desactivado. Actívalo en %1$s para recordar voces.</string>
+    <string name="ui_recording_title_placeholder">Añadir un título</string>
+    <string name="ui_settings_export_all">Exportar todas las reuniones</string>
+    <string name="ui_voices_stale_body_each">El reconocimiento de voz se ha actualizado y las voces guardadas antes de la actualización no se pueden reconocer. Vuelve a poner nombre a cada persona en una reunión para guardar su voz.</string>
 </resources>

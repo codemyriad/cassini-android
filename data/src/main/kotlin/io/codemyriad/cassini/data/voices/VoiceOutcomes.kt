@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.data.voices
 
 import io.codemyriad.cassini.core.Failure
+import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.Voice
 
 /** One saved person as Saved voices lists it (features.md section 10). */
@@ -83,4 +84,35 @@ sealed interface UnenrolOutcome {
 
     /** A voice file could not be written (full disk, I/O error); try again. */
     data class Failed(val failure: Failure) : UnenrolOutcome
+}
+
+/**
+ * Everything removed by [VoiceRepository.unenrolWithRollback] when taking back a confirmed enrolment, so Undo can
+ * restore the original saved voice (same id, colour, mean and timestamps) and every scrubbed match across notes,
+ * pending prints and drafts.
+ */
+data class UnenrolRollback(
+    val noteId: String,
+    val variantId: String,
+    val speakerId: String,
+    val voice: Voice?,
+    val forgotten: Boolean,
+    val match: Match,
+    val scrubbedNotes: Map<String, Map<String, Match>> = emptyMap(),
+    val scrubbedPending: Map<String, PendingScrub> = emptyMap(),
+    val scrubbedDrafts: Map<String, DraftScrub> = emptyMap(),
+) {
+    /** Matches and confirmations removed from one note's pending prints file. */
+    data class PendingScrub(
+        val matches: Map<String, Match>,
+        val confirmations: Map<String, Confirmation>,
+    )
+
+    /** Live matches, automatic names, Remember choices and rejections removed from one draft. */
+    data class DraftScrub(
+        val live: Map<String, Match>,
+        val automatic: Map<String, String>,
+        val remembered: Map<String, String>,
+        val rejected: Set<String>,
+    )
 }

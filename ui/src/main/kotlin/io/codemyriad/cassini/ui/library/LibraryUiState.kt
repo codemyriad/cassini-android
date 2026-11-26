@@ -140,6 +140,10 @@ sealed interface LibraryDialog {
 
     @Immutable
     data class StopAndTrash(val id: String) : LibraryDialog
+
+    /** "When was this recorded?" (D112, L-87), a sheet opened from the actions sheet. */
+    @Immutable
+    data class SetDateTime(val ui: io.codemyriad.cassini.ui.note.SetDateTimeUi) : LibraryDialog
 }
 
 /**

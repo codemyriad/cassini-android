@@ -56,6 +56,7 @@ These rules apply to a note directory:
 | Audio of a note | The file in `notes/<id>/` | `notes.audio_file`, `notes.duration_ms` |
 | Transcript versions, speaker labels, meeting ID, provenance | The sealed `document.opus` | The tables `variants`, `speakers`, `note_text` |
 | Title | Room `notes.title` | `meeting.title` and the `TITLE` tag of the document |
+| A start the person set ("Set date and time", D112) | Room `notes.started_at` | `meeting.startedAt`, `recordedAtUtc`, `recordedAtLocal` and the `DATE` tag of an OK document |
 | Selected version | The default version of an OK `document.opus` (coordination D53) | `notes.selected_variant` |
 | Trash state, playback position, preview | Room `notes` | None |
 | Transcription queue | Room `jobs` | None |
@@ -70,12 +71,13 @@ If `cassini.db` is lost, the app makes the catalogue again from the note directo
 - The playback positions and the queue.
 - A rename that the app did not write into the document yet.
 - The titles of the notes that have no document. The title of such a note becomes "Recovered recording" and the date.
+- A start set in "Set date and time" that the app did not write into the document yet, and every such start of a note without a document.
 
 A note with a valid checkpoint comes back paused.
 
 ## Room catalogue
 
-The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 4. The schemas are in `data/schemas/`. Room stores the enums as `TEXT` with stable names, never as ordinals.
+The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 6. The schemas are in `data/schemas/`. Room stores the enums as `TEXT` with stable names, never as ordinals.
 
 | Table | Key | Content |
 |---|---|---|
@@ -88,7 +90,7 @@ The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 4. The 
 | `note_voice_links` | `note_id`, `variant_id`, `speaker_id` | A copy of the matches in `voices/notes/<id>.json`: voice ID, state, score, seconds. No embeddings. |
 | `note_stars` | `note_id` | A starred note and when it was starred (L-34). Per-device Library state only: never in a Cassini file, an export or a ZIP archive. |
 
-Schema 2 added recording-time metadata. Schema 3 adds the derived `speakers.colour_index` column. Its explicit migration preserves notes and jobs, invalidating document signatures so startup re-derives the speaker cache from files. Variant-specific display ordinals remain separate from stored colour indices. Schema 4 adds the empty `note_stars` table and changes no existing row.
+Schema 2 added recording-time metadata. Schema 3 adds the derived `speakers.colour_index` column. Its explicit migration preserves notes and jobs, invalidating document signatures so startup re-derives the speaker cache from files. Variant-specific display ordinals remain separate from stored colour indices. Schema 4 adds the empty `note_stars` table and changes no existing row. Schema 5 adds two nullable `notes` columns and changes no existing row: `started_at`, the start a person set in "Set date and time" (D112, below), and `source_modified_at`, an import's last-saved time as its provider reported it, which only prefills that sheet. Schema 6 adds the derived `speakers.background` column (background voices, below); its migration starts it false and clears the document signatures, so startup derives the speakers, the searchable body and the preview from the files again.
 
 The tables `variants`, `speakers`, `note_text`, `jobs`, `note_voice_links` and `note_stars` cascade from `notes`. A catalogue rebuilt from the files has no stars. Each later schema version needs a written `Migration` and a `MigrationTestHelper` test. The code does not use `fallbackToDestructiveMigration`. If the database does not open, the app renames it `cassini.db.corrupt-<epoch>` and makes the catalogue again.
 
@@ -175,6 +177,14 @@ A Cassini document is an Ogg Opus file at 48 kHz. Any audio player plays it. The
 
 Speaker records can carry the optional `colourIndex` hint (L-41): a zero-based safe JSON integer (`0..9007199254740991`) in original first-speech order, including speakers not named yet. First speech means the earliest start time per speaker, with word-file order breaking ties; transcript items themselves keep their canonical turn order. New seals store it, draft merges keep the target's original slot, and later naming, merging or transcript variants retain valid stored slots. Missing legacy slots come from the first readable variant, with manifest order as a fallback when no body can be read. Reads and imports never rewrite a file; a later explicit document edit persists missing slots. Malformed hints are nonfatal: strings, fractions and out-of-range values use a derived fallback and are repaired on a later explicit speaker/transcript write. Valid slots retain their full precision. Fresh-run speaker IDs carry a known note-local or unambiguous saved-voice identity’s slot; a first separation of an undifferentiated transcript starts at zero, and unmatched speakers otherwise append slots before draft merges. This metadata is independent of the renderer's palette and assignment policy.
 
+### Background voices
+
+A speaker can be marked as a background voice: a voice the microphone picked up that is not part of the conversation (cassini-ux D112 / L-86, `meeting.schema.json` `speakers[].background`). The flag is `background: true`; absent means not a background voice, and switching it off removes the key, never `false`. The label, `colourIndex`, the merges and the transcript bodies stay as they are, so switching back restores the speaker as it was. The Name a speaker sheet writes the flag, with the names, in one document edit (`CassiniDocument.relabel`); no voiceprint is enrolled for a background voice.
+
+Android stores the flag on the manifest speaker record, beside `colourIndex`. This differs from the desktop and the other apps, which read it from `x["codemyriad.io"].meeting.speakers` (`library-v2/MAPPING.md`): Android has no `meeting.json` and never creates `x["codemyriad.io"]`, because the desktop validates that object against `x-schema.json` before an edit and a partial one would break it. When a file already carries `x["codemyriad.io"]` at schema 1 and lists the speaker there, Android writes the flag in both places, and on reading that shared copy wins for every speaker it lists (`SpeakerBackground`). The cassini-ux round-trip vector `background-voice.opus` is in `core/src/test/resources/cross-app/`.
+
+A background voice stays in the manifest `speakers[]` with its label, and `CASSINI_SPEAKER_COUNT` does not change. Android leaves it out of the names under the meeting title, the speaker count of the Library row, the speaker filter, Library search, find in the transcript, the preview and the TXT, Markdown, SRT and VTT exports. Its turns fold into "{n} background voices hidden" in the transcript. Playback, the timeline, the audio and the `.opus` copy keep everything.
+
 Each transcription adds a transcript version (a variant). The document keeps the earlier versions. "Save a copy" copies the document byte for byte, together with the versions, extensions and attachments that Android does not use.
 
 The version you choose in the Versions sheet, a merge undone included, is written into the document: its descriptor gets `default: true`, the earlier default gets `false`, and `CASSINI_TRANSCRIPT_DEFAULT` names it (`CassiniDocument.setDefault`). The versions keep their order and their bodies, and the manifest is re-encoded with everything else unchanged, `x` included. Every Cassini reader opens the file, and any copy of it, on that version (coordination D53.3; the shared vector `two-versions-default-switched.opus` in `core/src/test/resources/cross-app/`). iOS instead appends the chosen version again as a new last version at export; both follow the selection rule of the format. Two cases keep the choice in Room only, as the version this phone shows: a document that is not OK, which Android never rewrites, and a note with a job row, whose document is the job's audio source (the job's new version becomes the default when it is adopted).
@@ -193,6 +203,33 @@ The format code keeps four known differences from the specification, because the
 - The transcript bodies are JSON with indentation.
 - The document has no `DATE` tag.
 - The signature of a source that is not a file is `null:null`.
+
+## A start the person set (D112)
+
+"Set date and time" (cassini-ux D112, L-87) gives a meeting the start the person chose, RFC 3339 with their UTC
+offset on that day, seconds floored (`2026-11-23T14:36:00+01:00`). It wins over every other start (cassini-ux
+`LIBRARY-RULES` R6.2): Library day groups and order, the line under the title, Search date filters and the TXT and
+Markdown exports all use it. The import or copy time is never stored as the start; the imported file's last-saved
+time only prefills the sheet.
+
+Room `notes.started_at` holds it at once and orders the note by it (`created_at`). An OK document with no job row
+gets it in the same pass as a rename (`DocumentRepository.writeStart`); otherwise the adopt after the job, the startup
+pass beside `retitleDirty` or "Save a copy" writes it. The write (`CassiniDocument.withStartedAt`) sets these, and
+keeps `createdAtUtc`, the meeting id, the title, the audio and every transcript body:
+
+- manifest `meeting.startedAt` (format amendment A4) and the `DATE` tag: the start with its offset;
+- manifest `meeting.recordedAtUtc` and `CASSINI_RECORDED_AT_UTC`: the same instant, which the pinned reader takes first;
+- manifest `meeting.recordedAtLocal` and `CASSINI_RECORDED_AT_LOCAL`: its wall-clock part (the person knows the zone);
+- `x["codemyriad.io"].meeting.startedAt` and `startedAtSource: "user"` when the file already carries that Library v2
+  object (a file from GNOME, the Mac or iOS). Android keeps no Library v2 session, so it never creates the object;
+  the other apps read `meeting.startedAt` from an Android file (MAPPING.md reader order). This is a known
+  difference from the desktop writer.
+
+The file is never renamed. A document that is not OK keeps the start in Room only, like a title. Reading, Android
+takes a user `startedAt` in `x["codemyriad.io"]` first, then `meeting.startedAt`, then the D95 order
+([`recorded-at.md`](recorded-at.md)); a file whose `x["codemyriad.io"].namePrefixSource` is `import-time` has no
+known start unless the person set one, so its legacy publish-time `DATE`, `meeting.startedAt` and `recordedAtLocal`
+are ignored. `third_party/cassini-ux/vectors/library-vectors/round-trip/` pins the shared vectors of D-1171.
 
 ## Exports
 

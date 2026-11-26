@@ -10,10 +10,14 @@ import io.codemyriad.cassini.ui.components.NoteBounds
 // The navigators that [CassiniApp] gives each route: what a screen's "open", "close" and "replace" do to the back
 // stack.
 
-/** The Library's navigation: pushes, and the one Recording entry (pop to it when it is in the stack). */
+/**
+ * The Library's navigation: what it opens goes right above it, and the one Recording entry (pop to it when it is in
+ * the stack). On a phone only the Library is in the stack while it shows; beside a meeting on a wide window
+ * ([ListDetailSceneStrategy]), the new screen takes the right pane's place, as on iPad, instead of stacking on it.
+ */
 internal fun libraryNavigator(backStack: NavBackStack<NavKey>) = object : LibraryNavigator {
     override fun open(key: NavKey) {
-        if (backStack.lastOrNull() != key) backStack.add(key)
+        if (backStack.lastOrNull() != key) backStack.replaceWith(backStack.take(1) + key)
     }
 
     override fun openRecording() = backStack.replaceWith(DeepLinks.recording(backStack))

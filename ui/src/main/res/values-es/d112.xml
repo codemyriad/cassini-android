@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3; do not edit. -->
+<resources>
+    <string name="ui_sp_save">Guardar</string>
+    <string name="ui_bg_switch">Voz de fondo</string>
+    <string name="ui_bg_description">No forma parte de la conversación. Sus palabras se ocultan en la transcripción. La grabación no cambia.</string>
+    <string name="ui_bg_name_placeholder">No es necesario para una voz de fondo</string>
+    <plurals name="ui_bg_hidden">
+        <item quantity="one">%1$s voz de fondo oculta</item>
+        <item quantity="many">%1$s voces de fondo ocultas</item>
+        <item quantity="other">%1$s voces de fondo ocultas</item>
+    </plurals>
+    <string name="ui_bg_toast_single">%1$s ahora es una voz de fondo</string>
+    <plurals name="ui_bg_toast_named">
+        <item quantity="one">Llamado %1$s · %2$s voz de fondo</item>
+        <item quantity="many">Llamado %1$s · %2$s voces de fondo</item>
+        <item quantity="other">Llamado %1$s · %2$s voces de fondo</item>
+    </plurals>
+    <plurals name="ui_bg_toast_count">
+        <item quantity="one">%1$s voz de fondo</item>
+        <item quantity="many">%1$s voces de fondo</item>
+        <item quantity="other">%1$s voces de fondo</item>
+    </plurals>
+</resources>

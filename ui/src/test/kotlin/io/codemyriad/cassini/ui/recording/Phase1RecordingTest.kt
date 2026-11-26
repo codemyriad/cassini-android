@@ -111,7 +111,15 @@ class Phase1RecordingTest {
         assertTrue("The editable title is a 48dp touch target", bounds.bottom - bounds.top >= 48.dp)
         title.performTextReplacement("Renamed meeting")
         rule.runOnIdle { assertEquals(listOf(RecordingEvent.Title("Renamed meeting")), events) }
-        rule.onNodeWithText("Opus 48 kHz").assertIsDisplayed()
+        // QA 25 Nov: no sample-rate badge on the recording screen; it lives in Document info.
+        rule.onNodeWithText("Opus 48 kHz").assertDoesNotExist()
+    }
+
+    /** QA 25 Nov: an empty title line says "Add a title"; the typed title replaces it. */
+    @Test fun anEmptyTitleShowsAddATitle() {
+        show(state = BoardFixtures.recording.copy(title = ""))
+        rule.onNodeWithTag("recording-title-placeholder", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("Add a title", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test fun lightAppThemeStillRecordsOnNightGround() = nightGround(dark = false)

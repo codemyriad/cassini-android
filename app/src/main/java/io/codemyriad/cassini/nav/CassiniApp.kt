@@ -22,6 +22,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -57,6 +59,7 @@ import io.codemyriad.cassini.recording.RecordingViewModel
 import io.codemyriad.cassini.settings.GraphSettingsPorts
 import io.codemyriad.cassini.settings.SettingsRoute
 import io.codemyriad.cassini.settings.SettingsViewModel
+import io.codemyriad.cassini.transfer.TransferResultHost
 import io.codemyriad.cassini.trash.GraphTrashPorts
 import io.codemyriad.cassini.trash.TrashRoute
 import io.codemyriad.cassini.trash.TrashViewModel
@@ -84,6 +87,10 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
     val noteBounds = rememberNoteBounds()
     val morph = remember { NoteMorph() }
     val context = LocalContext.current
+    val window = LocalWindowInfo.current.containerSize
+    val wide = with(LocalDensity.current) {
+        ListDetailSceneStrategy.isWide(window.width.toDp().value.toInt(), window.height.toDp().value.toInt())
+    }
     LaunchedEffect(links) {
         links.collect { link -> open(graph, backStack, link) }
     }
@@ -107,8 +114,12 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
                 rememberSaveableStateHolderNavEntryDecorator(),
                 rememberViewModelStoreNavEntryDecorator(),
             ),
-            // The Library stays composed under a note it opened, so closing the note does not compose it again.
-            sceneStrategies = listOf(remember { LibraryNoteSceneStrategy(morph) }),
+            // A wide window shows the Library beside what it opens. Otherwise the Library stays composed under a note
+            // it opened, so closing the note does not compose it again.
+            sceneStrategies = listOf(
+                remember(wide) { ListDetailSceneStrategy(wide) },
+                remember { LibraryNoteSceneStrategy(morph) },
+            ),
             transitionSpec = { appPush(morph) },
             popTransitionSpec = { appPop(morph) },
             predictivePopTransitionSpec = { _ -> appPop(morph) },
@@ -131,6 +142,7 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
                 screenEntries(graph, backStack, context)
             },
         )
+        TransferResultHost(graph.transfers)
     }
 }
 
@@ -296,6 +308,7 @@ internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.pop(): ContentTran
 
 /** Recording comes up from the bottom and goes down again, also on a predictive back. */
 private val recordingTransitions: Map<String, Any> =
-    NavDisplay.transitionSpec { slideInVertically { it } togetherWith fadeOut() } +
+    LibraryNoteScenes.fullScreen() +
+        NavDisplay.transitionSpec { slideInVertically { it } togetherWith fadeOut() } +
         NavDisplay.popTransitionSpec { fadeIn() togetherWith slideOutVertically { it } } +
         NavDisplay.predictivePopTransitionSpec { _ -> fadeIn() togetherWith slideOutVertically { it } }

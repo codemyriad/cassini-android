@@ -90,15 +90,25 @@ class NamesStore internal constructor(
      * Applies [reducer] to every draft: the notes open in memory and every `names.json` on disk. For "Forget" and
      * "Forget everyone", which scrub voices from every draft. Returns the note ids it changed.
      */
-    suspend fun mutateAll(reducer: (CheckpointNames) -> CheckpointNames): List<String> = withContext(dispatchers.io) {
-        val onDisk = paths.notes.listFiles().orEmpty()
-            .filter { NoteIds.isValid(it.name) && WorkFiles.exists(File(paths.work(it.name), WorkFiles.NAMES)) }
-            .map { it.name }
-        (open.keys + onDisk).toSortedSet().filter { id ->
-            val before = entry(id).ref.get()
-            mutateNow(id, reducer) != before
+    suspend fun mutateAll(reducer: (CheckpointNames) -> CheckpointNames): List<String> =
+        mutateAllCapturing(reducer).keys.toList()
+
+    /**
+     * Like [mutateAll], returning the snapshot of each changed draft before [reducer] ran (for Undo of a scrubbed
+     * voice).
+     */
+    suspend fun mutateAllCapturing(reducer: (CheckpointNames) -> CheckpointNames): Map<String, CheckpointNames> =
+        withContext(dispatchers.io) {
+            val onDisk = paths.notes.listFiles().orEmpty()
+                .filter { NoteIds.isValid(it.name) && WorkFiles.exists(File(paths.work(it.name), WorkFiles.NAMES)) }
+                .map { it.name }
+            buildMap {
+                for (id in (open.keys + onDisk).toSortedSet()) {
+                    val before = entry(id).ref.get()
+                    if (mutateNow(id, reducer) != before) put(id, before)
+                }
+            }
         }
-    }
 
     /**
      * Forgets the in-memory names of [noteId], so the next use reads `names.json` again. Called after adopt, on purge

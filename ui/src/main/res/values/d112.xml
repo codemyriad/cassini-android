@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3; do not edit. -->
+<resources>
+    <string name="ui_sp_save">Save</string>
+    <string name="ui_bg_switch">Background voice</string>
+    <string name="ui_bg_description">Not part of the conversation. Their words fold away in the transcript. The recording isn’t changed.</string>
+    <string name="ui_bg_name_placeholder">Not needed for a background voice</string>
+    <plurals name="ui_bg_hidden">
+        <item quantity="one">%1$s background voice hidden</item>
+        <item quantity="other">%1$s background voices hidden</item>
+    </plurals>
+    <string name="ui_bg_toast_single">%1$s is now a background voice</string>
+    <plurals name="ui_bg_toast_named">
+        <item quantity="one">Named %1$s · %2$s background voice</item>
+        <item quantity="other">Named %1$s · %2$s background voices</item>
+    </plurals>
+    <plurals name="ui_bg_toast_count">
+        <item quantity="one">%1$s background voice</item>
+        <item quantity="other">%1$s background voices</item>
+    </plurals>
+</resources>

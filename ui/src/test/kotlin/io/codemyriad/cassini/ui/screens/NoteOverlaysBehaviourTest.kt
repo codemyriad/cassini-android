@@ -60,7 +60,7 @@ class NoteOverlaysBehaviourTest {
 
     @Test fun theNameSheetWrapsItsEvents() {
         show(withSheet(NoteSheet.NameSpeaker(BoardFixtures.nameSpeaker)))
-        rule.onNodeWithText("Save name").performClick()
+        rule.onNodeWithText("Save").performClick()
         rule.onNodeWithText("Cancel").performClick()
         assertEvents(NoteEvent.NameSheet(NameSheetEvent.SaveBlocked), NoteEvent.NameSheet(NameSheetEvent.Cancel))
     }

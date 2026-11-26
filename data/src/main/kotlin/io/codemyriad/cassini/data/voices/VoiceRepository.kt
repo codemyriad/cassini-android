@@ -317,17 +317,61 @@ class VoiceRepository(
      * Takes back the enrolment of a CONFIRMED print ("Not this person" on a confirmed name) and clears its match. A
      * person with only this print is forgotten everywhere, as [forget] does.
      */
-    suspend fun unenrol(noteId: String, variantId: String, speakerId: String): UnenrolOutcome {
+    suspend fun unenrol(noteId: String, variantId: String, speakerId: String): UnenrolOutcome =
+        unenrolWithRollback(noteId, variantId, speakerId).first
+
+    /**
+     * Like [unenrol], also returning an [UnenrolRollback] snapshot when an enrolment was taken back so Undo can
+     * restore the original voice (same id, colour, mean and timestamps) and every scrubbed match.
+     */
+    suspend fun unenrolWithRollback(
+        noteId: String,
+        variantId: String,
+        speakerId: String,
+    ): Pair<UnenrolOutcome, UnenrolRollback?> {
         val file = notesFile(noteId)
         val key = NoteVoiceCodec.prefix(variantId) + speakerId
-        val (outcome, forgotten) = writing(UnenrolOutcome.Failed(Failure.SAVE) to null) {
+        val (outcome, partial) = writing(UnenrolOutcome.Failed(Failure.SAVE) to null) {
             locked(paths.people) {
                 // The scrub takes pending locks, so it runs after the note's file lock is released.
-                locked(file) { unenrolLocked(noteId, key) }.also { (_, gone) -> gone?.let(::scrubLocked) }
+                val step = locked(file) { unenrolLocked(noteId, variantId, speakerId, key) }
+                val rollback = step.rollback?.let { base ->
+                    if (!base.forgotten) {
+                        base
+                    } else {
+                        val (pending, notes) = scrubLocked(base.match.voiceId)
+                        base.copy(scrubbedPending = pending, scrubbedNotes = notes)
+                    }
+                }
+                step.outcome to rollback
             }
         }
-        if (forgotten != null) names.mutateAll { forgetInDraft(it, forgotten) }
-        return outcome
+        val complete = if (partial != null && partial.forgotten) {
+            val voiceId = partial.match.voiceId
+            val drafts = names.mutateAllCapturing { forgetInDraft(it, voiceId) }
+                .mapValues { (_, before) -> draftScrub(before, voiceId) }
+            partial.copy(scrubbedDrafts = drafts)
+        } else {
+            partial
+        }
+        return outcome to complete
+    }
+
+    /**
+     * Restores a voice enrolment taken back by [unenrolWithRollback]: puts the original [Voice] back into
+     * `people.json` (preserving its id, colour and mean) or re-enrols into it if it is still saved, and restores the
+     * primary match and every scrubbed match across sealed notes, pending prints and drafts.
+     */
+    suspend fun restoreUnenrol(rollback: UnenrolRollback): Boolean {
+        val restored = writing(false) {
+            locked(paths.people) { restoreUnenrolLocked(rollback) }
+        }
+        if (restored) {
+            for ((draftNoteId, scrub) in rollback.scrubbedDrafts) {
+                names.mutate(draftNoteId) { restoreInDraft(it, rollback.match.voiceId, scrub) }
+            }
+        }
+        return restored
     }
 
     // Locked helpers. Each runs with the locks its caller took, in the documented order.
@@ -379,26 +423,40 @@ class VoiceRepository(
         return next
     }
 
-    /** Removes the matches to [voiceId] from every pending and sealed per-note file. */
-    private fun scrubLocked(voiceId: String) {
+    /** Removes the matches to [voiceId] from every pending and sealed per-note file, returning what was removed. */
+    private fun scrubLocked(
+        voiceId: String,
+    ): Pair<Map<String, UnenrolRollback.PendingScrub>, Map<String, Map<String, Match>>> {
+        val scrubbedPending = LinkedHashMap<String, UnenrolRollback.PendingScrub>()
         for (file in jsonFiles(File(paths.voices, PENDING))) {
             locked(file) {
                 val read = files.readPending(file) as? FileRead.Loaded ?: return@locked
                 val pending = read.value
-                val prints = withoutVoice(pending.prints, voiceId)
-                val choices = pending.confirmations.filterValues { it.isNew || it.voiceId != voiceId }
-                if (prints != pending.prints || choices != pending.confirmations) {
+                val removedMatches = matchingVoice(pending.prints, voiceId)
+                val removedChoices = pending.confirmations.filterValues { !it.isNew && it.voiceId == voiceId }
+                if (removedMatches.isNotEmpty() || removedChoices.isNotEmpty()) {
+                    val prints = withoutVoice(pending.prints, voiceId)
+                    val choices = pending.confirmations.filterValues { it.isNew || it.voiceId != voiceId }
                     files.writePending(file, pending.copy(prints = prints, confirmations = choices))
+                    scrubbedPending[file.name.removeSuffix(JSON)] =
+                        UnenrolRollback.PendingScrub(removedMatches, removedChoices)
                 }
             }
         }
+        val scrubbedNotes = LinkedHashMap<String, Map<String, Match>>()
         for (file in jsonFiles(File(paths.voices, NOTES))) {
             locked(file) {
                 val read = files.readNote(file) as? FileRead.Loaded ?: return@locked
-                val prints = withoutVoice(read.value.prints, voiceId)
-                if (prints != read.value.prints) writeNoteLocked(file.name.removeSuffix(JSON), read.value.model, prints)
+                val removedMatches = matchingVoice(read.value.prints, voiceId)
+                if (removedMatches.isNotEmpty()) {
+                    val noteId = file.name.removeSuffix(JSON)
+                    val prints = withoutVoice(read.value.prints, voiceId)
+                    writeNoteLocked(noteId, read.value.model, prints)
+                    scrubbedNotes[noteId] = removedMatches
+                }
             }
         }
+        return scrubbedPending to scrubbedNotes
     }
 
     private fun adoptLocked(noteId: String): PendingOutcome {
@@ -565,22 +623,25 @@ class VoiceRepository(
         return result?.first?.firstOrNull { it.id == target }
     }
 
-    /** The outcome, and the id of a person forgotten because this was their only print. */
-    private fun unenrolLocked(noteId: String, key: String): Pair<UnenrolOutcome, String?> {
+    private class UnenrolStep(val outcome: UnenrolOutcome, val rollback: UnenrolRollback?)
+
+    /** The outcome, and the rollback snapshot when a confirmed enrolment was taken back. */
+    private fun unenrolLocked(noteId: String, variantId: String, speakerId: String, key: String): UnenrolStep {
         val people = peopleLocked()
         val read = files.readNote(notesFile(noteId)) as? FileRead.Loaded
         val print = read?.value?.prints?.get(key)
         val match = print?.match?.takeIf { it.state == Match.State.CONFIRMED }
         val voice = people.voices.firstOrNull { it.id == match?.voiceId }
         return when {
-            people.readOnly -> UnenrolOutcome.ReadOnly to null
-            read == null || print == null || match == null -> UnenrolOutcome.NothingToUndo to null
+            people.readOnly -> UnenrolStep(UnenrolOutcome.ReadOnly, null)
+            read == null || print == null || match == null -> UnenrolStep(UnenrolOutcome.NothingToUndo, null)
             // The person first, the match last: when the note write fails, the match stays and a retry finds no
             // person, so it only clears the match. The scrub runs again for the match's voice id; it is idempotent.
             voice == null || voice.count <= 1 -> {
                 if (voice != null) savePeopleLocked(people.voices.filter { it.id != voice.id })
                 writeNoteLocked(noteId, read.value.model, read.value.prints + (key to print.copy(match = null)))
-                UnenrolOutcome.Forgotten to match.voiceId
+                val base = UnenrolRollback(noteId, variantId, speakerId, voice, forgotten = true, match = match)
+                UnenrolStep(UnenrolOutcome.Forgotten, base)
             }
             else -> {
                 val undone = VoiceCodec.unenrol(voice, print.embedding) ?: voice
@@ -592,7 +653,62 @@ class VoiceRepository(
                     savePeopleLocked(people.voices)
                     throw error
                 }
-                UnenrolOutcome.Unenrolled to null
+                val base = UnenrolRollback(noteId, variantId, speakerId, voice, forgotten = false, match = match)
+                UnenrolStep(UnenrolOutcome.Unenrolled, base)
+            }
+        }
+    }
+
+    /** Restores a voice and its scrubbed pending/sealed matches; caller holds `people.json` lock. */
+    private fun restoreUnenrolLocked(rollback: UnenrolRollback): Boolean {
+        val people = peopleLocked()
+        if (people.readOnly) return false
+        val voice = rollback.voice
+        val existedBefore = voice != null && people.voices.any { it.id == voice.id }
+        if (voice != null && !existedBefore) {
+            savePeopleLocked(people.voices + voice, people.nextColourIndex)
+        }
+        restorePendingLocked(rollback.scrubbedPending)
+        restoreNotesLocked(rollback, existedBefore)
+        return true
+    }
+
+    private fun restorePendingLocked(scrubbedPending: Map<String, UnenrolRollback.PendingScrub>) {
+        for ((pendingNoteId, scrub) in scrubbedPending) {
+            val file = pendingFile(pendingNoteId)
+            locked(file) {
+                val read = files.readPending(file) as? FileRead.Loaded ?: return@locked
+                val pending = read.value
+                val prints = restoreMatches(pending.prints, scrub.matches, forceKey = null)
+                val choices = pending.confirmations + scrub.confirmations.filterKeys { it !in pending.confirmations }
+                if (prints != pending.prints || choices != pending.confirmations) {
+                    files.writePending(file, pending.copy(prints = prints, confirmations = choices))
+                }
+            }
+        }
+    }
+
+    private fun restoreNotesLocked(rollback: UnenrolRollback, voiceExistedBefore: Boolean) {
+        val primaryKey = NoteVoiceCodec.prefix(rollback.variantId) + rollback.speakerId
+        val perNote = LinkedHashMap<String, Map<String, Match>>(rollback.scrubbedNotes)
+        perNote[rollback.noteId] = perNote[rollback.noteId].orEmpty() + (primaryKey to rollback.match)
+        for ((targetNoteId, matches) in perNote) {
+            val file = notesFile(targetNoteId)
+            locked(file) {
+                val read = files.readNote(file) as? FileRead.Loaded ?: return@locked
+                val isPrimary = targetNoteId == rollback.noteId
+                if (isPrimary && voiceExistedBefore && rollback.voice != null) {
+                    val print = read.value.prints[primaryKey]
+                    val current = peopleLocked()
+                    val existing = current.voices.firstOrNull { it.id == rollback.voice.id }
+                    if (print != null && existing != null) {
+                        enrolOne(current.voices, existing.id, existing.name, print, current.nextColourIndex)
+                            ?.let { (voices, _) -> savePeopleLocked(voices, current.nextColourIndex) }
+                    }
+                }
+                val forceKey = if (isPrimary) primaryKey else null
+                val updated = restoreMatches(read.value.prints, matches, forceKey)
+                if (updated != read.value.prints) writeNoteLocked(targetNoteId, read.value.model, updated)
             }
         }
     }
@@ -712,8 +828,22 @@ class VoiceRepository(
 
         private fun Match.asAuto(): Match = if (state == Match.State.CONFIRMED) copy(state = Match.State.AUTO) else this
 
+        private fun matchingVoice(prints: Map<String, SpeakerPrint>, voiceId: String): Map<String, Match> =
+            prints.mapNotNull { (key, print) ->
+                print.match?.takeIf { it.voiceId == voiceId }?.let { key to it }
+            }.toMap()
+
         private fun withoutVoice(prints: Map<String, SpeakerPrint>, voiceId: String) = prints.mapValues { (_, print) ->
             if (print.match?.voiceId == voiceId) print.copy(match = null) else print
+        }
+
+        private fun restoreMatches(
+            prints: Map<String, SpeakerPrint>,
+            matches: Map<String, Match>,
+            forceKey: String?,
+        ): Map<String, SpeakerPrint> = prints.mapValues { (key, print) ->
+            val match = matches[key]
+            if (match != null && (key == forceKey || print.match == null)) print.copy(match = match) else print
         }
 
         /** The draft's Remember choices for the speakers of [keys] that have a name; new people get an id now. */
@@ -735,6 +865,34 @@ class VoiceRepository(
                 automatic = draft.automatic - speakers,
                 remembered = draft.remembered.filterValues { it != voiceId },
                 rejected = draft.rejected.mapValues { it.value - voiceId }.filterValues { it.isNotEmpty() },
+            )
+        }
+
+        private fun draftScrub(before: CheckpointNames, voiceId: String): UnenrolRollback.DraftScrub {
+            val live = before.live.filterValues { it.voiceId == voiceId }
+            val automatic = before.automatic.filterKeys { it in live }
+            val remembered = before.remembered.filterValues { it == voiceId }
+            val rejected = before.rejected.filterValues { voiceId in it }.keys.toSet()
+            return UnenrolRollback.DraftScrub(live, automatic, remembered, rejected)
+        }
+
+        private fun restoreInDraft(
+            draft: CheckpointNames,
+            voiceId: String,
+            scrub: UnenrolRollback.DraftScrub,
+        ): CheckpointNames {
+            val liveToAdd = scrub.live.filterKeys { it !in draft.live }
+            val autoToAdd = scrub.automatic.filterKeys { it in liveToAdd && it !in draft.automatic }
+            val rememberedToAdd = scrub.remembered.filterKeys { it !in draft.remembered }
+            val rejected = draft.rejected.toMutableMap()
+            for (speaker in scrub.rejected) {
+                rejected[speaker] = rejected[speaker].orEmpty() + voiceId
+            }
+            return draft.copy(
+                live = draft.live + liveToAdd,
+                automatic = draft.automatic + autoToAdd,
+                remembered = draft.remembered + rememberedToAdd,
+                rejected = rejected,
             )
         }
     }

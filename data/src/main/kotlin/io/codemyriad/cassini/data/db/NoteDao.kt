@@ -40,6 +40,7 @@ abstract class NoteDao {
     @Query(
         "SELECT s.label FROM speakers s JOIN notes n ON s.note_id = n.id " +
             "WHERE n.trashed_at IS NULL AND s.variant_id = ${Sql.SELECTED_VARIANT} AND NOT s.is_placeholder " +
+            "AND NOT s.background " +
             "ORDER BY n.created_at DESC, n.id, s.ordinal",
     )
     abstract fun namedSpeakersFlow(): Flow<List<String>>
@@ -192,6 +193,13 @@ abstract class NoteDao {
         if (updateTextTitle(id, title) == 0) insertText(NoteTextEntity(noteId = id, title = title, body = ""))
         return true
     }
+
+    /** D112: stores the start a person set and orders the note by it (`created_at`). False without a row. */
+    @Query("UPDATE notes SET started_at = :startedAt, created_at = :orderAt, updated_at = :now WHERE id = :id")
+    protected abstract suspend fun updateStartedAt(id: String, startedAt: String, orderAt: Long, now: Long): Int
+
+    open suspend fun setStartedAt(id: String, startedAt: String, orderAt: Long, now: Long): Boolean =
+        updateStartedAt(id, startedAt, orderAt, now) > 0
 
     @Query("UPDATE notes SET position_ms = :positionMs WHERE id = :id")
     abstract suspend fun setPosition(id: String, positionMs: Long)

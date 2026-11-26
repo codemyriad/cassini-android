@@ -86,6 +86,10 @@ sealed interface NoteEvent {
     @Immutable
     data class RenameConfirmed(val title: String) : NoteEvent
 
+    /** Save in "When was this recorded?" (D112): the day and minute the person chose, in the phone's zone. */
+    @Immutable
+    data class DateTimeConfirmed(val date: java.time.LocalDate, val time: java.time.LocalTime) : NoteEvent
+
     /** The confirm button of [NoteUiState.dialog]. */
     data object ConfirmDialog : NoteEvent
 
@@ -109,4 +113,7 @@ sealed interface NoteEvent {
     data object DismissDialog : NoteEvent
 
     data object SnackbarTimeout : NoteEvent
+
+    /** Undo on the snackbar after the speakers were saved (D112 / L-86): every change of that Save goes back. */
+    data object SnackbarUndo : NoteEvent
 }

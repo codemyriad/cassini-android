@@ -8,11 +8,13 @@ import android.view.View
 import android.view.inspector.WindowInspector
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
@@ -165,11 +167,10 @@ class QaScreenshotsTest {
         shot(fileName("02", "read-and-listen"))
 
         rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_more_actions))).performClick()
-        see(rule.text(UiR.string.ui_export_heading))
-        see(rule.text(UiR.string.ui_export_cassini_file))
+        see(rule.text(UiR.string.ui_actions_export))
         shot(fileName("12", "note-actions"))
         Espresso.pressBack()
-        rule.waitGone(hasText(rule.text(UiR.string.ui_export_heading)))
+        rule.waitGone(hasText(rule.text(UiR.string.ui_actions_export)))
 
         captureNameSpeaker()
         library()
@@ -201,7 +202,8 @@ class QaScreenshotsTest {
         val placeholder = rule.text(UiR.string.ui_speaker_label, PLACEHOLDER_NUM)
             .substringBefore(PLACEHOLDER_NUM.toString())
         val speaker = hasContentDescription(placeholder, substring = true) and hasClickAction()
-        val list = rule.onAllNodes(hasScrollToNodeAction()).onFirst()
+        // The transcript, not the Library list that stays beside it when unfolded.
+        val list = rule.onAllNodes(hasScrollToNodeAction() and hasAnyDescendant(speaker)).onFirst()
         rule.waitForUi("Scroll to unnamed speaker", SEE_MS) {
             runCatching { list.performScrollToNode(speaker) }.isSuccess
         }
@@ -261,7 +263,7 @@ class QaScreenshotsTest {
         see(ELENA)
         see(MARCUS)
         shot(fileName("09", "saved-voices"))
-        Espresso.pressBack()
+        backToSettings()
 
         val trash = hasText(rule.text(UiR.string.ui_settings_trash)) and hasClickAction()
         rule.waitShown(trash)
@@ -269,8 +271,18 @@ class QaScreenshotsTest {
         see(TRASHED_TITLE)
         see(rule.text(UiR.string.ui_trash_restore))
         shot(fileName("08", "recently-deleted"))
-        Espresso.pressBack()
+        backToSettings()
         library()
+    }
+
+    /**
+     * The screen's own Back to settings. Espresso's back key waits for the whole window to idle, which never comes
+     * while the Library stays composed beside Settings on an unfolded screen.
+     */
+    private fun backToSettings() {
+        val back = hasContentDescription(rule.text(UiR.string.ui_back_to_settings)) and hasClickAction()
+        rule.waitShown(back)
+        rule.onAllNodes(back).onFirst().performSemanticsAction(SemanticsActions.OnClick)
     }
 
     private fun seedMeetingsAndVoices() = runBlocking {
@@ -447,17 +459,22 @@ class QaScreenshotsTest {
     private fun library() {
         val import = rule.text(UiR.string.ui_library_import)
         val atLibraryMatcher = hasText(import) or hasContentDescription(import)
+        // Model download's Close too: without the bundled Whistle runtime (x86_64 emulators) a finished recording
+        // opens it over the meeting.
         val back = hasContentDescription(rule.text(UiR.string.ui_back_to_library)) or
-            hasContentDescription(rule.text(UiR.string.ui_back_to_settings))
+            hasContentDescription(rule.text(UiR.string.ui_back_to_settings)) or
+            hasContentDescription(rule.text(UiR.string.ui_action_close))
+        // Unfolded, the Library stays beside what it opened: close that too, so the Library stands alone.
         repeat(BACK_TRIES) {
-            var atLibrary = false
+            var hasBack = false
             rule.awaitUi(SEE_MS) {
                 val nodes = rule.onAllNodes(atLibraryMatcher or back).fetchSemanticsNodes()
-                atLibrary = nodes.any(atLibraryMatcher::matches)
-                atLibrary || nodes.any(back::matches)
+                hasBack = nodes.any(back::matches)
+                hasBack || nodes.any(atLibraryMatcher::matches)
             }
-            if (atLibrary) return@repeat
-            rule.onNode(back).performSemanticsAction(SemanticsActions.OnClick)
+            if (!hasBack) return@repeat
+            rule.onAllNodes(back).onFirst().performSemanticsAction(SemanticsActions.OnClick)
+            rule.waitForIdle()
         }
         rule.waitShown(atLibraryMatcher)
         if (rule.onAllNodes(hasScrollToIndexAction()).fetchSemanticsNodes().isNotEmpty()) {
@@ -468,9 +485,10 @@ class QaScreenshotsTest {
     private fun openRow(title: String) {
         val row = hasContentDescription(title, substring = true) and hasClickAction() and
             SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick)
-        rule.waitShown(hasScrollToNodeAction())
+        val libraryList = hasScrollToNodeAction() and hasTestTag("library-list")
+        rule.waitShown(libraryList)
         rule.waitForUi("Library lays out $title", SEE_MS) {
-            runCatching { rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(row) }.isSuccess
+            runCatching { rule.onNode(libraryList).performScrollToNode(row) }.isSuccess
         }
         rule.waitShown(row)
         rule.onAllNodes(row).onFirst().performSemanticsAction(SemanticsActions.OnClick)

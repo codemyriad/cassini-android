@@ -11,6 +11,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.core.net.toUri
 import io.codemyriad.cassini.MainActivity
@@ -34,8 +35,12 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
+import io.codemyriad.cassini.ui.R as UiR
 
-/** Real Android URI IO, normal digest deduplication, ZIP output and Library summary/selection controls. */
+/**
+ * Real Android URI IO, normal digest deduplication, ZIP output, the import summary over the Library and the selection
+ * controls of Settings › Your meetings › Export all meetings (it left the Library, QA 25 Nov).
+ */
 @CiSmoke
 class BulkTransferDeviceTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
@@ -55,7 +60,8 @@ class BulkTransferDeviceTest {
 
     @Test fun anEmptyLibraryCannotOpenTheZipDestinationPicker() {
         val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-        val label = context.getString(R.string.export_zip_all)
+        val label = context.getString(UiR.string.ui_settings_export_all)
+        openSettings()
         rule.awaitUi(20_000) {
             rule.onNodeWithText(label).fetchSemanticsNode().config.contains(SemanticsProperties.Disabled)
         }
@@ -68,8 +74,9 @@ class BulkTransferDeviceTest {
         graph.transfers.import(listOf(Background.assetCopy("fleurs-it-short.wav").toUri()))
         runBlocking { withTimeout(20_000) { graph.transfers.state.first { !it.running } } }
         rule.onNodeWithText(context.getString(R.string.common_done)).performClick()
+        openSettings()
         awaitAllEnabled(true)
-        rule.onNodeWithText(context.getString(R.string.export_zip_all)).performClick()
+        rule.onNodeWithText(context.getString(UiR.string.ui_settings_export_all)).performScrollTo().performClick()
         rule.onNodeWithText(context.getString(R.string.common_cancel)).assertIsDisplayed()
         runBlocking {
             val id = graph.transfers.choices().single().id
@@ -125,8 +132,9 @@ class BulkTransferDeviceTest {
             rule.onNodeWithText(context.resources.getQuantityString(resource, 1, 1)).assertIsDisplayed()
         }
         rule.onNodeWithText(context.getString(R.string.common_done)).performClick()
+        openSettings()
         awaitAllEnabled(true)
-        rule.onNodeWithText(context.getString(R.string.export_zip_all)).performClick()
+        rule.onNodeWithText(context.getString(UiR.string.ui_settings_export_all)).performScrollTo().performClick()
         rule.onNodeWithText(context.getString(R.string.common_cancel)).assertIsDisplayed()
         rule.onNodeWithText(context.getString(R.string.common_cancel)).performClick()
         val choices = runBlocking { graph.transfers.choices() }
@@ -143,9 +151,22 @@ class BulkTransferDeviceTest {
         archive.delete()
         exported.delete()
     }
+
+    /** Settings, from the Library's Settings button (the only top action before and after the first meeting). */
+    private fun openSettings() {
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val settings = hasContentDescription(context.getString(UiR.string.ui_library_settings)) and hasClickAction()
+        rule.waitShown(settings)
+        rule.onNode(settings).performClick()
+        rule.waitShown(hasText(context.getString(UiR.string.ui_settings_export_all)))
+    }
+
+    /** Waits until the Settings row and, while it is open, the chooser's "Export All as ZIP…" are all [enabled]. */
     private fun awaitAllEnabled(enabled: Boolean) {
         val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-        val button = hasText(context.getString(R.string.export_zip_all)) and hasClickAction()
+        val labels = hasText(context.getString(R.string.export_zip_all)) or
+            hasText(context.getString(UiR.string.ui_settings_export_all))
+        val button = labels and hasClickAction()
         rule.awaitUi(20_000) {
             val nodes = rule.onAllNodes(button).fetchSemanticsNodes()
             nodes.isNotEmpty() && nodes.all { it.config.contains(SemanticsProperties.Disabled) != enabled }

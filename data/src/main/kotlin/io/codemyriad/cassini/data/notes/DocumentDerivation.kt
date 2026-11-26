@@ -4,6 +4,7 @@ import io.codemyriad.cassini.core.export.ReadingText
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.format.Word
+import io.codemyriad.cassini.core.format.backgroundSpeakers
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.PreviewText
 import io.codemyriad.cassini.core.library.VariantKind
@@ -43,6 +44,9 @@ internal object DocumentDerivation {
             id to (DefaultLabels.stored(id, document.speakerLabel(id)) ?: "Speaker ${ordinal + 1}")
         }
         val bounded = wordEndsBoundedByAudio(document)
+        // Background voices (D112 / L-86) stay out of the searchable body and the preview.
+        val background = document.backgroundSpeakers
+        val heard = if (background.isEmpty()) shownWords else shownWords.filter { it.speaker !in background }
         val meeting = document.manifest?.optJSONObject("meeting")
         val capture = row.captureProvenance(document)
         val time = row.recordingTime(document, capture.start?.let(java.time.Instant::ofEpochMilli))
@@ -51,7 +55,9 @@ internal object DocumentDerivation {
             captureStartedAt = capture.start,
             captureAudioSha256 = capture.audioSha256,
             legacyCaptureCandidate = capture.legacyCandidate,
-            createdAt = time?.instant?.toEpochMilli() ?: document.packagingInstant()?.toEpochMilli() ?: row.createdAt,
+            // The start the person set orders the note (D112); the cache keeps what the file states.
+            createdAt = (row.userStart() ?: time)?.instant?.toEpochMilli() ?: document.packagingInstant()?.toEpochMilli()
+                ?: row.createdAt,
             audioFile = NoteFiles.DOCUMENT,
             audioKind = AudioKind.DOCUMENT,
             durationMs = meeting?.optLong("durationMs", row.durationMs) ?: row.durationMs,
@@ -61,7 +67,7 @@ internal object DocumentDerivation {
             documentSignature = signature,
             meetingId = meeting?.optString("id")?.ifEmpty { null } ?: row.meetingId,
             selectedVariant = selected,
-            preview = PreviewText.of(shownWords, row.positionMs, labels, bounded)?.display,
+            preview = PreviewText.of(heard, row.positionMs, labels, bounded)?.display,
             titleDirty = document.manifest != null && document.title != row.title,
             updatedAt = now,
         )
@@ -70,13 +76,13 @@ internal object DocumentDerivation {
             variants = document.variants.mapIndexed { ordinal, variant ->
                 variantRow(row.id, document, variant, ordinal)
             },
-            speakers = readable.flatMap { (id, words) -> speakerRows(row.id, document, id, words) },
+            speakers = readable.flatMap { (id, words) -> speakerRows(row.id, document, id, words, background) },
             words = readable.flatMap { (id, words) ->
                 words.mapIndexed { index, word ->
                     WordEntity(row.id, id, index, word.startMs, word.endMs, word.speaker, word.text)
                 }
             },
-            body = ReadingText.body(shownWords, { labels[it] ?: it }, bounded),
+            body = ReadingText.body(heard, { labels[it] ?: it }, bounded),
         )
     }
 
@@ -108,7 +114,13 @@ internal object DocumentDerivation {
         )
     }
 
-    private fun speakerRows(noteId: String, document: CassiniDocument, variantId: String, words: List<Word>): List<SpeakerEntity> =
+    private fun speakerRows(
+        noteId: String,
+        document: CassiniDocument,
+        variantId: String,
+        words: List<Word>,
+        background: Set<String>,
+    ): List<SpeakerEntity> =
         SpeakerStats.of(words, wordEndsBoundedByAudio(document)).values.map { stat ->
             val label = document.speakerLabel(stat.speakerId) ?: stat.speakerId
             val placeholder = document.speakerProvenance(stat.speakerId) == "unnamed" || DefaultLabels.isDefault(stat.speakerId, label)
@@ -127,6 +139,7 @@ internal object DocumentDerivation {
                 firstMs = stat.firstMs,
                 sampleStartMs = stat.sample?.startMs,
                 sampleEndMs = stat.sample?.endMs,
+                background = stat.speakerId in background,
             )
         }
 

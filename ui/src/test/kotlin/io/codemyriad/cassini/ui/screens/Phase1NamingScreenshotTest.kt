@@ -39,7 +39,7 @@ private fun BoardTest.naming(dark: Boolean, large: Boolean = false) {
     }
     rule.mainClock.autoAdvance = true
     rule.onNodeWithText("Remember this voice", substring = true).performScrollTo().assertIsDisplayed()
-    rule.onNodeWithText("Save name").assertIsDisplayed()
+    rule.onNodeWithText("Save").assertIsDisplayed()
     rule.waitForIdle()
     rule.mainClock.autoAdvance = false
     rule.mainClock.advanceTimeBy(1_000)

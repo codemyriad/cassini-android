@@ -17,6 +17,7 @@ import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.nav.ModelDownloadKey
 import io.codemyriad.cassini.nav.NoteKey
 import io.codemyriad.cassini.nav.NoteStart
+import io.codemyriad.cassini.note.StartPrefill
 import io.codemyriad.cassini.notices.LibraryFacts
 import io.codemyriad.cassini.notices.NoticeFacts
 import io.codemyriad.cassini.notices.Notices
@@ -435,6 +436,13 @@ class LibraryViewModel(
                 saved[KEY_DIALOG] = null
                 launch { ports.rename(event.id, event.title) }
             }
+            is LibraryEvent.DateTimeConfirmed -> {
+                saved[KEY_DIALOG] = null
+                launch {
+                    val startedAt = StartPrefill.startedAt(event.date, event.time, clock.zone)
+                    if (!ports.setStartedAt(event.id, startedAt)) Log.w(TAG, "Set date and time: not stored")
+                }
+            }
             LibraryEvent.ConfirmDialog -> confirmDialog()
             LibraryEvent.DismissDialog -> saved[KEY_DIALOG] = null
         }
@@ -567,6 +575,10 @@ class LibraryViewModel(
                 closeSheet()
                 ports.setStarred(id, action == NoteAction.STAR)
             }
+            NoteAction.SET_DATE_TIME -> {
+                closeSheet()
+                openSetDateTime(id, details.note)
+            }
             NoteAction.TRANSCRIBE -> {
                 closeSheet()
                 transcribe(id, JobKind.TRANSCRIBE)
@@ -610,6 +622,12 @@ class LibraryViewModel(
                 emit(LibraryEffect.OpenNote(NoteKey(id, start = start(action))))
             }
         }
+    }
+
+    /** "Set date and time" (D112): the prefill rides in the dialog-title slot, so the sheet survives process death. */
+    private fun openSetDateTime(id: String, note: io.codemyriad.cassini.data.db.NoteEntity) {
+        saved[KEY_DIALOG_TITLE] = StartPrefill.encode(StartPrefill.of(note, Instant.now(clock), clock.zone))
+        saved[KEY_DIALOG] = dialogKey(DIALOG_SET_DATE_TIME, id)
     }
 
     private fun start(action: NoteAction): NoteStart? = when (action) {
@@ -693,6 +711,8 @@ class LibraryViewModel(
             DIALOG_START_OVER -> LibraryDialog.StartOver(id)
             DIALOG_TRANSCRIBE_FRESH -> LibraryDialog.TranscribeFresh(id)
             DIALOG_STOP_AND_TRASH -> LibraryDialog.StopAndTrash(id)
+            DIALOG_SET_DATE_TIME ->
+                StartPrefill.decode(title)?.takeIf { it.noteId == id }?.let(LibraryDialog::SetDateTime)
             else -> null
         }
     }
@@ -748,5 +768,6 @@ class LibraryViewModel(
         private const val DIALOG_START_OVER = "startOver"
         private const val DIALOG_TRANSCRIBE_FRESH = "transcribeFresh"
         private const val DIALOG_STOP_AND_TRASH = "stopAndTrash"
+        private const val DIALOG_SET_DATE_TIME = "setDateTime"
     }
 }

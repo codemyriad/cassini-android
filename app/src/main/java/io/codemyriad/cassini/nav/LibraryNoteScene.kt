@@ -38,6 +38,7 @@ internal object LibraryNoteScenes {
     private const val ROLE = "io.codemyriad.cassini.nav.LibraryNoteScenes.role"
     private const val LIBRARY = "library"
     private const val NOTE = "note"
+    private const val FULL_SCREEN = "full-screen"
 
     /** The metadata of the Library entry. */
     fun library(): Map<String, Any> = mapOf(ROLE to LIBRARY)
@@ -45,7 +46,12 @@ internal object LibraryNoteScenes {
     /** The metadata of a note entry. */
     fun note(): Map<String, Any> = mapOf(ROLE to NOTE)
 
+    /** The metadata of an entry that covers the whole window also beside the Library (Recording). */
+    fun fullScreen(): Map<String, Any> = mapOf(ROLE to FULL_SCREEN)
+
     internal fun isLibrary(entry: NavEntry<*>) = entry.metadata[ROLE] == LIBRARY
+
+    internal fun isFullScreen(entry: NavEntry<*>) = entry.metadata[ROLE] == FULL_SCREEN
 
     internal fun isNote(entry: NavEntry<*>) = entry.metadata[ROLE] == NOTE
 }
