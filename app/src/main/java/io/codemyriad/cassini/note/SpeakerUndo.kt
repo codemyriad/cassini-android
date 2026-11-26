@@ -1,21 +1,24 @@
 package io.codemyriad.cassini.note
 
 import io.codemyriad.cassini.core.speakers.Match
+import io.codemyriad.cassini.data.voices.UnenrolRollback
 import io.codemyriad.cassini.ui.components.SnackbarKind
 import io.codemyriad.cassini.ui.components.SpeakerNameUi
 
 /**
  * What one Save of the Name sheet changed, so that Undo on its snackbar puts everything back (cassini-ux D112 /
- * L-86): the stored [labels] and [background] states of the speakers it changed (one document write), the speakers
- * it [enrolled] into a saved voice, the [reenrol]ments it took back, the earlier [matches] and the earlier names of
- * the [renamedVoices]. [summary] is the snackbar, null when the Save switched no background voice on (the catalogue
- * has no wording for a rename alone, so a rename keeps showing no snackbar, as before D112).
+ * L-86): the [variantId] that was edited, the stored [labels] and [background] states of the speakers it changed (one
+ * document write), the speakers it [enrolled] into a saved voice, the [unenrolled] voice rollbacks to restore, the
+ * earlier [matches] and the earlier names of the [renamedVoices]. [summary] is the snackbar, null when the Save
+ * switched no background voice on (the catalogue has no wording for a rename alone, so a rename keeps showing no
+ * snackbar, as before D112).
  */
 data class SpeakerUndo(
+    val variantId: String?,
     val labels: Map<String, String>,
     val background: Map<String, Boolean>,
     val enrolled: List<String>,
-    val reenrol: Map<String, Pair<String, String>>,
+    val unenrolled: List<UnenrolRollback>,
     val matches: Map<String, Match?>,
     val renamedVoices: Map<String, String>,
     val summary: Summary?,
@@ -25,10 +28,15 @@ data class SpeakerUndo(
 
     companion object {
         /**
-         * The undo of [effects], the effects of saving [session]. [display] is the name a speaker shows with (a
-         * placeholder in the UI language when the file stores no label).
+         * The undo of [effects], the effects of saving [session] on [variantId]. [display] is the name a speaker shows
+         * with (a placeholder in the UI language when the file stores no label).
          */
-        fun of(session: NamingSession, effects: List<NamingEffect>, display: (SpeakerNameUi) -> String): SpeakerUndo {
+        fun of(
+            session: NamingSession,
+            effects: List<NamingEffect>,
+            variantId: String? = null,
+            display: (SpeakerNameUi) -> String,
+        ): SpeakerUndo {
             val inputs = session.forms.mapValues { it.value.input }
             val relabels = effects.filterIsInstance<NamingEffect.Relabel>()
             val switches = effects.filterIsInstance<NamingEffect.Background>()
@@ -39,19 +47,14 @@ data class SpeakerUndo(
                 inputs[effect.speakerId]?.let { effect.speakerId to it.background }
             }.toMap()
             val enrolled = effects.filterIsInstance<NamingEffect.RememberVoice>().map { it.speakerId }
-            val reenrol = effects.filterIsInstance<NamingEffect.Unenrol>().mapNotNull { effect ->
-                val input = inputs[effect.speakerId] ?: return@mapNotNull null
-                val voice = input.match?.voiceId ?: return@mapNotNull null
-                val name = input.voices.firstOrNull { it.id == voice }?.name ?: return@mapNotNull null
-                effect.speakerId to (voice to name)
-            }.toMap()
+            val unenrolSpeakers = effects.filterIsInstance<NamingEffect.Unenrol>().mapTo(HashSet()) { it.speakerId }
             val cleared = effects.filterIsInstance<NamingEffect.ClearMatch>().map { it.speakerId }
-            val matches = (enrolled + cleared).filter { it !in reenrol }.associateWith { inputs[it]?.match }
+            val matches = (enrolled + cleared).filter { it !in unenrolSpeakers }.associateWith { inputs[it]?.match }
             val renamed = effects.filterIsInstance<NamingEffect.RenameVoice>().mapNotNull { effect ->
                 inputs.values.flatMap { it.voices }.firstOrNull { it.id == effect.voiceId }?.let { effect.voiceId to it.name }
             }.toMap()
             val summary = summary(switches, relabels, inputs, display)
-            return SpeakerUndo(labels, background, enrolled, reenrol, matches, renamed, summary)
+            return SpeakerUndo(variantId, labels, background, enrolled, emptyList(), matches, renamed, summary)
         }
 
         private fun summary(

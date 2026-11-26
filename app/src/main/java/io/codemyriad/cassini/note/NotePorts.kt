@@ -34,6 +34,7 @@ import io.codemyriad.cassini.data.notes.RenameOutcome
 import io.codemyriad.cassini.data.notes.TranscriptExport
 import io.codemyriad.cassini.data.voices.SavedVoices
 import io.codemyriad.cassini.data.voices.UnenrolOutcome
+import io.codemyriad.cassini.data.voices.UnenrolRollback
 import io.codemyriad.cassini.data.voices.VoiceEdit
 import io.codemyriad.cassini.engine.job.JobFailure
 import io.codemyriad.cassini.inAppLanguage
@@ -202,6 +203,14 @@ interface NotePorts {
     suspend fun enrol(id: String, variantId: String, speakerId: String, voiceId: String?, name: String): Voice?
 
     suspend fun unenrol(id: String, variantId: String, speakerId: String): UnenrolOutcome
+
+    suspend fun unenrolWithRollback(
+        id: String,
+        variantId: String,
+        speakerId: String,
+    ): Pair<UnenrolOutcome, UnenrolRollback?> = unenrol(id, variantId, speakerId) to null
+
+    suspend fun restoreUnenrol(rollback: UnenrolRollback): Boolean = false
 
     suspend fun setMatch(id: String, variantId: String, speakerId: String, match: Match?): Boolean
 
@@ -402,6 +411,16 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override suspend fun unenrol(id: String, variantId: String, speakerId: String): UnenrolOutcome =
         graph.awaitCatalogue().voices.unenrol(id, variantId, speakerId)
+
+    override suspend fun unenrolWithRollback(
+        id: String,
+        variantId: String,
+        speakerId: String,
+    ): Pair<UnenrolOutcome, UnenrolRollback?> =
+        graph.awaitCatalogue().voices.unenrolWithRollback(id, variantId, speakerId)
+
+    override suspend fun restoreUnenrol(rollback: UnenrolRollback): Boolean =
+        graph.awaitCatalogue().voices.restoreUnenrol(rollback)
 
     override suspend fun setMatch(id: String, variantId: String, speakerId: String, match: Match?): Boolean =
         graph.awaitCatalogue().voices.setMatch(id, variantId, speakerId, match)

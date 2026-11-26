@@ -187,4 +187,56 @@ class SpeakerSessionTest {
         assertEquals(listOf("s3"), undo.enrolled)
         assertEquals(mapOf("s3" to earlier), undo.matches)
     }
+
+    @Test fun visitingAnUnchangedNamedSpeakerDoesNotEnrolItWhenSavingAnotherSpeaker() {
+        // s1 is already named "Silvio" (unconfirmed, with a print); visiting s1 and marking s5 background must only
+        // save s5, whether Save is pressed on s5 or after switching back to s1.
+        val onBackground = open("s1")
+            .select("s5").on(NamingEvent.BackgroundToggled(true))
+        assertEquals(
+            listOf(NamingEffect.Background("s5", true), NamingEffect.Close),
+            SpeakerNaming.reduce(onBackground, NamingEvent.Save).effects,
+        )
+        val backOnNamed = onBackground.select("s1")
+        assertEquals(
+            listOf(NamingEffect.Background("s5", true), NamingEffect.Close),
+            SpeakerNaming.reduce(backOnNamed, NamingEvent.Save).effects,
+        )
+    }
+
+    @Test fun visitingAnUnchangedAutoMatchedSpeakerDoesNotConfirmItWhenSavingAnotherSpeaker() {
+        val autoForm = SpeakerNaming.open(
+            input("s1", label = SpeakerNameUi.Named("Anna Ricci"), match = Match("anna", 0.8f, Match.State.AUTO)),
+        )
+        val visitedPlaceholder = NamingSession.of(autoForm, chips).select("s5")
+        assertEquals(SaveState.DISABLED, SpeakerNaming.ui(visitedPlaceholder).save)
+
+        val markedBackground = visitedPlaceholder.on(NamingEvent.BackgroundToggled(true))
+        assertEquals(
+            listOf(NamingEffect.Background("s5", true), NamingEffect.Close),
+            SpeakerNaming.reduce(markedBackground, NamingEvent.Save).effects,
+        )
+        val backOnAuto = markedBackground.select("s1")
+        assertEquals(
+            listOf(NamingEffect.Background("s5", true), NamingEffect.Close),
+            SpeakerNaming.reduce(backOnAuto, NamingEvent.Save).effects,
+        )
+
+        // Saving directly on the AUTO-matched speaker with no other edits still confirms it.
+        val direct = NamingSession.of(autoForm, chips)
+        assertEquals(SaveState.ENABLED, SpeakerNaming.ui(direct).save)
+        assertEquals(
+            listOf(NamingEffect.RememberVoice("s1", "anna", "Anna Ricci"), NamingEffect.Close),
+            SpeakerNaming.reduce(direct, NamingEvent.Save).effects,
+        )
+    }
+
+    @Test fun switchingBackgroundOffForAnUnchangedNamedSpeakerDoesNotEnrolIt() {
+        val session = open("s1", background = true).on(NamingEvent.BackgroundToggled(false))
+        assertEquals(SaveState.ENABLED, SpeakerNaming.ui(session).save)
+        assertEquals(
+            listOf(NamingEffect.Background("s1", false), NamingEffect.Close),
+            SpeakerNaming.reduce(session, NamingEvent.Save).effects,
+        )
+    }
 }

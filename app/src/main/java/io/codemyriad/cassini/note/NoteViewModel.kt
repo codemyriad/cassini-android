@@ -24,6 +24,7 @@ import io.codemyriad.cassini.data.notes.EditOutcome
 import io.codemyriad.cassini.data.notes.ExportOutcome
 import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.data.voices.SavedVoices
+import io.codemyriad.cassini.data.voices.UnenrolRollback
 import io.codemyriad.cassini.engine.job.DraftState
 import io.codemyriad.cassini.engine.job.JobFailure
 import io.codemyriad.cassini.engine.job.JobPhase
@@ -1446,7 +1447,8 @@ class NoteViewModel(
         val draft = ports.draft(noteId)
         val labels = effects.filterIsInstance<NamingEffect.Relabel>().associate { it.speakerId to it.label }
         val background = effects.filterIsInstance<NamingEffect.Background>().associate { it.speakerId to it.background }
-        val undo = saved?.let { SpeakerUndo.of(it, effects, ::speakerName) }
+        val undo = saved?.let { SpeakerUndo.of(it, effects, variant, ::speakerName) }
+        val rollbacks = mutableListOf<UnenrolRollback>()
         if (labels.isNotEmpty() || background.isNotEmpty()) {
             refusal(ports.relabel(noteId, labels, background))?.let {
                 showReadOnly(it)
@@ -1454,22 +1456,34 @@ class NoteViewModel(
             }
         }
         for (effect in effects) {
-            val refused = when (effect) {
-                is NamingEffect.Relabel, is NamingEffect.Background -> null
-                is NamingEffect.Reject -> reject(effect, details, variant, draft)
-                is NamingEffect.MergeSealed -> mergeSealed(effect, variant)
-                else -> {
-                    applyOther(effect, variant, draft)
-                    null
-                }
-            }
+            val refused = applyEffect(effect, details, variant, draft, rollbacks)
             if (refused != null) {
                 showReadOnly(refused)
                 break
             }
         }
         printsVersion.update { it + 1 }
-        undo?.takeIf { it.summary != null }?.let(::offerUndo)
+        undo?.copy(unenrolled = rollbacks)?.takeIf { it.summary != null }?.let(::offerUndo)
+    }
+
+    private suspend fun applyEffect(
+        effect: NamingEffect,
+        details: NoteDetails,
+        variant: String?,
+        draft: DraftNaming,
+        rollbacks: MutableList<UnenrolRollback>,
+    ): ReadOnlyReason? = when (effect) {
+        is NamingEffect.Relabel, is NamingEffect.Background -> null
+        is NamingEffect.Reject -> reject(effect, details, variant, draft)
+        is NamingEffect.MergeSealed -> mergeSealed(effect, variant)
+        is NamingEffect.Unenrol -> {
+            variant?.let { ports.unenrolWithRollback(noteId, it, effect.speakerId).second }?.let(rollbacks::add)
+            null
+        }
+        else -> {
+            applyOther(effect, variant, draft)
+            null
+        }
     }
 
     /** How [name] reads in the snackbar: a placeholder without a stored label is "Speaker N" in the UI language. */
@@ -1499,14 +1513,11 @@ class NoteViewModel(
         pendingUndo = null
         local.update { it.copy(snackbar = null) }
         launch {
-            val details = details.value?.details ?: return@launch
-            val variant = NoteMapping.selected(details)?.variantId
             refusal(ports.relabel(noteId, undo.labels, undo.background))?.let { return@launch showReadOnly(it) }
+            val variant = undo.variantId
             if (variant != null) {
                 undo.enrolled.forEach { ports.unenrol(noteId, variant, it) }
-                undo.reenrol.forEach { (speaker, voice) ->
-                    ports.enrol(noteId, variant, speaker, voice.first, voice.second)
-                }
+                undo.unenrolled.asReversed().forEach { ports.restoreUnenrol(it) }
                 undo.matches.forEach { (speaker, match) -> ports.setMatch(noteId, variant, speaker, match) }
                 undo.renamedVoices.forEach { (voice, name) -> ports.renameVoice(voice, name) }
             }

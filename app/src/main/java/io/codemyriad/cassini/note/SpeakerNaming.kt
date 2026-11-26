@@ -388,11 +388,13 @@ object SpeakerNaming {
     fun mergeUi(session: NamingSession): MergeUi? = mergeUi(session.form)
 
     /**
-     * Save for the whole sheet: enabled when any form has something to save, "answer first" when the shown form has an
-     * open question. A question open in another form is shown when Save is pressed.
+     * Save for the whole sheet: enabled when any edited form (or the active form when no other form was edited) has
+     * something to save, "answer first" when the shown form has an open question. A question open in another edited
+     * form is shown when Save is pressed.
      */
     fun saveState(session: NamingSession): SaveState {
-        val changes = session.forms.mapValues { change(it.value) }
+        val anyEdited = session.forms.values.any(::hasEdit)
+        val changes = session.forms.mapValues { sessionChange(session, it.value, anyEdited) }
         return when {
             changes[session.active] == FormChange.BLOCKED -> SaveState.BLOCKED_BY_QUESTION
             changes.values.any { it != FormChange.NONE } -> SaveState.ENABLED
@@ -418,27 +420,51 @@ object SpeakerNaming {
         val order = session.chips.map { it.speakerId }.filter { it in session.forms } +
             session.forms.keys.filter { id -> session.chips.none { it.speakerId == id } }
         val forms = order.map { session.forms.getValue(it) }
-        val blocked = forms.firstOrNull { change(it) == FormChange.BLOCKED }
+        val anyEdited = forms.any(::hasEdit)
+        val states = forms.map { it to sessionChange(session, it, anyEdited) }
+        val blocked = states.firstOrNull { it.second == FormChange.BLOCKED }?.first
         return when {
             blocked != null -> SessionResult(session.show(blocked), listOf(NamingEffect.FocusQuestion))
-            forms.none { change(it) == FormChange.READY } -> SessionResult(session)
+            states.none { it.second == FormChange.READY } -> SessionResult(session)
             else -> {
-                val effects = forms.filter { change(it) == FormChange.READY }.flatMap(::formEffects)
+                val effects = states.filter { it.second == FormChange.READY }.flatMap { formEffects(it.first) }
                 SessionResult(null, effects + NamingEffect.Close)
             }
         }
     }
 
+    /**
+     * What [state] would save inside [session]: an untouched form is excluded whenever another form was edited or
+     * another speaker is active, so merely visiting a named or AUTO-matched speaker never enrols it on Save.
+     */
+    private fun sessionChange(session: NamingSession, state: NamingState, anyEdited: Boolean): FormChange = when {
+        hasEdit(state) -> change(state)
+        !anyEdited && state.input.speakerId == session.active -> change(state)
+        else -> FormChange.NONE
+    }
+
+    private fun hasEdit(state: NamingState): Boolean =
+        state.background != state.input.background || hasNameEdit(state)
+
+    private fun hasNameEdit(state: NamingState): Boolean =
+        state.name.trim() != state.initialName.trim() ||
+            state.boundVoiceId != state.initialBound ||
+            effectiveRemember(state) != (state.initialRemember && rememberReason(state.input) == null) ||
+            state.declinedSamePerson != null ||
+            state.renameAnswer != null
+
     /** What [state] would save: nothing, a change, or a change held back by an open question. */
     fun change(state: NamingState): FormChange {
         val switched = state.background != state.input.background
-        if (state.background) return if (switched) FormChange.READY else FormChange.NONE
-        val named = when (nameSaveState(state)) {
-            SaveState.DISABLED -> FormChange.NONE
-            SaveState.BLOCKED_BY_QUESTION -> FormChange.BLOCKED
-            SaveState.ENABLED -> FormChange.READY
+        return when {
+            state.background -> if (switched) FormChange.READY else FormChange.NONE
+            switched && !hasNameEdit(state) -> FormChange.READY
+            else -> when (nameSaveState(state)) {
+                SaveState.DISABLED -> FormChange.NONE
+                SaveState.BLOCKED_BY_QUESTION -> FormChange.BLOCKED
+                SaveState.ENABLED -> FormChange.READY
+            }
         }
-        return if (named == FormChange.NONE && switched) FormChange.READY else named
     }
 
     /** The effects of one form with a change: the background switch, then the name and voice effects. */
@@ -447,7 +473,8 @@ object SpeakerNaming {
         val switched = state.background != input.background
         val background = listOfNotNull(NamingEffect.Background(input.speakerId, state.background).takeIf { switched })
         // A background voice keeps its name as it is and gets no voiceprint (D112).
-        if (state.background || nameSaveState(state) != SaveState.ENABLED) return background
+        val skipName = state.background || (switched && !hasNameEdit(state))
+        if (skipName || nameSaveState(state) != SaveState.ENABLED) return background
         return background + if (input.draft) draftSave(state) else sealedSave(state)
     }
 

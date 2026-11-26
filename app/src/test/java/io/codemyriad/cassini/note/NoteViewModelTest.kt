@@ -13,12 +13,16 @@ import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.speakers.Match
+import io.codemyriad.cassini.core.speakers.SpeakerPrint
 import io.codemyriad.cassini.data.checkpoint.DraftTranscript
 import io.codemyriad.cassini.data.db.SpeakerEntity
 import io.codemyriad.cassini.data.db.WordEntity
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.notes.TranscriptFormat
+import io.codemyriad.cassini.data.voices.SavedVoice
 import io.codemyriad.cassini.data.voices.SavedVoices
+import io.codemyriad.cassini.data.voices.UnenrolRollback
 import io.codemyriad.cassini.data.voices.VoiceProblem
 import io.codemyriad.cassini.engine.job.BatteryLine
 import io.codemyriad.cassini.engine.job.DraftState
@@ -1035,6 +1039,78 @@ class NoteViewModelTest {
         assertNull(viewModel.now().snackbar)
         assertEquals(mapOf("c" to false), ports.backgrounds.last())
         assertEquals("Speaker 2", ports.relabels.last()["b"])
+    }
+
+    /** Round-1 review #3: Undo restores a sole-enrolment voice through the dedicated rollback operation. */
+    @Test
+    fun undoRestoresAnUnenrolledSoleEnrolmentVoiceViaItsCapturedRollback() = runTest(dispatcher) {
+        val annaVoice = voice("anna", "Anna Ricci").copy(colourIndex = 2)
+        val confirmed = Match("anna", 0.9f, Match.State.CONFIRMED)
+        ports.saved.value = SavedVoices(listOf(SavedVoice(annaVoice, 2, false)), null)
+        ports.details.value = documentNote().copy(
+            speakers = SPEAKERS.map { if (it.speakerId == "a") it.copy(label = "Anna Ricci") else it },
+        )
+        ports.printRows.value = mapOf(
+            "a" to SpeakerPrint(FloatArray(ModelCatalog.VOICEPRINT_DIM).also { it[0] = 1f }, 12.0, confirmed),
+        )
+        val rollback = UnenrolRollback(
+            noteId = NOTE,
+            variantId = "v1",
+            speakerId = "a",
+            voice = annaVoice,
+            forgotten = true,
+            match = confirmed,
+            scrubbedNotes = mapOf("other-note" to mapOf("v1/s1" to Match("anna", 0.8f, Match.State.AUTO))),
+        )
+        ports.nextUnenrolRollback = rollback
+
+        val viewModel = viewModel()
+        send(
+            viewModel,
+            NoteEvent.SpeakerTap("a"),
+            NoteEvent.NameSheet(NameSheetEvent.NameChanged("Annette")),
+            NoteEvent.NameSheet(NameSheetEvent.SomeoneElse),
+            NoteEvent.NameSheet(NameSheetEvent.SelectSpeaker("c")),
+            NoteEvent.NameSheet(NameSheetEvent.BackgroundChanged(true)),
+            NoteEvent.NameSheet(NameSheetEvent.Save),
+        )
+        assertTrue("unenrolWithRollback:v1:a" in ports.voiceOps)
+        assertNotNull(viewModel.now().snackbar)
+        ports.voiceOps.clear()
+
+        send(viewModel, NoteEvent.SnackbarUndo)
+        assertEquals(listOf(rollback), ports.restoredRollbacks)
+        assertEquals(listOf("unenrol:v1:a", "restoreUnenrol:v1:a:anna"), ports.voiceOps)
+    }
+
+    /** Round-1 review #4: Save -> switch transcript version -> Undo still rolls back the edited variant. */
+    @Test
+    fun undoTargetsTheEditedVariantEvenAfterSwitchingTranscriptVersions() = runTest(dispatcher) {
+        ports.details.value = documentNote(variants = 2)
+        val earlier = Match("anna", 0.45f, Match.State.SUGGESTED)
+        ports.printRows.value = mapOf(
+            "b" to SpeakerPrint(FloatArray(ModelCatalog.VOICEPRINT_DIM).also { it[0] = 1f }, 8.0, earlier),
+        )
+        val viewModel = viewModel()
+        send(
+            viewModel,
+            NoteEvent.SpeakerTap("b"),
+            NoteEvent.NameSheet(NameSheetEvent.NameChanged("Marta")),
+            NoteEvent.NameSheet(NameSheetEvent.SelectSpeaker("c")),
+            NoteEvent.NameSheet(NameSheetEvent.BackgroundChanged(true)),
+            NoteEvent.NameSheet(NameSheetEvent.Save),
+        )
+        assertNotNull(viewModel.now().snackbar)
+        assertTrue("enrol:v1:b:null:Marta" in ports.voiceOps)
+        ports.voiceOps.clear()
+
+        // Switch the selected transcript version to v2 while the Undo snackbar is still available.
+        send(viewModel, NoteEvent.PickVersion(1))
+        ports.details.value = ports.details.value!!.let { it.copy(note = it.note.copy(selectedVariant = "v2")) }
+        advanceUntilIdle()
+
+        send(viewModel, NoteEvent.SnackbarUndo)
+        assertEquals(listOf("unenrol:v1:b", "setMatch:v1:b:SUGGESTED"), ports.voiceOps)
     }
 
     @Test

@@ -606,4 +606,48 @@ class VoiceRepositoryTest {
         val refused = runCatching { voices.adoptPending("../people") }.exceptionOrNull()
         assertTrue(refused is IllegalArgumentException)
     }
+
+    @Test fun unenrolWithRollbackRestoresSoleEnrolmentVoiceColourAndMatchesInOtherNotes() = runTest {
+        // Luca takes colourIndex 0; Bea is a sole-enrolment voice on sealedId with colourIndex 1.
+        writePeople(luca)
+        writeSealed(sealedId, mapOf("v1/S1" to print(10)))
+        val bea = checkNotNull(voices.enrol(sealedId, "v1", "S1", null, "Bea"))
+        assertEquals(1, bea.colourIndex)
+
+        // Another sealed note (draftId) has an AUTO match to Bea, and a draft references Bea in live/automatic/remember.
+        val autoInOther = Match(bea.id, 0.82f, Match.State.AUTO)
+        writeSealed(draftId, mapOf("v1/S2" to print(11, match = autoInOther)))
+        voices.syncLinks()
+        checkpoints.names.mutate(draftId) {
+            it.applyLive(mapOf("S2" to autoInOther), mapOf(bea.id to "Bea"))
+                .remember("S2", bea.id, 0)
+        }
+
+        // Unenrol Bea's sole enrolment: Bea is forgotten and matches in the other note and draft are scrubbed.
+        val (outcome, rollback) = voices.unenrolWithRollback(sealedId, "v1", "S1")
+        assertEquals(UnenrolOutcome.Forgotten, outcome)
+        assertNotNull(rollback)
+        assertTrue(people().voices.none { it.id == bea.id })
+        assertNull(voices.prints(sealedId, "v1").getValue("S1").match)
+        assertNull(voices.prints(draftId, "v1").getValue("S2").match)
+        assertNull(links(draftId)["v1/S2"])
+        assertNull(checkpoints.names.current(draftId).live["S2"])
+
+        // Restore via the dedicated operation: original id, colour, mean, links and matches across notes/drafts return.
+        assertTrue(voices.restoreUnenrol(rollback!!))
+        val restored = people().voices.single { it.id == bea.id }.voice
+        assertEquals(bea.id, restored.id)
+        assertEquals(bea.name, restored.name)
+        assertEquals(bea.colourIndex, restored.colourIndex)
+        assertEquals(bea.count, restored.count)
+        assertArrayEquals(bea.mean, restored.mean, 0f)
+        assertEquals(Match.State.CONFIRMED, voices.prints(sealedId, "v1").getValue("S1").match?.state)
+        assertEquals(bea.id, voices.prints(sealedId, "v1").getValue("S1").match?.voiceId)
+        assertEquals(autoInOther, voices.prints(draftId, "v1").getValue("S2").match)
+        assertEquals(bea.id, links(draftId)["v1/S2"])
+        val draftRestored = checkpoints.names.current(draftId)
+        assertEquals(autoInOther, draftRestored.live["S2"])
+        assertEquals("Bea", draftRestored.automatic["S2"])
+        assertEquals(bea.id, draftRestored.remembered["S2"])
+    }
 }

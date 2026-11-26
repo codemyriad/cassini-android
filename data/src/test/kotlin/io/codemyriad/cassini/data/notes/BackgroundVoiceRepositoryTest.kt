@@ -59,4 +59,43 @@ class BackgroundVoiceRepositoryTest {
         assertTrue(h.db.notes().text("a")!!.body.contains("discuss"))
         assertTrue(h.documents.relabel("a", emptyMap(), mapOf("S9" to true)) is EditOutcome.Invalid)
     }
+
+    @Test fun setPositionFinalAndSelectVariantKeepBackgroundVoicesOutOfPreviewAndBody() = runTest {
+        val threeSpeakers = io.codemyriad.cassini.core.format.Transcript(
+            listOf(
+                io.codemyriad.cassini.core.format.Word("S1", 0, 500, "morning"),
+                io.codemyriad.cassini.core.format.Word("S1", 600, 1_100, "delivery"),
+                io.codemyriad.cassini.core.format.Word("S2", 1_200, 1_700, "chatter"),
+                io.codemyriad.cassini.core.format.Word("S2", 1_800, 2_300, "coffee"),
+                io.codemyriad.cassini.core.format.Word("S3", 2_400, 2_900, "schedule"),
+            ),
+        )
+        h.documentNote("a", threeSpeakers)
+        h.notes.refreshIfStale("a")
+        // Merge S3 into S1 so the note has two readable variants that both contain background speaker S2.
+        val merged = (h.documents.mergeSpeakers("a", "words", "S3", "S1") as EditOutcome.Done).variantId!!
+        assertEquals(EditOutcome.Done(), h.documents.relabel("a", mapOf("S1" to "Giulia"), mapOf("S2" to true)))
+
+        // Pausing playback or leaving the note (setPosition with final = true) must not reintroduce S2's words.
+        h.notes.setPosition("a", 1_400, final = true)
+        val previewAtS2 = h.row("a").preview.orEmpty()
+        assertTrue(previewAtS2.contains("delivery") || previewAtS2.contains("schedule"))
+        assertFalse("preview at S2 timestamp leaves background voice out", previewAtS2.contains("chatter"))
+        assertFalse("preview at S2 timestamp leaves background voice out", previewAtS2.contains("coffee"))
+
+        // Switching transcript version must filter background voices from both preview and searchable body.
+        assertTrue(h.notes.selectVariant("a", "words"))
+        val wordsPreview = h.row("a").preview.orEmpty()
+        val wordsBody = h.db.notes().text("a")!!.body
+        assertTrue(wordsBody.contains("delivery"))
+        assertTrue(wordsBody.contains("schedule"))
+        assertFalse("words body leaves background voice out", wordsBody.contains("chatter"))
+        assertFalse("words body leaves background voice out", wordsBody.contains("coffee"))
+        assertFalse("words preview leaves background voice out", wordsPreview.contains("chatter"))
+        assertFalse("words preview leaves background voice out", wordsPreview.contains("coffee"))
+
+        assertTrue(h.notes.selectVariant("a", merged))
+        assertFalse("merged body leaves background voice out", h.db.notes().text("a")!!.body.contains("chatter"))
+        assertFalse("merged preview leaves background voice out", h.row("a").preview.orEmpty().contains("chatter"))
+    }
 }
