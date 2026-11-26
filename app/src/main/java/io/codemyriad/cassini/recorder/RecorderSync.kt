@@ -274,6 +274,9 @@ class RecorderSync(private val parts: Parts) {
         }
     }
 
+    /** True while a sync or binding runs or waits for the lock. */
+    fun isBusy(): Boolean = active.value > 0
+
     /** Returns when no sync and no binding runs: at once when none does. */
     suspend fun awaitIdle() {
         active.first { it == 0 }
@@ -284,6 +287,16 @@ class RecorderSync(private val parts: Parts) {
         val settings = store.read()
         return settings.binding != null && settings.current?.rebindNeeded != true &&
             parts.radio.readiness() == RadioReadiness.READY
+    }
+
+    /**
+     * How many imported recordings of the bound recorder still have an active transcription (`QUEUED` or `RUNNING`)
+     * whose sidecar has not yet been uploaded. Used to keep the foreground service alive across background transcription.
+     */
+    suspend fun activeTranscriptions(): Int {
+        val settings = store.read()
+        val address = settings.binding?.device?.address?.takeIf { settings.current?.rebindNeeded != true }
+        return if (address == null) 0 else parts.library.activeTranscriptions(awaitingSidecarNotes(address))
     }
 
     /**
@@ -469,6 +482,10 @@ class RecorderSync(private val parts: Parts) {
         val holdUploads = status.recording && status.namesActiveFile
         if (mode == SyncMode.UPLOADS) {
             val sent = upload(session, address, pong, plan.uploads, transcripts, holdUploads, unverified)
+            if (pong.syncStatusSupported) {
+                val pending = plan.downloads.size + sent.deferred + remainingSidecarWork(address)
+                reportSyncState(session, pending)
+            }
             return SyncOutcome.Done(
                 0,
                 sent.uploaded,
@@ -508,11 +525,22 @@ class RecorderSync(private val parts: Parts) {
                 }
             }
         }
-        // A transcript can have finished during the downloads (a long one, or an existing note): it goes now too.
+        // A transcript can have finished during the downloads or during earlier uploads: drain on this open session.
         val checked = (suspects.map { fileKey(it.name) } + plan.downloads.map { fileKey(it.name) }).toSet()
-        val latest = latestUploads(session, address, listing, status, SuspectChecks(checked, unverified))
-        val sent = upload(session, address, pong, latest.uploads, latest.transcripts, holdUploads, latest.unverified)
+        val sent = uploadDraining(
+            session,
+            address,
+            pong,
+            listing,
+            status,
+            holdUploads,
+            SuspectChecks(checked, unverified),
+        )
         withContext(parts.io) { deleteStrayParts(address) }
+        if (pong.syncStatusSupported) {
+            val pending = deferred + failed + sent.deferred + remainingSidecarWork(address)
+            reportSyncState(session, pending)
+        }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
         val waiting = plan.skipped.count { it.reason in WAITING_REASONS } + deferred + sent.deferred
         return SyncOutcome.Done(
@@ -789,7 +817,11 @@ class RecorderSync(private val parts: Parts) {
     )
 
     /** The transcripts a sync sent, and those that wait for the end of the recording. */
-    private data class Uploads(val uploaded: Int, val deferred: Int)
+    private data class Uploads(
+        val uploaded: Int,
+        val deferred: Int,
+        val sentSidecars: Set<String> = emptySet(),
+    )
 
     /**
      * Sends [uploads]. With [hold] (the recorder records and refuses card writes until it stops) none goes: they all
@@ -828,24 +860,28 @@ class RecorderSync(private val parts: Parts) {
         val (ready, waiting) = uploads.partition { fileKey(it.recording.name) !in unverified }
         if (waiting.isNotEmpty()) Log.i(TAG, "${waiting.size} transcripts wait until their recording can be compared")
         var uploaded = 0
+        val sentSidecars = HashSet<String>()
         for ((index, upload) in ready.withIndex()) {
             val transcript = upload.recording.noteId?.let(transcripts::get) ?: continue
             val failure = uploadOne(session, upload, transcript)
             if (failure == XrecFailure.LATER) {
                 Log.i(TAG, "The recorder records: ${ready.size - index} transcripts wait for its end")
-                return Uploads(uploaded, ready.size - index + waiting.size)
+                return Uploads(uploaded, ready.size - index + waiting.size, sentSidecars)
             }
             if (failure == XrecFailure.FIRMWARE_TOO_OLD) {
                 Log.w(TAG, "The recorder firmware $firmware does not take transcripts")
                 store.updateDevice(address) {
                     it.copy(transcriptsUnsupportedFirmware = firmware, transcriptsUnsupportedAt = now)
                 }
-                return Uploads(uploaded, 0)
+                return Uploads(uploaded, 0, sentSidecars)
             }
             store.updateDevice(address) { it.withUpload(upload, failure) }
-            if (failure == null) uploaded++
+            if (failure == null) {
+                uploaded++
+                sentSidecars += fileKey(upload.sidecarName)
+            }
         }
-        return Uploads(uploaded, waiting.size)
+        return Uploads(uploaded, waiting.size, sentSidecars)
     }
 
     /**
@@ -987,7 +1023,7 @@ class RecorderSync(private val parts: Parts) {
                     transcriptsUnsupportedAt = null,
                 )
                 val devices = settings.devices + (address to state)
-                settings.copy(binding = RecorderBinding(device, wrapped), devices = devices)
+                settings.copy(binding = RecorderBinding(device, wrapped), autoSync = true, devices = devices)
             }
             return BindOutcome.Bound
         } finally {
@@ -1075,6 +1111,64 @@ class RecorderSync(private val parts: Parts) {
     private suspend fun deviceState(address: String): RecorderDeviceState =
         store.read().devices[address] ?: RecorderDeviceState()
 
+    /** Notes of recordings still on [address] that have no uploaded sidecar yet and were not permanently refused. */
+    private suspend fun awaitingSidecarNotes(address: String): List<String> =
+        deviceState(address).recordings.filter { stored ->
+            !stored.absent &&
+                XrecNames.sidecarFor(stored.recording.name) != null &&
+                stored.recording.transcriptUploadedVersion == null &&
+                stored.failure == null
+        }.mapNotNull { it.recording.noteId }
+
+    /**
+     * Active transcriptions plus finished-but-unpushed transcripts, read in that order so a job transitioning from
+     * `RUNNING` to finished between the two calls is never reported as `0` in `+XREC:SYNC,<pending>`.
+     */
+    private suspend fun remainingSidecarWork(address: String): Int {
+        val active = parts.library.activeTranscriptions(awaitingSidecarNotes(address))
+        val ready = pendingUploads().size
+        return active + ready
+    }
+
+    @Suppress("LongParameterList") // session context + latest upload planning inputs
+    private suspend fun uploadDraining(
+        session: Session,
+        address: String,
+        pong: XrecReply.Pong,
+        listing: List<XrecReply.Entry>,
+        status: XrecReply.Status,
+        hold: Boolean,
+        checks: SuspectChecks,
+    ): Uploads {
+        var totalUploaded = 0
+        var lastDeferred = 0
+        var currentChecks = checks
+        val alreadySent = HashSet<String>()
+        repeat(MAX_UPLOAD_PASSES) {
+            val latest = latestUploads(session, address, listing, status, currentChecks)
+            val remaining = latest.uploads.filterNot { fileKey(it.sidecarName) in alreadySent }
+            val sent = upload(session, address, pong, remaining, latest.transcripts, hold, latest.unverified)
+            totalUploaded += sent.uploaded
+            lastDeferred = sent.deferred
+            alreadySent += sent.sentSidecars
+            if (sent.uploaded == 0 || sent.deferred > 0) return Uploads(totalUploaded, lastDeferred, alreadySent)
+            val newlyChecked = remaining.map { fileKey(it.recording.name) } + latest.unverified
+            currentChecks = SuspectChecks(currentChecks.checked + newlyChecked, latest.unverified)
+        }
+        return Uploads(totalUploaded, lastDeferred, alreadySent)
+    }
+
+    private suspend fun reportSyncState(session: Session, pending: Int) {
+        val clamped = pending.coerceIn(0, MAX_SYNC_PENDING)
+        try {
+            session.call { reportSync(clamped) }
+            Log.i(METRICS_TAG, "Reported +XREC:SYNC,$clamped")
+        } catch (error: XrecException) {
+            if (error.failure in LINK_FAILURES) throw error
+            Log.w(TAG, "The recorder refused +XREC:SYNC,$clamped (${error.failure})")
+        }
+    }
+
     private class EncodedTranscript(val bytes: ByteArray, val version: String)
 
     /** The sidecar bytes of each transcript; the version names the variant and the bytes, so any change sends again. */
@@ -1138,6 +1232,7 @@ class RecorderSync(private val parts: Parts) {
 
         /** The LS runs of one sync while a recording keeps stopping, starting or splitting during them. */
         private const val MAX_LISTINGS = 3
+        private const val MAX_UPLOAD_PASSES = 4
 
         /** The buffer of a `.part` file (docs/BT_SYNC_SPEED_AND_RECORDING.md A7). */
         private const val PART_BUFFER_BYTES = 64 * 1024
@@ -1145,6 +1240,7 @@ class RecorderSync(private val parts: Parts) {
         private const val HEAD_BYTES = 4096
         private const val VERSION_DIGEST_CHARS = 16
         private const val PERCENT = 100L
+        private const val MAX_SYNC_PENDING = 0xFFFF
         private const val PART = ".part"
         private const val NANOS_PER_MILLI = 1_000_000L
         private const val WATCHDOG_TICKS = 4

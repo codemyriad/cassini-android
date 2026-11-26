@@ -153,23 +153,19 @@ class RecorderTranscriptPushTest {
         assertTrue(waits.isEmpty())
     }
 
-    @Test fun aTranscriptionWithoutWordsSendsNothingAndIsNeverRetried() = runBlocking {
+    @Test fun aTranscriptionWithoutWordsPushesAZeroWordSidecar() = runBlocking {
         start()
         val opens = radio.opens
-        // REC_0001's transcription finished without words: the library has no transcript to send (no entry in
-        // ready), and the note is "no speech", so it never joins the pushable notes.
+        // REC_0001's transcription finished without words: its 0-word CWX1 sidecar is pushed so the recorder shows
+        // "No speech" instead of leaving the recording looking untranscribed.
+        library.ready["note-1"] = RecorderTranscript("v1", CwxTranscript("REC_0001", 2_000, emptyList(), emptyList()))
         val notes = mapOf("note-1" to NoteSyncInfo("REC_0001", null, transcribed = false, noSpeech = true))
         transcribed.value = RecorderNotes.pushable(notes)
-        delay(SETTLE_MS)
+        withTimeout(TIMEOUT_MS) { while (!uploaded()) delay(10) }
+        assertTrue(radio.device.files.containsKey("REC_0001.cwx"))
+        assertEquals(opens + 1, radio.opens)
         assertEquals(emptySet<String>(), sync.pendingUploads())
-        assertEquals(opens, radio.opens)
-        assertEquals(1, checks.get())
         assertTrue(waits.isEmpty())
-        assertFalse(radio.device.files.containsKey("REC_0001.cwx"))
-        // A full sync sends nothing for it either.
-        assertEquals(0, (sync.sync() as SyncOutcome.Done).uploaded)
-        assertFalse(uploaded())
-        assertEquals(emptySet<String>(), sync.pendingUploads())
     }
 
     @Test fun aTranscriptThatWaitsAtTheStartGoesWithoutANewTranscript() = runBlocking {

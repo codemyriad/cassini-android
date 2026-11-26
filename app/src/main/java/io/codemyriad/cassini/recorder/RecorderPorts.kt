@@ -101,4 +101,7 @@ interface RecorderLibrary {
 
     /** The finished transcripts of those of [noteIds] that have one now. */
     suspend fun transcripts(noteIds: Collection<String>): Map<String, RecorderTranscript>
+
+    /** How many of [noteIds] have an active transcription job (`QUEUED` or `RUNNING`) that will produce a transcript. */
+    suspend fun activeTranscriptions(noteIds: Collection<String>): Int = 0
 }

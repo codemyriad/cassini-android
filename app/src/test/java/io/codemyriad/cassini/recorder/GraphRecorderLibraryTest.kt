@@ -119,7 +119,7 @@ class GraphRecorderLibraryTest {
         assertEquals(listOf("Hello", "world"), fallback.cwx.words.map { it.text })
     }
 
-    @Test fun aTranscriptWithoutWordsIsNoSpeechAndNeverGoesToTheRecorder() = runBlocking {
+    @Test fun aTranscriptWithoutWordsProducesAZeroWordSidecarAndPushes() = runBlocking {
         val paths = AppPaths(folder.newFolder(), folder.newFolder(), modelRoot = folder.newFolder())
         graph = AppGraph(
             context,
@@ -131,18 +131,18 @@ class GraphRecorderLibraryTest {
             ),
         )
         val library = GraphRecorderLibrary(graph) { "Speaker $it" }
-        // A silent recording whose transcription finished with no words.
+        // A silent recording whose transcription finished with no words: encodes a 0-word CWX1 sidecar ("No speech").
         val opus = sealedDocument("REC_0031", emptyList())
         val noteId = (withTimeout(TIMEOUT_MS) { library.import(opus, "REC_0031.opus") } as LibraryImport.Created).noteId
 
-        // Nothing to send: an empty transcript never becomes a sidecar.
-        assertEquals(emptyMap<String, RecorderTranscript>(), library.transcripts(listOf(noteId)))
+        val noSpeech = library.transcripts(listOf(noteId)).getValue(noteId)
+        assertTrue(noSpeech.cwx.words.isEmpty())
+        assertTrue(noSpeech.cwx.speakers.isEmpty())
         assertFalse(library.needsTranscription(noteId))
-        // The Library row reads as transcribed without speech, not as waiting: no push starts for it.
         val row = graph.awaitCatalogue().notes.library().first().single { it.id == noteId }
         val info = RecorderNotes.info(row)
         assertEquals(NoteSyncInfo("REC_0031", null, transcribed = false, noSpeech = true), info)
-        assertEquals(emptySet<String>(), RecorderNotes.pushable(mapOf(noteId to info)))
+        assertEquals(setOf(noteId), RecorderNotes.pushable(mapOf(noteId to info)))
     }
 
     private fun sealedDocument(title: String, words: List<String>): File {

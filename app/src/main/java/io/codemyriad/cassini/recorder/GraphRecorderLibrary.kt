@@ -3,9 +3,11 @@ package io.codemyriad.cassini.recorder
 import android.net.Uri
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.library.AudioKind
+import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.data.notes.ImportOutcome
 import io.codemyriad.cassini.data.notes.NoteRepository
 import io.codemyriad.cassini.processing.StartOrigin
+import io.codemyriad.cassini.processing.TranscribeOutcome
 import kotlinx.coroutines.flow.first
 import java.io.File
 
@@ -29,13 +31,27 @@ class GraphRecorderLibrary(
     }
 
     override suspend fun transcribe(noteId: String) {
-        graph.processing.transcribe(noteId, origin = StartOrigin.AUTOMATIC)
+        val outcome = graph.processing.transcribe(noteId, origin = StartOrigin.AUTOMATIC)
+        if (outcome is TranscribeOutcome.Queued) {
+            graph.processing.drain()
+        }
     }
 
     override suspend fun needsTranscription(noteId: String): Boolean {
         val catalogue = graph.awaitCatalogue()
         val note = catalogue.notes.note(noteId).first()?.note ?: return false
         return note.trashedAt == null && note.audioKind != AudioKind.DOCUMENT && catalogue.jobs.job(noteId) == null
+    }
+
+    override suspend fun activeTranscriptions(noteIds: Collection<String>): Int {
+        if (noteIds.isEmpty()) return 0
+        val jobs = graph.awaitCatalogue().jobs
+        var count = 0
+        for (noteId in noteIds) {
+            val state = jobs.job(noteId)?.state
+            if (state == JobState.QUEUED || state == JobState.RUNNING) count++
+        }
+        return count
     }
 
     override suspend fun transcripts(noteIds: Collection<String>): Map<String, RecorderTranscript> {
@@ -49,9 +65,9 @@ class GraphRecorderLibrary(
     }
 
     /**
-     * The shown variant of [noteId] when it is a finished, readable transcript with words. A transcription that
-     * found no speech has nothing to send: an empty sidecar never goes to the recorder, so the note is never pending
-     * ([RecorderSync.pendingUploads]) and the row says "Transcribed, no speech" ([RecorderNotes.info]).
+     * The shown variant of [noteId] when it is a finished, readable transcript. A transcription that found no speech
+     * (`wordCount == 0`) produces a valid 0-word CWX1 sidecar so the recorder displays `"No speech"` (`[T]` badge) and
+     * completes the round-trip cleanly.
      */
     @Suppress("ReturnCount") // absent note, no readable variant, or an unrecoverable word cache
     private suspend fun transcript(notes: NoteRepository, noteId: String): RecorderTranscript? {
@@ -60,14 +76,17 @@ class GraphRecorderLibrary(
         notes.refreshIfStale(noteId)
         val details = notes.note(noteId).first()
             ?.takeIf { it.note.audioKind == AudioKind.DOCUMENT && it.note.trashedAt == null } ?: return null
-        val candidates = details.variants.filter { it.readable && it.wordCount > 0 }
-        val finished = candidates.firstOrNull { it.variantId == details.note.selectedVariant }
-            ?: candidates.firstOrNull { it.isDefault }
-            ?: candidates.firstOrNull()
+        val readable = details.variants.filter { it.readable }
+        val withWords = readable.filter { it.wordCount > 0 }
+        val finished = readable.firstOrNull { it.variantId == details.note.selectedVariant }
+            ?: withWords.firstOrNull { it.isDefault }
+            ?: withWords.firstOrNull()
+            ?: readable.firstOrNull { it.isDefault }
+            ?: readable.firstOrNull()
             ?: return null
-        val words = notes.words(noteId, finished.variantId)
-        if (words.isEmpty()) return null
-        val speakers = details.speakers.filter { it.variantId == finished.variantId }
+        val words = if (finished.wordCount > 0) notes.words(noteId, finished.variantId) else emptyList()
+        if (finished.wordCount > 0 && words.isEmpty()) return null
+        val speakers = if (words.isEmpty()) emptyList() else details.speakers.filter { it.variantId == finished.variantId }
         val note = details.note
         return RecorderTranscript(
             finished.variantId,

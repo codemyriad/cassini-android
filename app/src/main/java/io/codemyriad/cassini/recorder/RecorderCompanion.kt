@@ -7,6 +7,7 @@ import android.companion.AssociationInfo
 import android.companion.AssociationRequest
 import android.companion.BluetoothDeviceFilter
 import android.companion.CompanionDeviceManager
+import android.companion.DeviceNotAssociatedException
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
@@ -75,8 +76,52 @@ object RecorderCompanion {
     private fun extraDevice(result: Intent): BluetoothDevice? =
         IntentCompat.getParcelableExtra(result, CompanionDeviceManager.EXTRA_DEVICE, BluetoothDevice::class.java)
 
+    /**
+     * Registers [address] with [CompanionDeviceManager.startObservingDevicePresence] (API 31+) when it has a companion
+     * association, so Android wakes [RecorderCompanionService] as soon as the recorder pages the phone.
+     */
+    fun observePresence(context: Context, address: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val manager = context.getSystemService(CompanionDeviceManager::class.java)
+        val associated = manager != null && if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            manager.myAssociations.any { it.deviceMacAddress?.toString().equals(address, ignoreCase = true) }
+        } else {
+            @Suppress("DEPRECATION")
+            manager.associations.any { it.equals(address, ignoreCase = true) }
+        }
+        if (!associated) return
+        try {
+            @Suppress("DEPRECATION")
+            checkNotNull(manager).startObservingDevicePresence(address)
+            Log.i(TAG, "Observing presence of $address")
+        } catch (error: SecurityException) {
+            Log.w(TAG, "Android refused presence observation for $address", error)
+        } catch (error: DeviceNotAssociatedException) {
+            Log.w(TAG, "Cannot observe presence of unassociated $address", error)
+        } catch (error: IllegalArgumentException) {
+            Log.w(TAG, "Invalid address for presence observation: $address", error)
+        }
+    }
+
+    /** Stops observing presence of [address] (API 31+). */
+    fun stopObservingPresence(context: Context, address: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val manager = context.getSystemService(CompanionDeviceManager::class.java) ?: return
+        try {
+            @Suppress("DEPRECATION")
+            manager.stopObservingDevicePresence(address)
+        } catch (error: SecurityException) {
+            Log.w(TAG, "Android refused stopping presence observation for $address", error)
+        } catch (_: DeviceNotAssociatedException) {
+            // Already disassociated or never observed.
+        } catch (_: IllegalArgumentException) {
+            // Invalid address.
+        }
+    }
+
     /** Ends the association with [address] (Forget recorder). */
     fun disassociate(context: Context, address: String) {
+        stopObservingPresence(context, address)
         val manager = context.getSystemService(CompanionDeviceManager::class.java) ?: return
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

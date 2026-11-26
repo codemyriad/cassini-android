@@ -31,6 +31,8 @@ class XrecProtocolTest {
         val cassini = PutTarget.Cassini("notes.bin")
         assertEquals("+XREC:PUT,0,12,1,CAS,notes.bin:", XrecCommands.putHeader(0, 12, 1, cassini))
         assertEquals("+XREC:PUTEND", XrecCommands.putEnd())
+        assertEquals("+XREC:SYNC,0", XrecCommands.sync(0))
+        assertEquals("+XREC:SYNC,2,45", XrecCommands.sync(2, 45))
     }
 
     @Test fun namesMayContainCommas() {
@@ -52,6 +54,9 @@ class XrecProtocolTest {
         assertThrows { PutTarget.Record("a.wav") }
         assertThrows { PutTarget.Record("x".repeat(27) + ".cwx") }
         assertThrows { PutTarget.Record("é.cwx") }
+        assertThrows { XrecCommands.sync(-1) }
+        assertThrows { XrecCommands.sync(0x10000) }
+        assertThrows { XrecCommands.sync(1, -1) }
     }
 
     @Test fun followsTheFirmwareNameRules() {
@@ -94,8 +99,9 @@ class XrecProtocolTest {
                 authenticated = true,
                 pairingOpen = false,
                 recordTarget = true,
+                syncStatusSupported = true,
             ),
-            XrecReplies.parse("+XREC:PONG,openfw_v5,v5,bound=1,auth=1,pair=0,rec=1,future=x"),
+            XrecReplies.parse("+XREC:PONG,openfw_v5,v5,bound=1,auth=1,pair=0,rec=1,sync=1,future=x"),
         )
     }
 

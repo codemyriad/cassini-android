@@ -185,6 +185,14 @@ object XrecCommands {
 
     fun putEnd(): String = "${prefix}PUTEND"
 
+    /** Reports how many items ([pending], 0..65535) still need recorder sync/transcription, with an optional [etaSeconds]. */
+    fun sync(pending: Int, etaSeconds: Int = 0): String {
+        require(pending in 0..MAX_SYNC_FIELD && etaSeconds in 0..MAX_SYNC_FIELD) { "Sync status out of range" }
+        return if (etaSeconds > 0) "${prefix}SYNC,$pending,$etaSeconds" else "${prefix}SYNC,$pending"
+    }
+
+    private const val MAX_SYNC_FIELD = 0xFFFF
+
     private fun safe(name: String): String = name.also { require(XrecNames.isSafe(it)) { "Not a safe file name: $it" } }
 
     private fun checked(line: String): String = line.also {
@@ -195,8 +203,9 @@ object XrecCommands {
 /** A `+XREC:` reply line, parsed. */
 sealed interface XrecReply {
     /**
-     * `PONG,<firmware>,<protocol>,bound=,auth=,pair=[,rec=1]`. [recordTarget] is true when the recorder advertises the
-     * `REC,<stem>.cwx` upload target (`rec=1`); firmware without the flag may still have it (it is then probed).
+     * `PONG,<firmware>,<protocol>,bound=,auth=,pair=[,rec=1][,sync=1]`. [recordTarget] is true when the recorder
+     * advertises the `REC,<stem>.cwx` upload target (`rec=1`); [syncStatusSupported] is true when it accepts
+     * `+XREC:SYNC,<pending>` (`sync=1`) to shut down background Bluetooth as soon as `pending` reaches 0.
      */
     data class Pong(
         val firmware: String,
@@ -205,6 +214,7 @@ sealed interface XrecReply {
         val authenticated: Boolean,
         val pairingOpen: Boolean,
         val recordTarget: Boolean = false,
+        val syncStatusSupported: Boolean = false,
     ) : XrecReply
 
     /** `CHAL,<32 hex>`. */
@@ -314,6 +324,7 @@ object XrecReplies {
             authenticated = flags["auth"] == "1",
             pairingOpen = flags["pair"] == "1",
             recordTarget = flags["rec"] == "1",
+            syncStatusSupported = flags["sync"] == "1",
         )
     }
 

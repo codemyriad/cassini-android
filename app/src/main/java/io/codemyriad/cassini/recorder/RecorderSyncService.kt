@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -39,6 +40,7 @@ class RecorderSyncService : LifecycleService() {
     private val runner: RecorderRunner get() = recorder.runner
     private var follower: Job? = null
     private var foreground = false
+    private var wakeLock: PowerManager.WakeLock? = null
 
     /** The last start request, and whether it came while [follow] ran: all on the main thread. */
     private var lastStartId = 0
@@ -51,6 +53,7 @@ class RecorderSyncService : LifecycleService() {
         // Android requires startForeground on every startForegroundService delivery, even when already foregrounded.
         if (enterForeground(RecorderNotifications.build(this, sync.activity.value))) {
             foreground = true
+            acquireWakeLock()
         } else if (first) {
             stopSelf(startId)
             return START_NOT_STICKY
@@ -60,6 +63,7 @@ class RecorderSyncService : LifecycleService() {
     }
 
     override fun onDestroy() {
+        releaseWakeLock()
         if (foreground) ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
@@ -77,10 +81,19 @@ class RecorderSyncService : LifecycleService() {
                         activity != RecorderActivity.Idle || !active
                     }.first { it }
                 }
-                if (changed == null) break
+                if (changed == null && !runner.serviceActive.value) break
             }
             followActiveSync()
+            if (runner.serviceActive.value && sync.activity.value == RecorderActivity.Idle) {
+                // Waiting for background transcription + .cwx upload round-trip: stay foregrounded until released.
+                withTimeoutOrNull(POST_INTERVAL_MS) {
+                    combine(sync.activity, runner.serviceActive) { activity, active ->
+                        activity != RecorderActivity.Idle || !active
+                    }.first { it }
+                }
+            }
         } while (restarted || runner.serviceActive.value)
+        releaseWakeLock()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         foreground = false
         stopSelfResult(lastStartId)
@@ -123,8 +136,24 @@ class RecorderSyncService : LifecycleService() {
         false
     }
 
+    private fun acquireWakeLock() {
+        val lock = wakeLock ?: getSystemService(PowerManager::class.java)
+            ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG)
+            ?.also {
+                it.setReferenceCounted(false)
+                wakeLock = it
+            }
+        lock?.acquire(WAKE_LOCK_TIMEOUT_MS)
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.takeIf { it.isHeld }?.release()
+    }
+
     companion object {
         private const val TAG = "RecorderSyncService"
+        private const val WAKE_LOCK_TAG = "cassini:recorder_sync"
+        private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60_000L
         private const val START_GRACE_MS = 10_000L
         private const val POST_INTERVAL_MS = 500L
 
@@ -156,6 +185,26 @@ class AndroidRecorderServiceStarter(context: Context) : RecorderServiceStarter {
 object RecorderNotifications {
     /** After recording (1), processing (2) and results (3). */
     const val ID = 4
+    const val REBIND_ID = 5
+
+    fun notifyRebindNeeded(context: Context) {
+        val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) return
+        val res = context.inAppLanguage()
+        val notification = NotificationCompat.Builder(context, NotificationChannels.RECORDER)
+            .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
+            .setContentTitle(res.getString(R.string.recorder_title))
+            .setContentText(res.getString(R.string.recorder_rebind_needed))
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setContentIntent(openIntent(context))
+            .build()
+        NotificationManagerCompat.from(context).notify(REBIND_ID, notification)
+    }
 
     fun build(context: Context, activity: RecorderActivity): Notification {
         val res = context.inAppLanguage()

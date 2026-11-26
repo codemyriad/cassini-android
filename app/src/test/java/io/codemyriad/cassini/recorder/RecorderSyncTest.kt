@@ -634,6 +634,7 @@ class RecorderSyncTest {
         assertEquals(listOf(false, true), asked)
         val binding = store.read().binding!!
         assertEquals(DEVICE, binding.device)
+        assertTrue(store.read().autoSync)
         assertArrayEquals(fresh.key, FakeVault().unwrap(binding.wrappedKey))
         assertTrue(binding.wrappedKey.startsWith(FakeVault.PREFIX))
         assertNull(store.read().current!!.transcriptsUnsupportedFirmware)
@@ -683,6 +684,50 @@ class RecorderSyncTest {
         } catch (_: java.security.GeneralSecurityException) {
             // Expected.
         }
+    }
+
+    @Test fun syncReportsPendingTranscriptionsAndZeroWhenComplete() = runBlocking {
+        recorder.syncStatusSupported = true
+        recorder.files["REC_0001.wav"] = recording(4_000, seed = 1)
+        val (sync, store) = sync()
+        store.bound(key)
+
+        // First sync imports REC_0001.wav and starts its transcription: +XREC:SYNC,1 keeps the recorder listening.
+        library.activeCount = 1
+        assertDone(SyncOutcome.Done(downloaded = 1, uploaded = 0, skipped = 0, deviceRecording = false), sync.sync())
+        assertEquals(1, radio.device.lastSyncPending)
+
+        // Transcription finishes and pushes the sidecar: +XREC:SYNC,0 lets background Bluetooth shut down cleanly.
+        library.activeCount = 0
+        library.ready["note-1"] = RecorderTranscript("v1", transcript("Standup"))
+        assertDone(SyncOutcome.Done(0, 1, 0, false), sync.sync(SyncMode.UPLOADS))
+        assertEquals(0, radio.device.lastSyncPending)
+    }
+
+    @Test fun transcriptFinishingMidUploadDrainsOnSameSessionBeforeSyncZero() = runBlocking {
+        recorder.syncStatusSupported = true
+        recorder.files["REC_0001.wav"] = recording(4_000, seed = 1)
+        recorder.files["REC_0002.wav"] = recording(4_000, seed = 2)
+        val (sync, store) = sync()
+        store.bound(key)
+
+        // Both files download; note-1 is ready immediately after download, while note-2 finishes mid-PUTEND of note-1.
+        library.activeCount = 1
+        recorder.beforeGets = { name ->
+            if (name == "REC_0002.wav") {
+                library.ready["note-1"] = RecorderTranscript("v1", transcript("First"))
+            }
+        }
+        recorder.beforePutEnd = {
+            recorder.beforePutEnd = null
+            library.activeCount = 0
+            library.ready["note-2"] = RecorderTranscript("v1", transcript("Second"))
+        }
+
+        assertDone(SyncOutcome.Done(downloaded = 2, uploaded = 2, skipped = 0, deviceRecording = false), sync.sync())
+        assertTrue("REC_0001.cwx" in radio.device.files)
+        assertTrue("REC_0002.cwx" in radio.device.files)
+        assertEquals(0, radio.device.lastSyncPending)
     }
 
     private companion object {

@@ -119,6 +119,9 @@ internal class FakeLibrary : RecorderLibrary {
     /** Each read of the transcripts fails, as a broken library would. */
     @Volatile var failTranscripts = false
 
+    /** Simulated `QUEUED` / `RUNNING` transcription count reported to `+XREC:SYNC,<pending>`. */
+    @Volatile var activeCount = 0
+
     override suspend fun import(file: File, displayName: String): LibraryImport {
         val bytes = file.readBytes()
         val existing = imported.entries.firstOrNull { it.value.contentEquals(bytes) }?.key
@@ -148,6 +151,9 @@ internal class FakeLibrary : RecorderLibrary {
         check(!failTranscripts) { "The library cannot be read" }
         return synchronized(ready) { ready.filterKeys { it in noteIds } }
     }
+
+    override suspend fun activeTranscriptions(noteIds: Collection<String>): Int =
+        if (noteIds.isEmpty()) 0 else activeCount
 }
 
 /** A sync over [radio] with a store in [root]. */

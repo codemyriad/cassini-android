@@ -54,6 +54,8 @@ class FakeRecorder(
     @Volatile var stereo: Boolean = false,
     /** The GETS payload cap while a mono recording runs, in bytes per second; 0 for none. */
     @Volatile var recordingRate: Int = RECORDING_RATE,
+    /** Advertises `sync=1` in PONG and accepts `+XREC:SYNC,<pending>[,<eta>]`. */
+    @Volatile var syncStatusSupported: Boolean = false,
 ) : Closeable {
     val files: MutableMap<String, ByteArray> = Collections.synchronizedMap(LinkedHashMap())
     val cassini: MutableMap<String, ByteArray> = Collections.synchronizedMap(LinkedHashMap())
@@ -97,6 +99,13 @@ class FakeRecorder(
         private set
 
     @Volatile var authenticated = false
+        private set
+
+    /** The last `<pending>` and `<eta>` reported with `+XREC:SYNC`, or null when none was sent on this recorder. */
+    @Volatile var lastSyncPending: Int? = null
+        private set
+
+    @Volatile var lastSyncEtaSeconds: Int = 0
         private set
 
     private val toDevice = PipedInputStream(PIPE_BYTES)
@@ -148,7 +157,10 @@ class FakeRecorder(
             syncsWhileRecording,
             stereo,
             recordingRate,
+            syncStatusSupported,
         )
+        next.lastSyncPending = lastSyncPending
+        next.lastSyncEtaSeconds = lastSyncEtaSeconds
         synchronized(files) { next.files.putAll(files) }
         synchronized(cassini) { next.cassini.putAll(cassini) }
         next.dropFrames += dropFrames
@@ -250,6 +262,7 @@ class FakeRecorder(
             cmd.startsWith("GETS,") -> gets(cmd.removePrefix("GETS,"))
             cmd.startsWith("DEL,") -> delete(cmd.removePrefix("DEL,"))
             cmd == "PUTEND" -> putEnd()
+            cmd.startsWith("SYNC,") -> syncStatus(cmd.removePrefix("SYNC,"))
             else -> err("CMD")
         }
     }
@@ -279,8 +292,23 @@ class FakeRecorder(
     }
 
     private fun pong() {
-        val flags = "bound=${flag(key != null)},auth=${flag(authenticated)},pair=${flag(pairingPin != null)}"
+        val flags = buildString {
+            append("bound=${flag(key != null)},auth=${flag(authenticated)},pair=${flag(pairingPin != null)}")
+            if (syncStatusSupported) append(",sync=1")
+        }
         reply("+XREC:PONG,$firmware,v5,$flags")
+    }
+
+    private fun syncStatus(args: String) {
+        val parts = args.split(',')
+        val pending = parts.getOrNull(0)?.toIntOrNull()
+        val eta = if (parts.size >= 2) parts[1].toIntOrNull() else 0
+        if (parts.size !in 1..2 || pending == null || eta == null || pending !in 0..0xFFFF || eta !in 0..0xFFFF) {
+            return err("ARGS")
+        }
+        lastSyncPending = pending
+        lastSyncEtaSeconds = eta
+        reply("+XREC:OK,SYNC,$pending")
     }
 
     private fun pair(args: String) {

@@ -121,6 +121,28 @@ class RecorderAutoSyncTest {
         assertTrue(library.imported.isEmpty())
     }
 
+    @Test fun wakeAttemptRetriesAfterSdpPokeDisconnectAndHoldsServiceUntilRoundTripEnds() = runBlocking {
+        radio.reachable = false
+        radio.device.files["REC_0001.wav"] = recording(2_000)
+        val (sync, store) = recorderSync(folder.root, radio, library)
+        store.bound(key)
+        library.activeCount = 1
+        val runner = RecorderRunner(scope, sync) { services.add(Unit) }
+
+        val wake = runner.wakeAttempt(retryDelayMs = 80L, roundTripHoldMs = 5_000L)
+        delay(30L)
+        // After the recorder's SDP poke finishes, its SPP server accepts the retry.
+        radio.reachable = true
+        withTimeout(TIMEOUT_MS) { while (library.imported.isEmpty()) delay(10) }
+        assertTrue(runner.serviceActive.value)
+        // Once transcription and sidecar upload finish, the foreground service hold releases promptly.
+        library.activeCount = 0
+        val outcome = withTimeout(TIMEOUT_MS) { wake.await() }
+        assertTrue(outcome is SyncOutcome.Done)
+        assertEquals(false, runner.serviceActive.value)
+        assertEquals(1, services.size)
+    }
+
     private companion object {
         const val TIMEOUT_MS = 10_000L
     }

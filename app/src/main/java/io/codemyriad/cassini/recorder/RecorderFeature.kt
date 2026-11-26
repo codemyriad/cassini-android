@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.recorder
 
 import android.content.Context
+import android.util.Log
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.adapters.InstalledEngines
 import io.codemyriad.cassini.core.library.AudioKind
@@ -15,7 +16,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The recorder sync of the process (docs/recorder-sync.md), made by [AppGraph.recorder]: the store, the sync, its
@@ -45,7 +48,12 @@ class RecorderFeature(
         ),
     )
 
-    val runner = RecorderRunner(graph.appScope, sync, AndroidRecorderServiceStarter(app))
+    val runner = RecorderRunner(
+        graph.appScope,
+        sync,
+        onRebindNeeded = { RecorderNotifications.notifyRebindNeeded(app) },
+        service = AndroidRecorderServiceStarter(app),
+    )
 
     /** The live notes, as the recorder rows and "Auto sync" read them. */
     val notes: Flow<Map<String, NoteSyncInfo>> = flow {
@@ -56,6 +64,7 @@ class RecorderFeature(
         )
     }
 
+    private val started = AtomicBoolean(false)
     private val autoSync = RecorderAutoSync(graph.appScope, store.settings, runner)
 
     private val push = RecorderTranscriptPush(
@@ -67,8 +76,49 @@ class RecorderFeature(
     )
 
     fun start() {
+        if (!started.compareAndSet(false, true)) return
         autoSync.start()
         push.start()
+        graph.appScope.launch(graph.dispatchers.io) {
+            ensurePresenceObserved("start")
+        }
+    }
+
+    /** Ensures companion presence observation matches the bound recorder and "Auto sync" state. */
+    suspend fun ensurePresenceObserved(reason: String) {
+        val settings = store.read()
+        val address = settings.binding?.device?.address ?: return
+        if (settings.autoSync && settings.current?.rebindNeeded != true) {
+            Log.i(TAG, "Ensuring companion presence observation for $address ($reason)")
+            RecorderCompanion.observePresence(app, address)
+        } else {
+            RecorderCompanion.stopObservingPresence(app, address)
+        }
+    }
+
+    /**
+     * Woken when [address] (null: any associated recorder) connected over Bluetooth ([reason]: `companion_appeared` or
+     * `acl_connected`). Starts a full sync when [address] is the bound recorder and "Auto sync" is on.
+     */
+    fun onDevicePresent(address: String?, reason: String) {
+        start()
+        if (sync.isBusy()) return
+        graph.appScope.launch(graph.dispatchers.io) {
+            if (sync.isBusy()) return@launch
+            val settings = store.read()
+            val bound = settings.binding?.device?.address ?: return@launch
+            if (address != null && !address.equals(bound, ignoreCase = true)) return@launch
+            if (!settings.autoSync || settings.current?.rebindNeeded == true) {
+                Log.i(TAG, "Ignoring $reason for $bound (autoSync=${settings.autoSync})")
+                return@launch
+            }
+            Log.i(TAG, "Recorder $bound present ($reason); starting wake sync")
+            runner.wakeAttempt().await()
+        }
+    }
+
+    private companion object {
+        const val TAG = "Recorder"
     }
 }
 
@@ -85,8 +135,9 @@ object RecorderNotes {
         return NoteSyncInfo(row.title, row.jobState, transcribed, noSpeech)
     }
 
-    /** The notes whose transcript can go to the recorder: one without words never does, so it starts no push. */
-    fun pushable(notes: Map<String, NoteSyncInfo>): Set<String> = notes.filterValues { it.transcribed }.keys
+    /** The notes whose transcript sidecar goes to the recorder (both speech and 0-word `"No speech"` sidecars). */
+    fun pushable(notes: Map<String, NoteSyncInfo>): Set<String> =
+        notes.filterValues { it.transcribed || it.noSpeech }.keys
 }
 
 /** [RecorderScreenPorts] over the graph's [RecorderFeature]. */
@@ -107,12 +158,17 @@ class GraphRecorderScreenPorts(context: Context, private val feature: RecorderFe
         feature.runner.syncNow()
     }
 
-    override suspend fun setAutoSync(enabled: Boolean) = feature.sync.setAutoSync(enabled)
+    override suspend fun setAutoSync(enabled: Boolean) {
+        feature.sync.setAutoSync(enabled)
+        feature.ensurePresenceObserved("setAutoSync")
+    }
 
     override suspend fun setSyncWhileRecording(enabled: Boolean) = feature.sync.setSyncWhileRecording(enabled)
 
     override suspend fun bind(device: RecorderDevice, pin: suspend (Boolean) -> String?): BindOutcome =
-        feature.sync.bind(device, pin)
+        feature.sync.bind(device, pin).also { outcome ->
+            if (outcome == BindOutcome.Bound) feature.ensurePresenceObserved("bind")
+        }
 
     override suspend fun forget(device: RecorderDevice) {
         feature.sync.forget()

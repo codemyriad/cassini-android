@@ -126,6 +126,9 @@ class XrecClient(
 
     fun delete(name: String) = requestOk(XrecCommands.delete(name), "DEL")
 
+    /** `SYNC`: tells the recorder how many downloads/transcriptions/uploads remain (`0` lets background sync shut down). */
+    fun reportSync(pending: Int, etaSeconds: Int = 0) = requestOk(XrecCommands.sync(pending, etaSeconds), "SYNC")
+
     /**
      * Downloads /record/[name] of the listed [size] into [sink], starting at [resumeOffset] (the bytes [sink] already
      * has). Returns the final offset, equal to [size]. [progress] gets the offset after each good frame, and the same

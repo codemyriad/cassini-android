@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.recorder
 
 import android.util.Log
+import io.codemyriad.cassini.core.recorder.XrecFailure
 import io.codemyriad.cassini.data.recorder.RecorderSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,7 @@ fun interface RecorderServiceStarter {
 class RecorderRunner(
     private val scope: CoroutineScope,
     private val sync: RecorderSync,
+    private val onRebindNeeded: () -> Unit = {},
     private val service: RecorderServiceStarter,
 ) {
     private val serviceRuns = MutableStateFlow(0)
@@ -68,9 +70,57 @@ class RecorderRunner(
                     started = acquireService()
                     if (!started) Log.i(TAG, "No foreground service for this sync; it goes on while the process lives")
                 }
+            }.also { outcome ->
+                if (outcome == SyncOutcome.RebindNeeded) onRebindNeeded()
             }
         } finally {
             if (started) releaseService()
+        }
+    }
+
+    /**
+     * Runs a full sync triggered by companion presence or `ACTION_ACL_CONNECTED`. Starts the `connectedDevice`
+     * foreground service up front while the companion wakeup exemption is active, retries once if RFCOMM raced the
+     * recorder's SDP poke teardown, and keeps the foreground service alive while newly imported notes transcribe and
+     * push their `.cwx` sidecars back.
+     */
+    fun wakeAttempt(
+        retryDelayMs: Long = POKE_RETRY_MS,
+        roundTripHoldMs: Long = ROUND_TRIP_HOLD_MS,
+    ): Deferred<SyncOutcome> = scope.async {
+        var started = false
+        if (sync.canSync()) {
+            started = acquireService()
+            if (!started) Log.i(TAG, "Android refused foreground service on wakeAttempt; continuing in process")
+        }
+        try {
+            var outcome = sync.sync(SyncMode.FULL)
+            if (retryDelayMs > 0 && isTransientConnectRace(outcome)) {
+                Log.i(TAG, "First wake sync ended with $outcome; retrying after $retryDelayMs ms")
+                delay(retryDelayMs)
+                outcome = sync.sync(SyncMode.FULL)
+            }
+            Log.i(TAG, "Wake sync finished: $outcome")
+            if (outcome == SyncOutcome.RebindNeeded) onRebindNeeded()
+            if (started && roundTripHoldMs > 0 && outcome is SyncOutcome.Done) {
+                holdForPendingRoundTrip(roundTripHoldMs)
+            }
+            outcome
+        } finally {
+            if (started) releaseService()
+        }
+    }
+
+    private fun isTransientConnectRace(outcome: SyncOutcome): Boolean =
+        outcome == SyncOutcome.Unreachable ||
+            (outcome is SyncOutcome.Failed && outcome.failure == XrecFailure.DISCONNECTED)
+
+    private suspend fun holdForPendingRoundTrip(limitMs: Long) {
+        var waited = 0L
+        while (waited < limitMs) {
+            if (sync.activeTranscriptions() == 0 && sync.pendingUploads().isEmpty()) return
+            delay(ROUND_TRIP_POLL_MS)
+            waited += ROUND_TRIP_POLL_MS
         }
     }
 
@@ -96,6 +146,9 @@ class RecorderRunner(
 
     private companion object {
         const val TAG = "RecorderRunner"
+        const val POKE_RETRY_MS = 1_500L
+        const val ROUND_TRIP_HOLD_MS = 5 * 60_000L
+        const val ROUND_TRIP_POLL_MS = 500L
     }
 }
 

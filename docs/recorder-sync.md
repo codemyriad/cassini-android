@@ -173,8 +173,12 @@ records. The recording always wins: the firmware paces the transfers and refuses
   (about 2 hours); then the usual waits of `AutoSyncBackoff` apply. A failed attempt keeps the failure waits. The sync
   disconnects when it is done, as always: no link stays open between polls.
 
-Not done here (stage S5 of the design): the recorder's radio still runs only in its Bluetooth phone mode, and the
-companion device presence (the recorder paging the phone after a recording) does not start a sync yet.
+Stage S5 ("just works" background sync): when automatic sync is enabled on the recorder, finishing a recording brings
+up Bluetooth in the background and sends an outbound SDP poke to the bonded phone. Android wakes
+`RecorderCompanionService` (or `RecorderBluetoothReceiver` on `ACTION_ACL_CONNECTED`), which starts a sync, imports and
+transcribes the new recordings (including 0-word `"No speech"` sidecars), pushes their `.cwx` sidecars back, and ends
+with `+XREC:SYNC,0` so the recorder shuts down Bluetooth and powers off cleanly when idle. Binding enables "Auto sync"
+by default and registers companion device presence observation (`REQUEST_COMPANION_RUN_IN_BACKGROUND`).
 
 ## What runs when
 
@@ -225,7 +229,10 @@ companion device presence (the recorder paging the phone after a recording) does
 | `BLUETOOTH_CONNECT` (Android 12 and later, at run time) | Bond, connect, read the bonded devices. The Recorder screen asks for it. After a denial, the screen shows "App settings". |
 | `BLUETOOTH`, `BLUETOOTH_ADMIN` (`maxSdkVersion 30`) | The same on Android 11 and earlier. |
 | `FOREGROUND_SERVICE_CONNECTED_DEVICE` | The type of `RecorderSyncService`. |
+| `REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE` | `startObservingDevicePresence` / `stopObservingDevicePresence` for background wakeups. |
+| `REQUEST_COMPANION_RUN_IN_BACKGROUND` | Wakes `RecorderCompanionService` when the bound recorder connects over Bluetooth. |
 | `REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND` | "Auto sync" with a companion device. |
+| `RECEIVE_BOOT_COMPLETED` | Re-registers companion device presence observation after a phone reboot. |
 
 The app does not ask for `BLUETOOTH_SCAN` or a location permission: it does not scan. Bluetooth and the companion
 device chooser are optional features (`android:required="false"`).
