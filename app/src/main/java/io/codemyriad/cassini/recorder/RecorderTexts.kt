@@ -72,6 +72,7 @@ object RecorderTexts {
         RecordingStatus.TRANSCRIPTION_FAILED -> context.getString(R.string.recorder_status_transcription_failed)
         RecordingStatus.IMPORTED -> context.getString(R.string.recorder_status_imported)
         RecordingStatus.TRANSCRIBED -> context.getString(R.string.recorder_status_transcribed)
+        RecordingStatus.TRANSCRIBED_NO_SPEECH -> context.getString(R.string.recorder_status_no_speech)
         RecordingStatus.TRANSCRIBED_NOT_ON_RECORDER -> context.getString(R.string.recorder_status_not_on_recorder)
         RecordingStatus.UPLOADED -> context.getString(R.string.recorder_status_uploaded)
         RecordingStatus.UPLOAD_FAILED ->

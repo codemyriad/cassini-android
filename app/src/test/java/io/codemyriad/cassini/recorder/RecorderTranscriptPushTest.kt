@@ -153,6 +153,25 @@ class RecorderTranscriptPushTest {
         assertTrue(waits.isEmpty())
     }
 
+    @Test fun aTranscriptionWithoutWordsSendsNothingAndIsNeverRetried() = runBlocking {
+        start()
+        val opens = radio.opens
+        // REC_0001's transcription finished without words: the library has no transcript to send (no entry in
+        // ready), and the note is "no speech", so it never joins the pushable notes.
+        val notes = mapOf("note-1" to NoteSyncInfo("REC_0001", null, transcribed = false, noSpeech = true))
+        transcribed.value = RecorderNotes.pushable(notes)
+        delay(SETTLE_MS)
+        assertEquals(emptySet<String>(), sync.pendingUploads())
+        assertEquals(opens, radio.opens)
+        assertEquals(1, checks.get())
+        assertTrue(waits.isEmpty())
+        assertFalse(radio.device.files.containsKey("REC_0001.cwx"))
+        // A full sync sends nothing for it either.
+        assertEquals(0, (sync.sync() as SyncOutcome.Done).uploaded)
+        assertFalse(uploaded())
+        assertEquals(emptySet<String>(), sync.pendingUploads())
+    }
+
     @Test fun aTranscriptThatWaitsAtTheStartGoesWithoutANewTranscript() = runBlocking {
         start(readyBefore = true)
         // Nothing changes in the transcribed notes: the push's first check finds the transcript and sends it.

@@ -45,8 +45,17 @@ interface RecorderScreenPorts {
     suspend fun forget(device: RecorderDevice)
 }
 
-/** A note as the recorder rows show it: [transcribed] when it has a finished transcript. */
-data class NoteSyncInfo(val title: String, val jobState: JobState?, val transcribed: Boolean)
+/**
+ * A note as the recorder rows show it: [transcribed] when it has a finished transcript with words, [noSpeech] when its
+ * transcription finished without any word (a silent recording). A transcript without words never goes to the recorder
+ * ([GraphRecorderLibrary.transcripts] leaves it out), so such a row waits for nothing.
+ */
+data class NoteSyncInfo(
+    val title: String,
+    val jobState: JobState?,
+    val transcribed: Boolean,
+    val noSpeech: Boolean = false,
+)
 
 enum class RecordingStatus {
     IMPORT_FAILED,
@@ -56,6 +65,9 @@ enum class RecordingStatus {
     TRANSCRIPTION_FAILED,
     IMPORTED,
     TRANSCRIBED,
+
+    /** The transcription finished without any word: there is no transcript to send to the recorder. */
+    TRANSCRIBED_NO_SPEECH,
 
     /** Transcribed, but the recording is no longer on the recorder: the transcript has nowhere to go. */
     TRANSCRIBED_NOT_ON_RECORDER,
@@ -267,6 +279,7 @@ object RecorderRows {
         note.transcribed && stored.recording.transcriptUploadedVersion != null -> RecordingStatus.UPLOADED
         note.transcribed && stored.absent -> RecordingStatus.TRANSCRIBED_NOT_ON_RECORDER
         note.transcribed -> RecordingStatus.TRANSCRIBED
+        note.noSpeech -> RecordingStatus.TRANSCRIBED_NO_SPEECH
         note.jobState == JobState.NEEDS_CONSENT -> RecordingStatus.WAITING_FOR_CONSENT
         note.jobState == JobState.FAILED -> RecordingStatus.TRANSCRIPTION_FAILED
         note.jobState != null -> RecordingStatus.TRANSCRIBING

@@ -54,6 +54,7 @@ class RecorderViewModelTest {
                             stored("REC_0006.wav", "d", failure = RecorderSync.UPLOAD_FAILURE + "BAD_NAME"),
                             stored("REC_0007.wav", "e"),
                             stored("REC_0008.wav", "f", absent = true),
+                            stored("REC_0009.wav", "g"),
                         ),
                         lastSync = LastSync(1, RecorderSync.OUTCOME_OK, downloaded = 2),
                     ),
@@ -66,6 +67,7 @@ class RecorderViewModelTest {
                 "d" to NoteSyncInfo("Long name", null, transcribed = true),
                 "e" to NoteSyncInfo("Waits", null, transcribed = true),
                 "f" to NoteSyncInfo("Wiped", null, transcribed = true),
+                "g" to NoteSyncInfo("Silence", null, transcribed = false, noSpeech = true),
             )
             val state = expectMostRecentItem()
             assertEquals(DEVICE, state.device)
@@ -73,6 +75,8 @@ class RecorderViewModelTest {
             assertEquals(LastSync(1, RecorderSync.OUTCOME_OK, downloaded = 2), state.lastSync)
             assertEquals(
                 listOf(
+                    // A transcription without words: done, and no transcript waits for the recorder.
+                    RecordingRow("REC_0009.wav", "g", "Silence", RecordingStatus.TRANSCRIBED_NO_SPEECH),
                     RecordingRow("REC_0008.wav", "f", "Wiped", RecordingStatus.TRANSCRIBED_NOT_ON_RECORDER),
                     RecordingRow("REC_0007.wav", "e", "Waits", RecordingStatus.TRANSCRIBED),
                     RecordingRow("REC_0006.wav", "d", "Long name", RecordingStatus.UPLOAD_FAILED, "BAD_NAME"),

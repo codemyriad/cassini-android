@@ -4,6 +4,9 @@ import android.content.Context
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.adapters.InstalledEngines
 import io.codemyriad.cassini.core.library.AudioKind
+import io.codemyriad.cassini.core.library.NoteFacts
+import io.codemyriad.cassini.core.library.NoteStatus
+import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.recorder.RecorderDevice
 import io.codemyriad.cassini.data.recorder.RecorderSettings
 import io.codemyriad.cassini.data.recorder.RecorderStore
@@ -48,10 +51,7 @@ class RecorderFeature(
     val notes: Flow<Map<String, NoteSyncInfo>> = flow {
         emitAll(
             graph.awaitCatalogue().notes.library().map { rows ->
-                rows.associate { row ->
-                    val transcribed = row.audioKind == AudioKind.DOCUMENT && (row.wordCount ?: 0) > 0
-                    row.id to NoteSyncInfo(row.title, row.jobState, transcribed)
-                }
+                rows.associate { row -> row.id to RecorderNotes.info(row) }
             },
         )
     }
@@ -62,7 +62,7 @@ class RecorderFeature(
         graph.appScope,
         store.settings,
         runner,
-        notes.map { notes -> notes.filterValues { it.transcribed }.keys },
+        notes.map(RecorderNotes::pushable),
         sync::pendingUploads,
     )
 
@@ -70,6 +70,23 @@ class RecorderFeature(
         autoSync.start()
         push.start()
     }
+}
+
+/** The recorder's view of the Library rows. */
+object RecorderNotes {
+    /**
+     * [row] for the recorder rows: transcribed when its document has words; no speech when the Library shows it as
+     * transcribed with 0 words ("· No speech", [NoteStatus.Suffix.NO_SPEECH]).
+     */
+    fun info(row: LibraryRow): NoteSyncInfo {
+        val words = row.wordCount ?: 0
+        val transcribed = row.audioKind == AudioKind.DOCUMENT && words > 0
+        val noSpeech = words == 0 && NoteStatus.of(NoteFacts(row.audioKind, row.documentState)) == NoteStatus.TRANSCRIBED
+        return NoteSyncInfo(row.title, row.jobState, transcribed, noSpeech)
+    }
+
+    /** The notes whose transcript can go to the recorder: one without words never does, so it starts no push. */
+    fun pushable(notes: Map<String, NoteSyncInfo>): Set<String> = notes.filterValues { it.transcribed }.keys
 }
 
 /** [RecorderScreenPorts] over the graph's [RecorderFeature]. */

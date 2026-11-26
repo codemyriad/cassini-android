@@ -48,7 +48,11 @@ class GraphRecorderLibrary(
         return result
     }
 
-    /** The shown variant of [noteId] when it is a finished, readable transcript. */
+    /**
+     * The shown variant of [noteId] when it is a finished, readable transcript with words. A transcription that
+     * found no speech has nothing to send: an empty sidecar never goes to the recorder, so the note is never pending
+     * ([RecorderSync.pendingUploads]) and the row says "Transcribed, no speech" ([RecorderNotes.info]).
+     */
     @Suppress("ReturnCount") // absent note, no readable variant, or an unrecoverable word cache
     private suspend fun transcript(notes: NoteRepository, noteId: String): RecorderTranscript? {
         notes.note(noteId).first()
