@@ -15,7 +15,8 @@ library/ recording/ note/ models/ settings/ voices/ trash/ licenses/
              XxxScreen.kt (stateless), XxxUiState.kt, XxxEvent.kt
 res/         values/strings.xml, values-{it,fr,es,pt-rBR,pt-rPT}/strings.xml, values/colors.xml + values-night/colors.xml (ui_window_bg),
              font/ui_*.ttf, drawable-*dpi/ui_saturn_{nav,mid}.png, drawable/ui_ic_stat_logo.xml,
-             drawable/ui_ic_launcher_{foreground,background,monochrome}.xml, mipmap-anydpi/ui_ic_launcher.xml (+ _round)
+             drawable/ui_ic_launcher_{background,monochrome}.xml, mipmap-*dpi/ui_ic_launcher_foreground.png,
+             mipmap-anydpi/ui_ic_launcher.xml (+ _round)
 src/test/    fixtures (BoardFixtures.kt, VariantFixtures.kt), BoardTest base, frames, screenshot tests, ContrastTest, FormatTest, FontAssetsTest
 src/test/screenshots/{light,dark,it,fontscale,variants,components,states}/*.png   committed goldens
 ```
@@ -230,7 +231,7 @@ The code has `enum class Glyph(paths, filled, viewport)` and `CassiniIcon(glyph,
 | Info | circle(12,12,9) + `M12 11v6M12 7.5v.5` | 24/1.7 |
 | Warn | `M12 4 3 20h18z` + `M12 10v4M12 17v.5` | 14/2 (trust chips) |
 
-The boards' line-art logo (a circle and an ellipse rotated −20°) is retired (L-04). The app draws the `cassini.talk` Saturn instead: the vendored cassini-ux `saturn-nav.svg` (37 x 24 dp, Library search field) and `saturn-mid.svg` (86 x 56 dp, Model download), rasterized per density and pinned by `scripts/check-nav-mark.py`. The line-art shape is still the adaptive launcher foreground (ink on bg, in `mipmap-anydpi/ui_ic_launcher.xml` with a monochrome layer) and the small notification icon `ui_ic_stat_logo`.
+The boards' line-art logo (a circle and an ellipse rotated −20°) is retired (L-04). The app draws the `cassini.talk` Saturn instead: the vendored cassini-ux `saturn-nav.svg` (37 x 24 dp, Library search field) and `saturn-mid.svg` (86 x 56 dp, Model download), rasterized per density and pinned by `scripts/check-nav-mark.py`. The line-art shape is still the small notification icon `ui_ic_stat_logo`. The launcher icon (D-1175, approved 26 Nov 2026, the same icon as the other Cassini talk apps) is `saturn-nav.svg` on the dark ground `#0D1015` (`ui_launcher_background`, from ground/dark): its drawn outline is 74% of the visible 72 dp (53.3 dp wide), centred on the 108 dp canvas. The Saturn's gradients and blur need a bitmap, so the foreground is `mipmap-*dpi/ui_ic_launcher_foreground.png` (108 to 432 px, pinned by `scripts/launcher-mark.json`); the themed-icon monochrome layer is a VectorDrawable of the flat outline (`mark-flat.svg`), with the gap between ring and planet kept open.
 
 ## 5. Touch targets
 

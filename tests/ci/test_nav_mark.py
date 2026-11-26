@@ -1,4 +1,4 @@
-"""Android's filtered Saturn SVG exports (nav and mid) remain byte-pinned without a platform renderer in CI."""
+"""Android's filtered Saturn SVG exports (nav, mid, launcher foreground) stay byte-pinned with no renderer in CI."""
 import importlib.util
 import json
 import tempfile
@@ -18,12 +18,14 @@ class NavMarkTest(unittest.TestCase):
         self.root = Path(temp.name)
         self.receipt = json.loads((ROOT / 'scripts/nav-mark.json').read_text())
         mid = json.loads((ROOT / 'scripts/mid-mark.json').read_text())
-        self.receipts = ['scripts/nav-mark.json', 'scripts/mid-mark.json']
+        launcher = json.loads((ROOT / 'scripts/launcher-mark.json').read_text())
+        self.receipts = ['scripts/nav-mark.json', 'scripts/mid-mark.json', 'scripts/launcher-mark.json']
         self.paths = [*self.receipts,
                       'third_party/cassini-ux/brand/mark/saturn-nav.svg',
                       'third_party/cassini-ux/brand/mark/saturn-mid.svg',
                       *[row['path'] for row in self.receipt['images']],
-                      *[row['path'] for row in mid['images']]]
+                      *[row['path'] for row in mid['images']],
+                      *[row['path'] for row in launcher['images']]]
         for name in self.paths:
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -54,3 +56,17 @@ class NavMarkTest(unittest.TestCase):
         (self.root / 'scripts/mid-mark.json').write_text(json.dumps(mid))
         with self.assertRaisesRegex(ValueError, 'saturn-mid.*density'):
             MARK.check(self.root)
+
+    def test_omitting_a_launcher_density_does_not_hide_it(self):
+        launcher = json.loads((self.root / 'scripts/launcher-mark.json').read_text())
+        launcher['images'].pop()
+        (self.root / 'scripts/launcher-mark.json').write_text(json.dumps(launcher))
+        with self.assertRaisesRegex(ValueError, 'launcher.*density'):
+            MARK.check(self.root)
+
+    def test_launcher_foreground_is_the_full_adaptive_canvas(self):
+        for density, (width, height) in MARK.MARKS['launcher'][3].items():
+            with self.subTest(density=density):
+                self.assertEqual(width, height)
+                self.assertEqual(width * 160, 108 * {'mdpi': 160, 'hdpi': 240, 'xhdpi': 320, 'xxhdpi': 480,
+                                                     'xxxhdpi': 640}[density])
