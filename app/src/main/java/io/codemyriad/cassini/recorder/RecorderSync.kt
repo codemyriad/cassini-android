@@ -277,6 +277,11 @@ class RecorderSync(private val parts: Parts) {
     /** True while a sync or binding runs or waits for the lock. */
     fun isBusy(): Boolean = active.value > 0
 
+    /** True when a [SyncMode.FULL] sync can either start now or queue behind a running [SyncMode.UPLOADS] push. */
+    fun canAcceptFullSync(): Boolean = synchronized(stateLock) {
+        !lock.isLocked || canQueueFull(SyncMode.FULL)
+    }
+
     /** Returns when no sync and no binding runs: at once when none does. */
     suspend fun awaitIdle() {
         active.first { it == 0 }
@@ -478,12 +483,13 @@ class RecorderSync(private val parts: Parts) {
         val unverified = verifySuspects(session, address, suspects)
         val state = deviceState(address).syncState()
         val plan = SyncPlanner.plan(listing, status, state, versions, syncWhileRecording)
+        val waitingForRecording = plan.skipped.count { it.reason in WAITING_REASONS }
         // A firmware that names the file it records refuses every card write while it records: transcripts wait.
         val holdUploads = status.recording && status.namesActiveFile
         if (mode == SyncMode.UPLOADS) {
             val sent = upload(session, address, pong, plan.uploads, transcripts, holdUploads, unverified)
             if (pong.syncStatusSupported) {
-                val pending = plan.downloads.size + sent.deferred + remainingSidecarWork(address)
+                val pending = waitingForRecording + plan.downloads.size + sent.deferred + remainingSidecarWork(address)
                 reportSyncState(session, pending)
             }
             return SyncOutcome.Done(
@@ -538,11 +544,11 @@ class RecorderSync(private val parts: Parts) {
         )
         withContext(parts.io) { deleteStrayParts(address) }
         if (pong.syncStatusSupported) {
-            val pending = deferred + failed + sent.deferred + remainingSidecarWork(address)
+            val pending = waitingForRecording + deferred + failed + sent.deferred + remainingSidecarWork(address)
             reportSyncState(session, pending)
         }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
-        val waiting = plan.skipped.count { it.reason in WAITING_REASONS } + deferred + sent.deferred
+        val waiting = waitingForRecording + deferred + sent.deferred
         return SyncOutcome.Done(
             downloaded,
             sent.uploaded,
@@ -1111,14 +1117,21 @@ class RecorderSync(private val parts: Parts) {
     private suspend fun deviceState(address: String): RecorderDeviceState =
         store.read().devices[address] ?: RecorderDeviceState()
 
-    /** Notes of recordings still on [address] that have no uploaded sidecar yet and were not permanently refused. */
-    private suspend fun awaitingSidecarNotes(address: String): List<String> =
-        deviceState(address).recordings.filter { stored ->
-            !stored.absent &&
-                XrecNames.sidecarFor(stored.recording.name) != null &&
-                stored.recording.transcriptUploadedVersion == null &&
-                stored.failure == null
-        }.mapNotNull { it.recording.noteId }
+    /** Notes of recordings still on [address] whose active transcription can still upload a sidecar. */
+    private suspend fun awaitingSidecarNotes(address: String): List<String> {
+        val state = deviceState(address)
+        val badName = UPLOAD_FAILURE + XrecFailure.BAD_NAME.name
+        return if (!takesTranscripts(state)) {
+            emptyList()
+        } else {
+            state.recordings.filter { stored ->
+                !stored.absent &&
+                    XrecNames.sidecarFor(stored.recording.name) != null &&
+                    stored.failure != badName &&
+                    stored.failure?.startsWith(IMPORT_FAILURE) != true
+            }.mapNotNull { it.recording.noteId }
+        }
+    }
 
     /**
      * Active transcriptions plus finished-but-unpushed transcripts, read in that order so a job transitioning from

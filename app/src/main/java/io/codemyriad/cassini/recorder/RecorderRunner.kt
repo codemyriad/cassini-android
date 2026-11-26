@@ -88,6 +88,7 @@ class RecorderRunner(
         retryDelayMs: Long = POKE_RETRY_MS,
         roundTripHoldMs: Long = ROUND_TRIP_HOLD_MS,
     ): Deferred<SyncOutcome> = scope.async {
+        if (!sync.canAcceptFullSync()) return@async SyncOutcome.Busy
         var started = false
         if (sync.canSync()) {
             started = acquireService()

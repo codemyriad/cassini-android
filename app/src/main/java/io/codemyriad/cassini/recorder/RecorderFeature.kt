@@ -102,9 +102,9 @@ class RecorderFeature(
      */
     fun onDevicePresent(address: String?, reason: String) {
         start()
-        if (sync.isBusy()) return
+        if (!sync.canAcceptFullSync()) return
         graph.appScope.launch(graph.dispatchers.io) {
-            if (sync.isBusy()) return@launch
+            if (!sync.canAcceptFullSync()) return@launch
             val settings = store.read()
             val bound = settings.binding?.device?.address ?: return@launch
             if (address != null && !address.equals(bound, ignoreCase = true)) return@launch
