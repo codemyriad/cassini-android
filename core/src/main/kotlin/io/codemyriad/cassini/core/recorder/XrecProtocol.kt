@@ -215,6 +215,7 @@ sealed interface XrecReply {
         val pairingOpen: Boolean,
         val recordTarget: Boolean = false,
         val syncStatusSupported: Boolean = false,
+        val liveRecordingSupported: Boolean = false,
     ) : XrecReply
 
     /** `CHAL,<32 hex>`. */
@@ -239,6 +240,7 @@ sealed interface XrecReply {
         val totalMb: Long,
         val recordingIndex: Long? = null,
         val paceMillis: Long? = null,
+        val recordingBytes: Long? = null,
     ) : XrecReply {
         val recording: Boolean get() = media == XrecLimits.MEDIA_RECORDING
 
@@ -325,6 +327,7 @@ object XrecReplies {
             pairingOpen = flags["pair"] == "1",
             recordTarget = flags["rec"] == "1",
             syncStatusSupported = flags["sync"] == "1",
+            liveRecordingSupported = flags["live"] == "1",
         )
     }
 
@@ -344,6 +347,7 @@ object XrecReplies {
             totalMb = values[7],
             recordingIndex = fields.getOrNull(8)?.toLongOrNull()?.takeIf { it >= 0 },
             paceMillis = fields.getOrNull(9)?.toLongOrNull()?.takeIf { it >= 0 },
+            recordingBytes = fields.getOrNull(10)?.toLongOrNull()?.takeIf { it >= 0 },
         )
     }
 

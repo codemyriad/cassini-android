@@ -30,6 +30,9 @@ class GraphRecorderLibrary(
         }
     }
 
+    override suspend fun openLivePrecompute(partFile: File, displayName: String): LivePrecomputeSession? =
+        graph.openRecorderLivePrecompute(partFile)
+
     override suspend fun transcribe(noteId: String) {
         val outcome = graph.processing.transcribe(noteId, origin = StartOrigin.AUTOMATIC)
         if (outcome is TranscribeOutcome.Queued) {

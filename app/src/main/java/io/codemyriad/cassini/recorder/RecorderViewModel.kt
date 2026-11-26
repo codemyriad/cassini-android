@@ -131,7 +131,7 @@ data class RecorderUiState(
     val device: RecorderDevice? = null,
     val rebindNeeded: Boolean = false,
     val autoSync: Boolean = false,
-    val syncWhileRecording: Boolean = false,
+    val syncWhileRecording: Boolean = true,
     val activity: RecorderActivity = RecorderActivity.Idle,
     val lastSync: LastSync? = null,
     val transcriptsUnsupported: Boolean = false,

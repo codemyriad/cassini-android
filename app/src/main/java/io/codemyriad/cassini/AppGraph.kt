@@ -16,9 +16,11 @@ import io.codemyriad.cassini.adapters.RepositoryModelInstallBackend
 import io.codemyriad.cassini.adapters.SelectedModelAccess
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
+import io.codemyriad.cassini.core.asr.TranscriptionMode
 import io.codemyriad.cassini.core.models.ModelCheck
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
+import io.codemyriad.cassini.core.models.ParakeetSuggestion
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.requireUser
 import io.codemyriad.cassini.data.AppPaths
@@ -85,7 +87,9 @@ import io.codemyriad.cassini.processing.RecordingPrecomputeController
 import io.codemyriad.cassini.processing.ServiceStarter
 import io.codemyriad.cassini.processing.ThermalMonitor
 import io.codemyriad.cassini.processing.TranscriptionJobFactory
+import io.codemyriad.cassini.recorder.LivePrecomputeSession
 import io.codemyriad.cassini.recorder.RecorderFeature
+import io.codemyriad.cassini.recorder.RecorderLivePrecomputer
 import io.codemyriad.cassini.recording.AndroidRecordingPlatform
 import io.codemyriad.cassini.recording.CaptureSource
 import io.codemyriad.cassini.recording.FactoryCaptureSource
@@ -94,6 +98,7 @@ import io.codemyriad.cassini.recording.RecordingConsent
 import io.codemyriad.cassini.recording.RecordingController
 import io.codemyriad.cassini.recording.RecordingNotes
 import io.codemyriad.cassini.recording.RecordingPlatform
+import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.recording.RepositoryRecordingNotes
 import io.codemyriad.cassini.recording.SettingsConsent
 import io.codemyriad.cassini.recording.TranscriptionHandoff
@@ -130,6 +135,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
@@ -317,6 +323,7 @@ class AppGraph(context: Context, val config: Config) {
     private val thermalHolder = lazy<ThermalMonitor> { config.processing.thermal ?: AndroidThermalMonitor(app) }
     private val foregroundBusy = MutableStateFlow(false)
     private val recordingPrecompute = AtomicReference<RecordingPrecomputeController?>(null)
+    private val recorderLivePrecompute = AtomicReference<RecorderLivePrecomputer?>(null)
     private val recordingHolder = lazy { createRecording() }
 
     /** The one recording of the process (architecture 5.8), created on first use. */
@@ -722,6 +729,94 @@ class AppGraph(context: Context, val config: Config) {
 
     private fun preemptRecordingPrecompute() {
         recordingPrecompute.get()?.preempt()
+        recorderLivePrecompute.get()?.preempt()
+    }
+
+    internal suspend fun openRecorderLivePrecompute(partFile: File): LivePrecomputeSession? {
+        val eligible = canStartRecorderLivePrecompute()
+        return if (!eligible) {
+            null
+        } else {
+            createRecorderLivePrecompute(partFile)
+        }
+    }
+
+    private suspend fun canStartRecorderLivePrecompute(): Boolean {
+        if (config.processing.sdkInt < Build.VERSION_CODES.Q) return false
+        ready.await()
+        val parsedMode = settings.transcriptionModeResolution.first()
+        val model = speech.selected()
+        val ramOk = model != SpeechModel.PARAKEET ||
+            !parsedMode.fellBackToDefault ||
+            deviceTotalRamBytes() >= ParakeetSuggestion.MIN_TOTAL_BYTES
+        val decision = TranscriptionMode.evaluate(
+            rawMode = if (parsedMode.fellBackToDefault) null else parsedMode.mode.canonical,
+            hasForegroundSavedJob = foregroundBusy.value,
+            manualTranscribeRequested = false,
+            platformSupportsPrecompute = ramOk,
+        )
+        return decision.spawnWorkerDuringRecording && transcriptionConsented() && isRecorderPrecomputeAllowed()
+    }
+
+    private suspend fun createRecorderLivePrecompute(partFile: File): LivePrecomputeSession {
+        val catalogue = awaitCatalogue()
+        val model = speech.selected()
+        val stagingDir = File(paths.cache, "recorder-live-${UUID.randomUUID()}")
+        val workerEngines = jobEngines(
+            model,
+            partFile,
+            File(stagingDir, "whistle-segments.json"),
+            precompute = true,
+        )
+        val choices = settings.speakerChoices.first()
+        val precomputer = RecorderLivePrecomputer(
+            RecorderLivePrecomputer.Parts(
+                scope = appScope,
+                partFile = partFile,
+                stagingDir = stagingDir,
+                speechModel = model,
+                models = SelectedModelAccess(modelAccess, choices),
+                engines = workerEngines,
+                env = jobEnvironment,
+                storage = catalogue.jobStorage,
+                voices = catalogue.jobVoices,
+                shouldContinue = ::isRecorderPrecomputeAllowed,
+            ),
+        )
+        recorderLivePrecompute.getAndSet(precomputer)?.preempt()
+        return LivePrecomputeHandle(precomputer, recorderLivePrecompute)
+    }
+
+    private fun isPhoneRecording(): Boolean {
+        if (!recordingHolder.isInitialized()) return false
+        val state = recording.state.value
+        return state is RecordingState.Starting || state is RecordingState.Active
+    }
+
+    private fun isRecorderPrecomputeAllowed(): Boolean =
+        !foregroundBusy.value && !thermalHolder.value.throttled.value && !isPhoneRecording()
+
+    private class LivePrecomputeHandle(
+        private val precomputer: RecorderLivePrecomputer,
+        private val slot: AtomicReference<RecorderLivePrecomputer?>,
+    ) : LivePrecomputeSession {
+        override fun onBytesAvailable(bytes: Long) = precomputer.onBytesAvailable(bytes)
+
+        override suspend fun finishAndInstall(noteId: String) {
+            try {
+                precomputer.finishAndInstall(noteId)
+            } finally {
+                slot.compareAndSet(precomputer, null)
+            }
+        }
+
+        override fun close() {
+            try {
+                precomputer.close()
+            } finally {
+                slot.compareAndSet(precomputer, null)
+            }
+        }
     }
 
     private suspend fun runRecordingPrecompute(noteId: String, shouldContinue: () -> Boolean): PrecomputeStopReason {

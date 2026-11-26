@@ -100,8 +100,9 @@ class XrecProtocolTest {
                 pairingOpen = false,
                 recordTarget = true,
                 syncStatusSupported = true,
+                liveRecordingSupported = true,
             ),
-            XrecReplies.parse("+XREC:PONG,openfw_v5,v5,bound=1,auth=1,pair=0,rec=1,sync=1,future=x"),
+            XrecReplies.parse("+XREC:PONG,openfw_v5,v5,bound=1,auth=1,pair=0,rec=1,sync=1,live=1,future=x"),
         )
     }
 
@@ -125,18 +126,22 @@ class XrecProtocolTest {
     }
 
     @Test fun parsesTheStatFieldsOfSyncWhileRecording() {
-        val stat = XrecReplies.parse("+XREC:STAT,87,3990,0,0,33,12,1500,7600,7,342") as XrecReply.Status
-        assertEquals(XrecReply.Status(87, 3990, 0, false, 33, 12, 1500, 7600, 7, 342), stat)
+        val stat = XrecReplies.parse("+XREC:STAT,87,3990,0,0,33,12,1500,7600,7,342,4096") as XrecReply.Status
+        assertEquals(XrecReply.Status(87, 3990, 0, false, 33, 12, 1500, 7600, 7, 342, 4096), stat)
+        assertEquals(4096L, stat.recordingBytes)
         assertTrue(stat.namesActiveFile)
-        val idle = XrecReplies.parse("+XREC:STAT,87,3990,0,0,16,0,1500,7600,0,0") as XrecReply.Status
+        val idle = XrecReplies.parse("+XREC:STAT,87,3990,0,0,16,0,1500,7600,0,0,0") as XrecReply.Status
         assertEquals(0L, idle.recordingIndex)
+        assertEquals(0L, idle.recordingBytes)
         assertTrue(idle.namesActiveFile)
         // Later fields, and fields that are not numbers after the eighth, do not make the reply unreadable.
-        val extra = XrecReplies.parse("+XREC:STAT,87,3990,0,0,33,12,1500,7600,7,342,future,9") as XrecReply.Status
+        val extra = XrecReplies.parse("+XREC:STAT,87,3990,0,0,33,12,1500,7600,7,342,8192,future,9") as XrecReply.Status
         assertEquals(7L, extra.recordingIndex)
-        val odd = XrecReplies.parse("+XREC:STAT,87,3990,0,0,33,12,1500,7600,x") as XrecReply.Status
+        assertEquals(8192L, extra.recordingBytes)
+        val odd = XrecReplies.parse("+XREC:STAT,87,3990,0,0,33,12,1500,7600,x,x,x") as XrecReply.Status
         assertNull(odd.recordingIndex)
         assertNull(odd.paceMillis)
+        assertNull(odd.recordingBytes)
         assertEquals(7600L, odd.totalMb)
     }
 

@@ -85,10 +85,24 @@ sealed interface LibraryImport {
 /** The finished transcript of a note, ready for the recorder: its [variantId] and the sidecar content. */
 data class RecorderTranscript(val variantId: String, val cwx: CwxTranscript)
 
+/** Incremental head-start transcription session attached while a recorder `.wav` streams in. */
+interface LivePrecomputeSession : AutoCloseable {
+    /** Signals that the `.part` file now has at least [bytes] written and synced to disk. */
+    fun onBytesAvailable(bytes: Long)
+
+    /** Stops background precomputation, installs any checkpointed progress into [noteId]'s work dir, and cleans up. */
+    suspend fun finishAndInstall(noteId: String)
+
+    override fun close()
+}
+
 /** The library, as the recorder sync needs it. */
 interface RecorderLibrary {
     /** Imports [file] as a new note titled after [displayName]. */
     suspend fun import(file: File, displayName: String): LibraryImport
+
+    /** Opens an optional best-effort live precompute session over [partFile] as it grows; null when skipped. */
+    suspend fun openLivePrecompute(partFile: File, displayName: String): LivePrecomputeSession? = null
 
     /** Asks for a transcription of [noteId]; without model consent the note waits for it ("Needs model"). */
     suspend fun transcribe(noteId: String)

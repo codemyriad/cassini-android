@@ -293,7 +293,8 @@ class RecorderTranscriptPushTest {
 
     @Test fun withSyncWhileRecordingOffATranscriptThatWaitsForTheRecordingIsNotPolled() = runBlocking {
         start()
-        assertFalse(store.read().syncWhileRecording)
+        store.update { it.copy(syncWhileRecording = false) }
+        org.junit.Assert.assertFalse(store.read().syncWhileRecording)
         radio.device.syncsWhileRecording = true
         radio.device.recording = true
         val opens = radio.opens

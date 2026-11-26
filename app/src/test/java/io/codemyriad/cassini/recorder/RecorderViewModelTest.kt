@@ -184,8 +184,10 @@ class RecorderViewModelTest {
             assertEquals(RadioReadiness.READY, awaitItem().readiness)
             viewModel.onEvent(RecorderEvent.AutoSync(true))
             assertEquals(true, awaitItem().autoSync)
-            // "Sync while the recorder records" is off until the user turns it on.
-            assertEquals(false, viewModel.state.value.syncWhileRecording)
+            // "Sync while the recorder records" is on by default and toggles off and on.
+            assertEquals(true, viewModel.state.value.syncWhileRecording)
+            viewModel.onEvent(RecorderEvent.SyncWhileRecording(false))
+            assertEquals(false, awaitItem().syncWhileRecording)
             viewModel.onEvent(RecorderEvent.SyncWhileRecording(true))
             assertEquals(true, awaitItem().syncWhileRecording)
             viewModel.onEvent(RecorderEvent.ListBonded)
