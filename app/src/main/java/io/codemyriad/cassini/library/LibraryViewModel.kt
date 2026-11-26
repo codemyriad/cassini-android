@@ -87,6 +87,8 @@ sealed interface LibraryEffect {
 
     data object OpenSettings : LibraryEffect
 
+    data object OpenRecorder : LibraryEffect
+
     data class OpenModelDownload(val key: ModelDownloadKey) : LibraryEffect
 
     /** "Import audio": the system picker (`ACTION_OPEN_DOCUMENT`) with [LibraryViewModel.IMPORT_TYPES]. */
@@ -417,6 +419,7 @@ class LibraryViewModel(
             LibraryEvent.OpenTrash -> emit(LibraryEffect.OpenTrash)
             LibraryEvent.OpenSettings -> emit(LibraryEffect.OpenSettings)
             LibraryEvent.OpenProgress -> openProgress()
+            LibraryEvent.OpenRecorder -> emit(LibraryEffect.OpenRecorder)
             is LibraryEvent.Resume -> launch { resume(event.id) }
             is LibraryEvent.TryAgain -> launch { resume(event.id) }
             is LibraryEvent.Rename -> launch { openRename(event.id) }

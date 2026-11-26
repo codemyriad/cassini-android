@@ -21,6 +21,7 @@ The contributor entrypoints at the root of the repository are [`CONTRIBUTING.md`
 - [`data-formats.md`](data-formats.md): storage layout, the portable document, exports and the differences from gocassini.
 - [`backup.md`](backup.md): device-to-device transfer and backup (D97, D98).
 - [`recorded-at.md`](recorded-at.md): the recording time of a note (D95).
+- [`recorder-sync.md`](recorder-sync.md): binding and syncing the Cassini voice recorder over Bluetooth.
 - [`transcript-rendering.md`](transcript-rendering.md): how `ReadingTurns` groups the transcript into turns (D84).
 - [`whistle-speech-gate.md`](whistle-speech-gate.md): the Whistle speech gate, ported from the desktop `SpeechGate`.
 - [`whistle/included.md`](whistle/included.md): the included Whistle model and the default speech model.
@@ -51,6 +52,8 @@ These files are dated evidence. Read the current guides and reference documents 
   [D82 CI profile](review/android-ci-d82.md), [bulk transfer (D96)](review/android-bulk-transfer-d96.md),
   [Files-app access (D97)](review/android-documents-provider-d97.md),
   [API 29 heap failure](review/android-flake-api29-heap.md) and [CI memory evidence](review/ci-memory-evidence.md).
+- Recorder sync review: [the independent review](reviews/RECORDER_SYNC_REVIEW.md) and
+  [its triage after S4](reviews/RECORDER_SYNC_REVIEW_TRIAGE.md).
 - Test-suite benchmarks: [app unit-test JIT](benchmarks/app-unit-test-jit.md),
   [coordinator factory events](benchmarks/coordinator-factory-events.md), [export CPU work](benchmarks/export-cpu-work.md),
   [held-queue events](benchmarks/held-queue-events.md), [job cancellation](benchmarks/job-cancellation-events.md),

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Recorder screen, its Settings row and its notification (docs/recorder-sync.md).
+     TODO(i18n): English only for now. Translate into the five other app languages (values-it, values-fr, values-es,
+     values-pt-rBR, values-pt-rPT), then move these strings into strings.xml so that TranslationsTest checks them and
+     remove tools:ignore. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="recorder_title">Recorder</string>
+    <string name="recorder_back">Back</string>
+    <string name="recorder_not_bound">Not bound</string>
+    <string name="recorder_bound_device">%1$s (%2$s)</string>
+    <string name="recorder_privacy">Cassini copies the recordings from your own recorder over Bluetooth, and sends their transcripts back to it. Nothing goes to other devices or to the internet.</string>
+    <string name="recorder_rebind_needed">Bind again: the recorder does not accept the key of this phone.</string>
+    <string name="recorder_bind">Bind recorder</string>
+    <string name="recorder_forget">Forget recorder</string>
+    <string name="recorder_sync_now">Sync now</string>
+    <string name="recorder_auto_sync">Auto sync</string>
+    <string name="recorder_auto_sync_hint">Syncs automatically when your recorder is on and in range, and sends transcripts back as soon as they finish.</string>
+    <string name="recorder_sync_while_recording">Sync while the recorder records</string>
+    <string name="recorder_sync_while_recording_hint">Copies finished recordings while the recorder makes a new mono recording, at a slow pace. Needs recorder firmware that supports it; transcripts go after the recording.</string>
+    <string name="recorder_last_sync">Last sync %1$s: %2$s</string>
+    <string name="recorder_last_sync_never">No sync yet.</string>
+    <string name="recorder_outcome_ok">done. Downloaded: %1$d. Transcripts sent: %2$d.</string>
+    <string name="recorder_outcome_ok_speed">done. Downloaded: %1$d (%3$d KB/s). Transcripts sent: %2$d.</string>
+    <string name="recorder_outcome_unreachable">the recorder did not answer. Turn the recorder on and bring it in range.</string>
+    <string name="recorder_outcome_rebind">the recorder refused the key.</string>
+    <string name="recorder_outcome_failed">stopped (%1$s).</string>
+    <string name="recorder_outcome_unavailable">Bluetooth was not available.</string>
+    <string name="recorder_transcripts_unsupported">The recorder firmware is too old to receive transcripts. Update the recorder.</string>
+    <string name="recorder_activity_connecting">Connecting to the recorder…</string>
+    <string name="recorder_activity_checking">Checking the recorder…</string>
+    <string name="recorder_activity_downloading">Downloading %1$s (%2$d%%)</string>
+    <string name="recorder_activity_importing">Importing %1$s</string>
+    <string name="recorder_activity_uploading">Sending the transcript %1$s</string>
+    <string name="recorder_activity_bonding">Pairing. Tap Pair when Android asks.</string>
+    <string name="recorder_activity_pairing">Binding…</string>
+    <string name="recorder_recordings">Recordings</string>
+    <string name="recorder_recordings_empty">No recordings synced yet.</string>
+    <string name="recorder_status_import_failed">Not imported (%1$s)</string>
+    <string name="recorder_status_note_gone">Note deleted</string>
+    <string name="recorder_status_consent">Waiting for model consent</string>
+    <string name="recorder_status_transcribing">Transcribing</string>
+    <string name="recorder_status_transcription_failed">Transcription failed</string>
+    <string name="recorder_status_imported">Imported</string>
+    <string name="recorder_status_transcribed">Transcribed · Waiting to send to the recorder</string>
+    <string name="recorder_status_no_speech">Transcribed (no speech) · Waiting to send to the recorder</string>
+    <string name="recorder_status_not_on_recorder">Transcribed. The recording is no longer on the recorder.</string>
+    <string name="recorder_status_uploaded">Transcript sent to the recorder</string>
+    <string name="recorder_status_uploaded_no_speech">Transcript sent to the recorder (no speech)</string>
+    <string name="recorder_status_upload_failed">Transcript not sent (%1$s)</string>
+    <string name="recorder_action_open">Open recorder</string>
+    <string name="recorder_banner_downloading_title">Downloading %1$s</string>
+    <plurals name="recorder_banner_waiting_title">
+        <item quantity="one">%1$d transcript waiting for the recorder</item>
+        <item quantity="other">%1$d transcripts waiting for the recorder</item>
+    </plurals>
+    <string name="recorder_banner_waiting_line">%1$s · Sent automatically when in range</string>
+    <string name="recorder_banner_waiting_with_tx">%1$s · %2$s</string>
+    <plurals name="recorder_queue_transcribing">
+        <item quantity="one">%1$d transcribing</item>
+        <item quantity="other">%1$d transcribing</item>
+    </plurals>
+    <plurals name="recorder_queue_waiting">
+        <item quantity="one">%1$d waiting for the recorder</item>
+        <item quantity="other">%1$d waiting for the recorder</item>
+    </plurals>
+    <string name="recorder_queue_summary">Queue: %1$s</string>
+    <string name="recorder_settings_subtitle_status">%1$s · %2$s</string>
+    <plurals name="recorder_notif_waiting">
+        <item quantity="one">Transcribing %1$d recording for the recorder…</item>
+        <item quantity="other">Transcribing %1$d recordings for the recorder…</item>
+    </plurals>
+    <plurals name="recorder_notif_sending_queued">
+        <item quantity="one">Sending %1$d queued transcript to the recorder…</item>
+        <item quantity="other">Sending %1$d queued transcripts to the recorder…</item>
+    </plurals>
+    <string name="recorder_bind_instructions">On the recorder, open the Bluetooth screen (Home, BT, ENTER; choose Phone if it asks). Press ENTER: the recorder shows a PIN for 60 seconds. Then tap Find recorder.</string>
+    <string name="recorder_bind_find">Find recorder</string>
+    <string name="recorder_bind_choose">Choose your recorder. If it is not in the list, pair it in the Bluetooth settings of Android first.</string>
+    <string name="recorder_bind_none">No paired recorder.</string>
+    <string name="recorder_bluetooth_settings">Bluetooth settings</string>
+    <string name="recorder_bind_pin">Type the 6-digit PIN that the recorder shows.</string>
+    <string name="recorder_bind_pin_wrong">Wrong PIN. Type it again.</string>
+    <string name="recorder_bind_pin_label">PIN</string>
+    <string name="recorder_bind_confirm">Bind</string>
+    <string name="recorder_cancel">Cancel</string>
+    <string name="recorder_try_again">Try again</string>
+    <string name="recorder_bind_failed_not_bonded">Android did not pair with the recorder. Press ENTER on the recorder, then try again.</string>
+    <string name="recorder_bind_failed_unreachable">The recorder did not answer. Make sure that it shows its Bluetooth screen.</string>
+    <string name="recorder_bind_failed_stale_bond">The recorder does not know this phone any more. In the Bluetooth settings of Android, forget the recorder. Then bind it again.</string>
+    <string name="recorder_bind_failed_closed">The pairing window of the recorder is closed. Press ENTER on the recorder, then try again.</string>
+    <string name="recorder_bind_failed_chooser">Android could not show the recorders (%1$s).</string>
+    <string name="recorder_bind_failed_other">Binding failed (%1$s).</string>
+    <string name="recorder_permission">Cassini needs the Nearby devices permission to connect to the recorder.</string>
+    <string name="recorder_permission_allow">Allow</string>
+    <string name="recorder_app_settings">App settings</string>
+    <string name="recorder_bluetooth_off">Bluetooth is off.</string>
+    <string name="recorder_no_bluetooth">This phone has no Bluetooth.</string>
+    <string name="recorder_notif_title">Syncing with the recorder</string>
+    <string name="recorder_channel">Recorder sync</string>
+</resources>

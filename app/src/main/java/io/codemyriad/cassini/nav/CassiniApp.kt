@@ -50,6 +50,9 @@ import io.codemyriad.cassini.note.GraphNotePorts
 import io.codemyriad.cassini.note.NoteRoute
 import io.codemyriad.cassini.note.NoteViewModel
 import io.codemyriad.cassini.processing.StartOrigin
+import io.codemyriad.cassini.recorder.GraphRecorderScreenPorts
+import io.codemyriad.cassini.recorder.RecorderRoute
+import io.codemyriad.cassini.recorder.RecorderViewModel
 import io.codemyriad.cassini.recording.GraphRecordingPorts
 import io.codemyriad.cassini.recording.RecordingRoute
 import io.codemyriad.cassini.recording.RecordingViewModel
@@ -173,7 +176,7 @@ private fun NoteEntry(
     )
 }
 
-/** Model download, Settings, Saved voices, Trash and Licenses, each with its ViewModel over [graph]. */
+/** Model download, Settings, Recorder, Saved voices, Trash and Licenses, each with its ViewModel over [graph]. */
 private fun EntryProviderScope<NavKey>.screenEntries(
     graph: AppGraph,
     backStack: NavBackStack<NavKey>,
@@ -192,6 +195,10 @@ private fun EntryProviderScope<NavKey>.screenEntries(
     entry<SettingsKey> {
         val viewModel = viewModel { SettingsViewModel(GraphSettingsPorts(graph)) }
         SettingsRoute(viewModel, screenNavigator(backStack, SettingsKey))
+    }
+    entry<RecorderKey> {
+        val viewModel = viewModel { RecorderViewModel(GraphRecorderScreenPorts(context, graph.recorder)) }
+        RecorderRoute(viewModel, screenNavigator(backStack, RecorderKey))
     }
     entry<SavedVoicesKey> {
         val viewModel = viewModel { SavedVoicesViewModel(createSavedStateHandle(), GraphSavedVoicesPorts(graph)) }

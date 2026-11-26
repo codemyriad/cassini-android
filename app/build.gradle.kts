@@ -209,6 +209,8 @@ dependencies {
     testImplementation(libs.zstd.jni)
     testImplementation(libs.org.json)
     testImplementation(testFixtures(project(":app-logic")))
+    // FakeRecorder: the recorder's XREC side of a link, for the recorder sync tests.
+    testImplementation(testFixtures(project(":core")))
     testImplementation(libs.bundles.testing.robolectric)
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)

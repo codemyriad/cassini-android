@@ -1,6 +1,6 @@
 # Privacy
 
-Cassini for Android processes and stores your recordings, transcripts and voiceprints on your phone. Cassini does not upload them to its servers. Android can include them in your encrypted cloud backup and copy them directly to a new phone, as described below. Cassini has no accounts, no advertising, no analytics and no crash reports. The app connects to the internet only to download optional models, and only after you agree. Whistle is included on supported devices and basic transcription with it needs no model download. Its isolated worker has no internet permission.
+Cassini for Android processes and stores your recordings, transcripts and voiceprints on your phone. Cassini does not upload them to its servers. Android can include them in your encrypted cloud backup and copy them directly to a new phone, as described below. Cassini has no accounts, no advertising, no analytics and no crash reports. The app connects to the internet only to download optional models, and only after you agree. If you bind your own Cassini recorder, the app also exchanges recordings and transcripts with that recorder over Bluetooth, and with no other device (see "Your Cassini recorder"). Whistle is included on supported devices and basic transcription with it needs no model download. Its isolated worker has no internet permission.
 
 This file applies to Cassini for Android 0.2 and later. The app shows the same text on its Licenses screen.
 
@@ -13,6 +13,7 @@ Cassini keeps your data in its private app storage (the `filesDir` directory of 
 - Unfinished transcription: the progress of a transcription, the words found so far, the draft speaker names, the matches between speakers and saved voices, short audio clips of each speaker (at most 45 seconds for each speaker), and the state of the speaker model. This state is a list of numbers that the speaker model calculates from the voices in the note, so that the transcription can continue later. It is not a voiceprint, and Cassini does not use it to recognize people. A match is the ID of a saved voice and a score. It is not a voiceprint. Location: `notes/<noteId>/work/`. Cassini deletes this directory when the transcription ends, when you start again, or when it deletes the note.
 - Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognize the people that you name. Location: `voices/` only. The section "Voiceprints" gives the details.
 - Settings and state: your selected speech model, the pinned model of each queued transcription, your model download decisions and their times, the queue of transcriptions, the trash state of notes, the playback position, and some one-time notices. Location: `settings.preferences_pb` and `cassini.db`. On Android 13 and later, Android keeps the app language. On earlier versions, Cassini keeps the app language in a small file in its private storage.
+- Your Cassini recorder: the Bluetooth name and address of the bound recorder, its binding key in encrypted form, the "Auto sync" choice, the names and sizes of the recordings that Cassini copied from it with their notes and a hash of their first 4 KiB, and the result of the last sync. Location: `recorder/recorder.json` (if this file cannot be read, Cassini keeps it as `recorder/recorder.json.bad` and starts a new one). A download that stopped is in the cache (`recorder/`) until the next sync finishes it. The section "Your Cassini recorder" gives the details.
 - Models: the downloaded speech and speaker models. They contain no personal data. Location: `models/`. Cassini 0.3.0 kept them in `parakeet-ultra/`, `vad/` and `speaker-models/`. Later versions do not read these directories and do not delete them.
 
 When you import a file, or open a file with Cassini from a different app, Cassini copies the file into its storage. The original file stays where it is.
@@ -70,11 +71,24 @@ The host receives the IP address of your phone and the name of the file. Cassini
 
 Before Cassini uses a downloaded file, it makes sure that the size and the SHA-256 hash of the file are correct. The security policy of Cassini gives the details: https://github.com/codemyriad/cassini-android/blob/main/SECURITY.md
 
+## Your Cassini recorder
+
+You can bind your own Cassini voice recorder in Settings, Recorder. Cassini then talks only to that recorder, over Bluetooth, and only while the recorder is in its Bluetooth phone mode. Cassini does not use the internet for it.
+
+- Binding: you press ENTER on the recorder, select the recorder in the Android device chooser, accept the Android pairing request, and type the PIN that the recorder shows. Cassini then makes a random 32-byte key and sends it to the recorder. Cassini keeps this key only in encrypted form, with a key of the Android Keystore that never leaves your phone. The key is not in backups. A recorder keeps the key of one phone: if you bind a different phone, the first phone must bind the recorder again.
+- From the recorder to Cassini: right after you bind the recorder, when you push "Sync now", or every few minutes while "Auto sync" is on and Cassini runs, Cassini copies the new recordings of the recorder into new notes. Then it transcribes them on your phone as for any other note, if you agreed to the model download.
+- From Cassini to the recorder: Cassini sends back the transcript of each copied recording (the title, the words with their times, and the speaker names and colours), so that the recorder can show it during playback. Cassini sends no voiceprints, and no other notes.
+- Cassini also sets the clock of the recorder to the time of your phone.
+- Cassini does not delete recordings from the recorder.
+
+"Forget recorder" removes the binding and its key from Cassini, with the Android Keystore key that encrypted it and any download that stopped before it finished. The notes stay. The recorder keeps the key until a phone binds it again.
+
 ## Permissions
 
 - Microphone: Cassini uses the microphone only while you record. Cassini shows a notification during the recording.
 - Notifications: Cassini shows the progress of recordings, downloads and transcriptions. If you set Android to hide sensitive notification content on the lock screen, these notifications do not show the title of the note on a secure lock screen.
 - Internet: Cassini uses the internet only for the model downloads.
+- Nearby devices (Bluetooth, Android 12 and later): Cassini uses Bluetooth only to bind and sync your own Cassini recorder. Cassini does not scan for other devices and does not use your location. The Android device chooser finds the recorder.
 
 ## Backup and device transfer
 

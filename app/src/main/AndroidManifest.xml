@@ -13,6 +13,23 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The recorder sync (docs/recorder-sync.md): a Bluetooth SPP link to the user's own Cassini recorder. Android 12+
+         asks for "Nearby devices" (BLUETOOTH_CONNECT) at run time. The app does not scan: the companion device chooser
+         of Android finds the recorder, so no BLUETOOTH_SCAN and no location permission. Android 11 and earlier grant
+         BLUETOOTH and BLUETOOTH_ADMIN (createBond) at install. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- An app with a companion device may start its foreground service from the background ("Auto sync") and wake when
+         the bound recorder comes nearby (RecorderCompanionService / RecorderBluetoothReceiver). -->
+    <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Bluetooth and the companion device chooser are optional: the app installs on devices without them. -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />
     <!-- tools:targetApi: localeConfig and enableOnBackInvokedCallback are API 33, dataExtractionRules API 31; older
          releases ignore them. -->
     <application android:name=".CassiniApplication" android:label="@string/app_name"
@@ -74,6 +91,30 @@
         <service android:name=".nav.ImportGrantService" android:exported="false" />
         <service android:name=".processing.ProcessingService" android:exported="false"
             android:foregroundServiceType="dataSync|mediaProcessing" />
+        <!-- Holds the process while a recorder sync transfers files (recorder/RecorderSyncService.kt). -->
+        <service android:name=".recorder.RecorderSyncService" android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+        <!-- Woken by CompanionDeviceManager when the bound recorder connects over Bluetooth (API 31+). -->
+        <service
+            android:name=".recorder.RecorderCompanionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
+            <intent-filter>
+                <action android:name="android.companion.CompanionDeviceService" />
+            </intent-filter>
+        </service>
+        <!-- Fallback wakeups: ACL_CONNECTED from the Bluetooth stack (which carries no app-matching permission), plus
+             re-registering companion presence after boot or update. Only the bound recorder's MAC is acted upon. -->
+        <receiver
+            android:name=".recorder.RecorderBluetoothReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <!-- Exported for media controllers (the system UI, Bluetooth, Android Auto), as Media3 requires; no permission
              can name them all, and the session decides what each connecting controller may do. -->
         <service android:name=".playback.PlaybackService" android:exported="true"
