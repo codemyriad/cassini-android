@@ -79,9 +79,7 @@ enum class RecordingStatus {
 data class RecorderQueueCounts(
     val transcribing: Int = 0,
     val waitingForRecorder: Int = 0,
-) {
-    val hasWork: Boolean get() = transcribing > 0 || waitingForRecorder > 0
-}
+)
 
 /** One synced recording: its file [name], its note ([noteId], [title]) and where it is now. */
 data class RecordingRow(
