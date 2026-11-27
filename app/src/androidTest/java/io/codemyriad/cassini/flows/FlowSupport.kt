@@ -17,6 +17,7 @@ import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
@@ -64,6 +65,7 @@ internal object Flows {
     const val TEST_FILES = "testfiles.${BuildConfig.APPLICATION_ID}"
     const val JOB_MS = 300_000L
     private const val TAG = "CassiniFlow"
+    private const val FIRST_RUN_TOP_BAR = "first-run-top-bar"
 
     val graph get() = Background.graph
 
@@ -165,6 +167,19 @@ internal object Flows {
 
     fun AppRule.waitGone(matcher: SemanticsMatcher, timeoutMs: Long = SCREEN_MS) =
         awaitUi(timeoutMs) { onAllNodes(matcher).fetchSemanticsNodes().isEmpty() }
+
+    /**
+     * Waits until the Library shows the top bar of the stored catalogue: the first-run bar (Settings alone) when it has
+     * no meeting, else the search bar. The Library opens loading, with the search bar; an empty catalogue then swaps
+     * it for the first-run bar, whose Settings button is a new node, and a click on the old one while it goes is lost
+     * (D-1186, BulkTransferDeviceTest on API 34). The rule launches the activity before `@Before` resets the data,
+     * so the swap can follow the first frame. Call it before the Library's Settings button is clicked.
+     */
+    fun AppRule.awaitLibraryTopBar(timeoutMs: Long = SCREEN_MS) {
+        val empty = runBlocking { graph.awaitCatalogue().notes.library().first().isEmpty() }
+        val firstRun = hasTestTag(FIRST_RUN_TOP_BAR)
+        if (empty) waitShown(firstRun, timeoutMs) else waitGone(firstRun, timeoutMs)
+    }
 
     /**
      * Waits until the window that shows the node of [matcher] has no keyboard inset. A sheet opened while a field has

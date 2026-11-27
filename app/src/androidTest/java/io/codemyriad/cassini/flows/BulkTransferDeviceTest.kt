@@ -18,6 +18,7 @@ import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.R
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.data.notes.ImportSummary
+import io.codemyriad.cassini.flows.Flows.awaitLibraryTopBar
 import io.codemyriad.cassini.flows.Flows.awaitUi
 import io.codemyriad.cassini.flows.Flows.waitShown
 import io.codemyriad.cassini.test.CiSmoke
@@ -152,9 +153,10 @@ class BulkTransferDeviceTest {
         exported.delete()
     }
 
-    /** Settings, from the Library's Settings button (the only top action before and after the first meeting). */
+    /** Settings, from the Library's Settings button, once the Library shows the bar of the stored catalogue. */
     private fun openSettings() {
         val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        rule.awaitLibraryTopBar()
         val settings = hasContentDescription(context.getString(UiR.string.ui_library_settings)) and hasClickAction()
         rule.waitShown(settings)
         rule.onNode(settings).performClick()
