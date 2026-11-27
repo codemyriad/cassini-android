@@ -91,7 +91,7 @@ interface LivePrecomputeSession : AutoCloseable {
     fun onBytesAvailable(bytes: Long)
 
     /** Stops live precomputation and awaits full worker teardown without deleting staged files. */
-    suspend fun awaitStopped() = Unit
+    suspend fun awaitStopped()
 
     /** Stops background precomputation, installs any checkpointed progress into [noteId]'s work dir, and cleans up. */
     suspend fun finishAndInstall(noteId: String)

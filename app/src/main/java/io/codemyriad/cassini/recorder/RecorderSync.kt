@@ -803,7 +803,12 @@ class RecorderSync(private val parts: Parts) {
             }
             null
         } catch (error: XrecException) {
-            downloadFailed(address, planned, part, error)
+            if (error.failure == XrecFailure.LATER) {
+                Log.i(TAG, "${planned.name} header refresh waits for the end of the recording")
+                FileResult.DEFERRED
+            } else {
+                downloadFailed(address, planned, part, error)
+            }
         }
     }
 

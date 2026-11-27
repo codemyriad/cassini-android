@@ -807,6 +807,8 @@ class AppGraph(context: Context, val config: Config) {
     ) : LivePrecomputeSession {
         override fun onBytesAvailable(bytes: Long) = precomputer.onBytesAvailable(bytes)
 
+        override suspend fun awaitStopped() = precomputer.awaitStopped()
+
         override suspend fun finishAndInstall(noteId: String) {
             try {
                 precomputer.finishAndInstall(noteId)
