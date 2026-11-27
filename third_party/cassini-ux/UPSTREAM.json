@@ -1,10 +1,10 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "160fb923944422c5c4ff01aa777bb572e2a6e96e",
+  "commit": "e709094d283434fa59428544e0065e8deb49967b",
   "files": {
     "strings.json": {
       "source": "strings/strings.json",
-      "sha256": "01e70aee17a107b8f248293e8752dbd98d3457484bc8b6c14946e0b83ec669f9"
+      "sha256": "8272be2e315ff8cb6435b2eb6fba6568ecb11ee84975ff19fcb9bbaaf715a7fb"
     },
     "brand/tokens.json": {
       "source": "brand/tokens.json",
@@ -16,7 +16,7 @@
     },
     "contract/LIBRARY-RULES.md": {
       "source": "contract/LIBRARY-RULES.md",
-      "sha256": "415d866eb4a098400c76a3975969d9764bb70eed905726fbdcf7e90e42f85ce8"
+      "sha256": "1525db1ac89d2bf4cbe6ca8c1d2bf8d912bed4011b827ab2bda832c4a18465ea"
     },
     "vectors/states/states-vectors.json": {
       "source": "vectors/states/states-vectors.json",
@@ -28,7 +28,7 @@
     },
     "vectors/library-vectors/expected/main.json": {
       "source": "vectors/library-vectors/expected/main.json",
-      "sha256": "d179f5f123092051e5126d7189aa257d2454cd9a1b12b205fc17f408360b013b"
+      "sha256": "c0102da6121a449cb44ae4360dbdd7cd6921835a5e85f463cad42cf953d2dc35"
     },
     "vectors/library-vectors/expected/r3-transcript-precedence.json": {
       "source": "vectors/library-vectors/expected/r3-transcript-precedence.json",
@@ -60,11 +60,11 @@
     },
     "contract/HARMONY.md": {
       "source": "contract/HARMONY.md",
-      "sha256": "e58675bf720e2111ffd13e8b6c590250be9592f7ad260252e963cc01299815d0"
+      "sha256": "585b52e4eaaa3f89ff5433b1da237e0ad59923228085291e724a734da9889317"
     },
     "strings/strings.json": {
       "source": "strings/strings.json",
-      "sha256": "01e70aee17a107b8f248293e8752dbd98d3457484bc8b6c14946e0b83ec669f9"
+      "sha256": "8272be2e315ff8cb6435b2eb6fba6568ecb11ee84975ff19fcb9bbaaf715a7fb"
     },
     "contract/import-types.json": {
       "source": "contract/import-types.json",
@@ -73,8 +73,8 @@
     },
     "wave5/strings.json": {
       "source": "strings/strings.json",
-      "commit": "160fb923944422c5c4ff01aa777bb572e2a6e96e",
-      "sha256": "01e70aee17a107b8f248293e8752dbd98d3457484bc8b6c14946e0b83ec669f9"
+      "commit": "e709094d283434fa59428544e0065e8deb49967b",
+      "sha256": "8272be2e315ff8cb6435b2eb6fba6568ecb11ee84975ff19fcb9bbaaf715a7fb"
     },
     "phase2/strings.json": {
       "source": "strings/strings.json",

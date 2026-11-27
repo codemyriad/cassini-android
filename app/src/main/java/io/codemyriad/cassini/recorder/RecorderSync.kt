@@ -88,9 +88,6 @@ enum class SyncMode {
  * failed GETS windows. Null in [SyncOutcome.Done] when nothing was downloaded.
  */
 data class DownloadSpeed(val bytes: Long, val millis: Long, val retries: Int) {
-    /** Kilobytes (1000 bytes) per second; 0 when no time was measured. */
-    val kilobytesPerSecond: Long get() = if (millis > 0) bytes / millis else 0
-
     operator fun plus(stats: XrecDownloadStats) =
         DownloadSpeed(bytes + stats.bytes, millis + stats.millis, retries + stats.retries)
 }
