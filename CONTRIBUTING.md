@@ -100,7 +100,10 @@ ruff check --config config/ruff.toml scripts tools
 scripts/check-links.sh
 python3 -I scripts/check-resource-collisions.py
 scripts/check-verbatim.sh
+python3 -m unittest discover -s tests/ci -p 'test_*.py'
 ```
+
+If you change the vendored cassini-ux inputs in `third_party/cassini-ux/` or a generated resource, also run the checks of the CI step "Pinned brand colours match their generator" (`.github/workflows/android.yml`): `python3 -I scripts/check-ux-pin.py`, each `scripts/generate-*-strings.py --check`, `python3 -I scripts/generate-brand-colors.py --check` and `python3 third_party/cassini-ux/vectors/states/verify.py`.
 
 CI also runs actionlint on the workflows in `.github/workflows/`. [Code style](#code-style) and [Verbatim engine code](#verbatim-engine-code) tell more about these checks.
 
@@ -134,7 +137,13 @@ If you change a screen on purpose, do these steps:
 2. Examine each changed PNG with `git diff --stat ui/src/test/screenshots` and an image viewer.
 3. Commit the goldens together with the change.
 
-On macOS or Windows, do not run `ciTest`, and do not record goldens there. Run the same tests without the pixel comparison. CI does the pixel comparison. To get new goldens without Linux x86_64, push your branch and let CI record them:
+On macOS or Windows, do not run `ciTest`, and do not record goldens there. Run the same tests without the pixel comparison. CI does the pixel comparison:
+
+```sh
+./gradlew :core:test :app-logic:test :engine:testDebugUnitTest :data:testDebugUnitTest :ui:testDebugUnitTest :app:testDebugUnitTest
+```
+
+To get new goldens without Linux x86_64, push your branch and let CI record them:
 
 ```sh
 gh workflow run record-goldens.yml --ref <branch>
@@ -142,10 +151,6 @@ gh run download <run id> --name recorded-goldens --dir .   # only the goldens th
 ```
 
 Then examine each changed PNG and commit the goldens with the change, as in steps 2 and 3.
-
-```sh
-./gradlew :core:test :engine:testDebugUnitTest :data:testDebugUnitTest :ui:testDebugUnitTest :app:testDebugUnitTest
-```
 
 ## Device tests
 
