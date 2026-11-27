@@ -6,6 +6,7 @@ import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.data.notes.ImportOutcome
 import io.codemyriad.cassini.data.notes.NoteRepository
+import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.processing.StartOrigin
 import io.codemyriad.cassini.processing.TranscribeOutcome
 import kotlinx.coroutines.flow.first
@@ -32,6 +33,13 @@ class GraphRecorderLibrary(
 
     override suspend fun openLivePrecompute(partFile: File, displayName: String): LivePrecomputeSession? =
         graph.openRecorderLivePrecompute(partFile)
+
+    override suspend fun setRecordingStartIfAbsent(noteId: String, startedAt: String) {
+        graph.ready.await()
+        val notes = graph.awaitCatalogue().notes
+        val row = notes.note(noteId).first()?.note ?: return
+        if (row.recordingTime() == null) notes.setStartedAt(noteId, startedAt)
+    }
 
     override suspend fun transcribe(noteId: String) {
         val outcome = graph.processing.transcribe(noteId, origin = StartOrigin.AUTOMATIC)

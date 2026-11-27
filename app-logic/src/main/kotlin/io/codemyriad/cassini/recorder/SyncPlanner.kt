@@ -3,6 +3,8 @@ package io.codemyriad.cassini.recorder
 import io.codemyriad.cassini.core.recorder.XrecLimits
 import io.codemyriad.cassini.core.recorder.XrecNames
 import io.codemyriad.cassini.core.recorder.XrecReply
+import java.time.DateTimeException
+import java.time.LocalDateTime
 import java.util.Locale
 
 /**
@@ -22,8 +24,16 @@ data class SyncedRecording(
     val transcriptRefusedVersion: String? = null,
 )
 
-/** A download that stopped before its end; [bytes] are on disk. */
-data class PartialDownload(val name: String, val size: Long, val bytes: Long)
+/**
+ * A download that stopped before its end; [bytes] are on disk. [liveHeaderPending] marks a `.part` populated during
+ * active recording whose initial 44-byte WAV header must still be refreshed after stop even if the file size didn't grow.
+ */
+data class PartialDownload(
+    val name: String,
+    val size: Long,
+    val bytes: Long,
+    val liveHeaderPending: Boolean = false,
+)
 
 /** What the app remembers about one recorder. */
 data class RecorderSyncState(
@@ -60,6 +70,7 @@ data class PlannedDownload(
      * length of its `.part` file, which can be ahead of the stored bytes after process death.
      */
     val resume: PartialDownload? = null,
+    val recordedAt: LocalDateTime? = null,
 )
 
 data class PlannedUpload(
@@ -183,7 +194,7 @@ object SyncPlanner {
     private fun download(entry: XrecReply.Entry, state: RecorderSyncState): PlannedDownload {
         val partial = state.partial?.takeIf { it.name.equals(entry.name, ignoreCase = true) && it.size == entry.size }
             ?.takeIf { it.bytes in 0..entry.size }
-        return PlannedDownload(entry.name, entry.size, partial)
+        return PlannedDownload(entry.name, entry.size, partial, RecorderTimestamps.resolve(entry))
     }
 
     private fun upload(
@@ -201,4 +212,35 @@ object SyncPlanner {
             listing.any { it.name.equals(sidecar, ignoreCase = true) }
         return if (current) null else PlannedUpload(recording, checkNotNull(sidecar), checkNotNull(version))
     }
+}
+
+/** Resolves a recorder file's local start timestamp from `+XREC:LS,T` or legacy `YYYYMMDD-HHMMSS` filenames. */
+object RecorderTimestamps {
+    private val filenameDatePrefix = Regex("^(\\d{4})(\\d{2})(\\d{2})-(\\d{2})(\\d{2})(\\d{2})(?:\\D|$)")
+    private const val MIN_YEAR = 2000
+    private const val MAX_YEAR = 2099
+
+    @Suppress("MagicNumber") // Matches YYYYMMDD-HHMMSS regex capture groups 1..6 cleanly.
+    fun filenameStart(name: String): LocalDateTime? {
+        val match = filenameDatePrefix.find(name)
+        val year = match?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it in MIN_YEAR..MAX_YEAR }
+        return if (year == null) {
+            null
+        } else {
+            try {
+                LocalDateTime.of(
+                    year,
+                    match.groupValues[2].toInt(),
+                    match.groupValues[3].toInt(),
+                    match.groupValues[4].toInt(),
+                    match.groupValues[5].toInt(),
+                    match.groupValues[6].toInt(),
+                )
+            } catch (_: DateTimeException) {
+                null
+            }
+        }
+    }
+
+    fun resolve(entry: XrecReply.Entry): LocalDateTime? = entry.recordedAt ?: filenameStart(entry.name)
 }

@@ -90,6 +90,9 @@ interface LivePrecomputeSession : AutoCloseable {
     /** Signals that the `.part` file now has at least [bytes] written and synced to disk. */
     fun onBytesAvailable(bytes: Long)
 
+    /** Stops live precomputation and awaits full worker teardown without deleting staged files. */
+    suspend fun awaitStopped() = Unit
+
     /** Stops background precomputation, installs any checkpointed progress into [noteId]'s work dir, and cleans up. */
     suspend fun finishAndInstall(noteId: String)
 
@@ -100,6 +103,9 @@ interface LivePrecomputeSession : AutoCloseable {
 interface RecorderLibrary {
     /** Imports [file] as a new note titled after [displayName]. */
     suspend fun import(file: File, displayName: String): LibraryImport
+
+    /** Records [startedAt] (RFC 3339 with offset) on [noteId] only when it still has no known recording time. */
+    suspend fun setRecordingStartIfAbsent(noteId: String, startedAt: String) = Unit
 
     /** Opens an optional best-effort live precompute session over [partFile] as it grows; null when skipped. */
     suspend fun openLivePrecompute(partFile: File, displayName: String): LivePrecomputeSession? = null

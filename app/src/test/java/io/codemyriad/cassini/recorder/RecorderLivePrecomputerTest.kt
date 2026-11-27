@@ -57,8 +57,10 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -169,6 +171,58 @@ class RecorderLivePrecomputerTest {
             (0 until totalSeconds).map { "w$it" },
             storage.markedDocument!!.selected(null)!!.transcript!!.words.map { it.text },
         )
+    }
+
+    @Test fun concurrentJobOwnershipSkipsSnapshotInstallUnderNoteLock() = runBlocking {
+        val totalSeconds = 40
+        val wav = buildPcmWav(sampleRate = 16_000, channels = 1, frames = 16_000 * totalSeconds)
+        val prefixBytes = 44 + 16_000 * 30 * 2
+        val partFile = temp.newFile("REC_0002.wav.part").apply {
+            writeBytes(buildWavHeader(dataBytes = prefixBytes - 44, sampleRate = 16_000, channels = 1))
+            appendBytes(wav.copyOfRange(44, prefixBytes))
+        }
+
+        val noteDir = temp.newFolder("note-locked")
+        val finalAudio = File(noteDir, "source.wav")
+        val storage = TestJobStorage(noteDir, finalAudio, SpeechModel.PARAKEET)
+        val voices = TestJobVoices()
+        val models = TestModelAccess()
+        val decodedWindows = CopyOnWriteArrayList<Long>()
+        val audioStarts = CopyOnWriteArrayList<Long>()
+        val engines = buildTestEngines(decodedWindows, audioStarts)
+        val env = JobEnvironment(placeholderLabel = { "Speaker $it" }, inference = inference, io = Dispatchers.IO)
+        val firstCheckpoint = CompletableDeferred<Long>()
+        val stagingDir = temp.newFolder("staging-locked")
+        var lockSeenByGuard = false
+        val precomputer = RecorderLivePrecomputer(
+            RecorderLivePrecomputer.Parts(
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+                partFile = partFile,
+                stagingDir = stagingDir,
+                speechModel = SpeechModel.PARAKEET,
+                models = models,
+                engines = engines,
+                env = env,
+                storage = storage,
+                voices = voices,
+                speakerPrefix = { "diar_live_" },
+                canInstallBlocking = {
+                    lockSeenByGuard = storage.insideLock
+                    false
+                },
+                onCheckpointed = { doneMs -> if (doneMs > 0L) firstCheckpoint.complete(doneMs) },
+            ),
+        )
+        precomputer.onBytesAvailable(partFile.length())
+        assertEquals(28_000L, withTimeout(TIMEOUT_MS) { firstCheckpoint.await() })
+
+        precomputer.awaitStopped()
+        finalAudio.writeBytes(wav)
+        precomputer.finishAndInstall("note-locked")
+
+        assertTrue(lockSeenByGuard)
+        assertEquals(CheckpointLoad.Missing, storage.loadCheckpoint("note-locked"))
+        assertFalse(stagingDir.exists())
     }
 
     private fun buildTestEngines(
@@ -368,6 +422,8 @@ class RecorderLivePrecomputerTest {
         private val marker = File(work, "sealed")
         private val namesRef = AtomicReference(CheckpointNames(emptyMap(), emptyMap()))
         private var checkpointJson: String? = null
+        private var lockDepth = 0
+        val insideLock: Boolean get() = lockDepth > 0
         var markedDocument: CassiniDocument? = null
 
         override suspend fun loadCheckpoint(noteId: String): CheckpointLoad {
@@ -418,7 +474,14 @@ class RecorderLivePrecomputerTest {
 
         override fun sealTarget(noteId: String) = File(work, "sealed.opus")
 
-        override fun <T> withNoteLockBlocking(noteId: String, block: () -> T): T = block()
+        override fun <T> withNoteLockBlocking(noteId: String, block: () -> T): T {
+            lockDepth++
+            return try {
+                block()
+            } finally {
+                lockDepth--
+            }
+        }
 
         override fun existingDocumentBlocking(noteId: String): CassiniDocument? = null
 

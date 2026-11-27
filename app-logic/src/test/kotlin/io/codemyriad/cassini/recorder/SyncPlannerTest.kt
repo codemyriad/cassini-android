@@ -6,6 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDateTime
 
 class SyncPlannerTest {
     private val idle = XrecReply.Status(80, 3900, 0, false, 16, 0, 1000, 7000)
@@ -225,5 +226,20 @@ class SyncPlannerTest {
         val plan = SyncPlanner.plan(listOf(file(name, 1_000)), idle, state, mapOf("n1" to "v1"))
         assertTrue(plan.uploads.isEmpty())
         assertNull(plan.downloads.firstOrNull())
+    }
+
+    @Test fun resolvesTimestampsFromTimedListingOrLegacyFilenames() {
+        val listingTime = LocalDateTime.of(2026, 11, 25, 9, 30, 14)
+        val listing = listOf(
+            XrecReply.Entry(1_000, "REC_0001.wav", listingTime),
+            XrecReply.Entry(1_000, "20261124-081509.wav", null),
+            XrecReply.Entry(1_000, "20260230-081509.wav", null),
+            XrecReply.Entry(1_000, "REC_0002.wav", null),
+        )
+        val plan = SyncPlanner.plan(listing, idle, RecorderSyncState(), emptyMap())
+        assertEquals(
+            listOf(listingTime, LocalDateTime.of(2026, 11, 24, 8, 15, 9), null, null),
+            plan.downloads.map { it.recordedAt },
+        )
     }
 }

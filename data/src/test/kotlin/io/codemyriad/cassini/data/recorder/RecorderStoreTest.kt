@@ -37,7 +37,7 @@ class RecorderStoreTest {
                 StoredRecording(SyncedRecording("REC, with comma.wav", 2_000, null), failure = "IMPORT_WAV"),
                 StoredRecording(SyncedRecording("REC_0003.wav", 3_000, "n3"), absent = true),
             ),
-            partial = PartialDownload("REC_0002.wav", 9_000, 3_840),
+            partial = PartialDownload("REC_0002.wav", 9_000, 3_840, liveHeaderPending = true),
             lastSync = LastSync(
                 42,
                 "OK",
@@ -62,7 +62,11 @@ class RecorderStoreTest {
         val restored = RecorderStore(file, Dispatchers.IO)
         assertEquals(settings, restored.read())
         assertEquals(state, restored.read().current)
-        assertEquals(state.syncState().partial, PartialDownload("REC_0002.wav", 9_000, 3_840))
+        assertEquals(
+            state.syncState().partial,
+            PartialDownload("REC_0002.wav", 9_000, 3_840, liveHeaderPending = true),
+        )
+        assertTrue(restored.read().current!!.partial!!.liveHeaderPending)
     }
 
     @Test fun updatesOfOneRecorderKeepTheOthersAndForgetKeepsTheRecord() = runTest {

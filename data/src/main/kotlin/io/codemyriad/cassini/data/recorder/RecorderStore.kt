@@ -229,7 +229,11 @@ internal object RecorderJson {
             .putOpt("transcriptsUnsupportedAt", state.transcriptsUnsupportedAt)
             .putOpt("lastSuccessAt", state.lastSuccessAt)
         state.partial?.let {
-            json.put("partial", JSONObject().put("name", it.name).put("size", it.size).put("bytes", it.bytes))
+            json.put(
+                "partial",
+                JSONObject().put("name", it.name).put("size", it.size).put("bytes", it.bytes)
+                    .putOpt("liveHeaderPending", it.liveHeaderPending.takeIf { pending -> pending }),
+            )
         }
         state.lastSync?.let {
             json.put(
@@ -247,7 +251,12 @@ internal object RecorderJson {
         return RecorderDeviceState(
             recordings = (0 until recordings.length()).map { decodeRecording(recordings.getJSONObject(it)) },
             partial = json.optJSONObject("partial")?.let {
-                PartialDownload(it.getString("name"), it.getLong("size"), it.getLong("bytes"))
+                PartialDownload(
+                    it.getString("name"),
+                    it.getLong("size"),
+                    it.getLong("bytes"),
+                    liveHeaderPending = it.optBoolean("liveHeaderPending", false),
+                )
             },
             lastSync = json.optJSONObject("lastSync")?.let {
                 LastSync(

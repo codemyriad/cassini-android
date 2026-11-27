@@ -5,7 +5,7 @@ package io.codemyriad.cassini.core.recorder
 import java.time.DateTimeException
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
+import java.time.format.ResolverStyle
 
 /** The limits of the open_fw XREC protocol (recorder firmware `xrec_proto.c`). */
 object XrecLimits {
@@ -167,7 +167,7 @@ object XrecCommands {
         "${prefix}RTC,$year,$monthValue,$dayOfMonth,$hour,$minute,$second,${dayOfWeek.value - 1}"
     }
 
-    fun list(): String = "${prefix}LS"
+    fun list(withTimestamps: Boolean = false): String = if (withTimestamps) "${prefix}LS,T" else "${prefix}LS"
 
     fun gets(offset: Long, total: Int, chunk: Int, name: String): String {
         require(offset in 0..XrecLimits.MAX_OFFSET) { "Offset out of range" }
@@ -216,6 +216,7 @@ sealed interface XrecReply {
         val recordTarget: Boolean = false,
         val syncStatusSupported: Boolean = false,
         val liveRecordingSupported: Boolean = false,
+        val listTimestampsSupported: Boolean = false,
     ) : XrecReply
 
     /** `CHAL,<32 hex>`. */
@@ -251,8 +252,8 @@ sealed interface XrecReply {
     /** `RTC,YYYY-MM-DD HH:MM:SS,<weekday 0=Monday>`. [time] is null when the device clock holds no valid date. */
     data class Clock(val text: String, val time: LocalDateTime?, val weekday: Int) : XrecReply
 
-    /** `F,<size>,<name>`: one file of /record. The name may contain commas. */
-    data class Entry(val size: Long, val name: String) : XrecReply
+    /** `F,<size>,<name>` or `FT,<size>,<YYYY-MM-DDTHH:MM:SS or ->,<name>`: one file of /record. The name may contain commas. */
+    data class Entry(val size: Long, val name: String, val recordedAt: LocalDateTime? = null) : XrecReply
 
     /** `END`: the end of an LS listing. */
     data object End : XrecReply
@@ -278,6 +279,8 @@ sealed interface XrecReply {
 @Suppress("ReturnCount") // Each parser gives null at its first unreadable field.
 object XrecReplies {
     private val clockFormat = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss")
+    private val entryTimeFormat =
+        DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss").withResolverStyle(ResolverStyle.STRICT)
 
     /** The reply of [line] (without CR/LF), or null when it does not start with `+XREC:` (the app ignores it). */
     fun parse(line: String): XrecReply? {
@@ -299,6 +302,7 @@ object XrecReplies {
         "STAT" to ::status,
         "RTC" to ::clock,
         "F" to ::entry,
+        "FT" to ::timedEntry,
         "OK" to ::ok,
         "ERR" to XrecReply::Failed,
     )
@@ -328,6 +332,7 @@ object XrecReplies {
             recordTarget = flags["rec"] == "1",
             syncStatusSupported = flags["sync"] == "1",
             liveRecordingSupported = flags["live"] == "1",
+            listTimestampsSupported = flags["lst"] == "1",
         )
     }
 
@@ -357,8 +362,6 @@ object XrecReplies {
         val weekday = rest.substringAfterLast(',').toIntOrNull() ?: return null
         val time = try {
             LocalDateTime.parse(text, clockFormat)
-        } catch (_: DateTimeParseException) {
-            null
         } catch (_: DateTimeException) {
             null
         }
@@ -370,5 +373,21 @@ object XrecReplies {
         if (parts.size != 2 || parts[1].isEmpty()) return null
         val size = parts[0].toLongOrNull()?.takeIf { it >= 0 } ?: return null
         return XrecReply.Entry(size, parts[1])
+    }
+
+    private fun timedEntry(rest: String): XrecReply.Entry? {
+        val parts = rest.split(',', limit = 3)
+        if (parts.size != 3 || parts[2].isEmpty()) return null
+        val size = parts[0].toLongOrNull()?.takeIf { it >= 0 } ?: return null
+        val time = if (parts[1] == "-") {
+            null
+        } else {
+            try {
+                LocalDateTime.parse(parts[1], entryTimeFormat)
+            } catch (_: DateTimeException) {
+                return null
+            }
+        }
+        return XrecReply.Entry(size, parts[2], time)
     }
 }

@@ -111,9 +111,9 @@ class XrecClient(
 
     fun setRtc(time: LocalDateTime) = requestOk(XrecCommands.setRtc(time), "RTC")
 
-    /** `LS`: the files of /record, in directory order. */
-    fun list(): List<XrecReply.Entry> {
-        send(XrecCommands.list())
+    /** `LS` (or `LS,T` when [withTimestamps]): the files of /record, in directory order. */
+    fun list(withTimestamps: Boolean = false): List<XrecReply.Entry> {
+        send(XrecCommands.list(withTimestamps))
         val entries = mutableListOf<XrecReply.Entry>()
         while (true) {
             when (val reply = readReply(deadline(timeouts.replyMillis))) {

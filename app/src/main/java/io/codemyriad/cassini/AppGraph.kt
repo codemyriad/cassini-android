@@ -17,6 +17,7 @@ import io.codemyriad.cassini.adapters.SelectedModelAccess
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.asr.TranscriptionMode
+import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.models.ModelCheck
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
@@ -781,6 +782,10 @@ class AppGraph(context: Context, val config: Config) {
                 storage = catalogue.jobStorage,
                 voices = catalogue.jobVoices,
                 shouldContinue = ::isRecorderPrecomputeAllowed,
+                canInstallBlocking = { id ->
+                    catalogue.database.jobs().jobBlocking(id) == null &&
+                        catalogue.database.notes().noteBlocking(id)?.audioKind == AudioKind.PLAIN
+                },
             ),
         )
         recorderLivePrecompute.getAndSet(precomputer)?.preempt()

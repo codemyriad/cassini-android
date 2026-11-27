@@ -229,6 +229,7 @@ class RecorderLivePrecomputer(
         val voices: JobVoices,
         val speakerPrefix: () -> String = env.speakerPrefix,
         val shouldContinue: () -> Boolean = { true },
+        val canInstallBlocking: (String) -> Boolean = { true },
         val onCheckpointed: (Long) -> Unit = {},
     )
 
@@ -249,6 +250,12 @@ class RecorderLivePrecomputer(
     fun preempt() {
         allowed.set(false)
         wakeups.trySend(Unit)
+    }
+
+    override suspend fun awaitStopped() {
+        allowed.set(false)
+        wakeups.trySend(Unit)
+        worker.cancelAndJoin()
     }
 
     override suspend fun finishAndInstall(noteId: String) {
@@ -456,43 +463,50 @@ class RecorderLivePrecomputer(
         val stagedOpus = File(parts.stagingDir, WORK_AUDIO_PART)
         val stagedClips = File(parts.stagingDir, WORK_CLIPS)
         val minClipsBytes = snap.clipSamples.toLong() * BYTES_PER_FLOAT
-        val valid = audioFile.isFile &&
-            stagedOpus.isFile && stagedOpus.length() >= snap.encoder.length &&
-            stagedClips.isFile && stagedClips.length() >= minClipsBytes
-        if (!valid) return
+        withContext(parts.env.io) {
+            parts.storage.withNoteLockBlocking(noteId) {
+                val valid = parts.canInstallBlocking(noteId) &&
+                    audioFile.isFile &&
+                    stagedOpus.isFile && stagedOpus.length() >= snap.encoder.length &&
+                    stagedClips.isFile && stagedClips.length() >= minClipsBytes
+                if (valid) {
+                    val work = parts.storage.workFiles(noteId)
+                    val generation = parts.voices.generationBlocking()
+                    parts.storage.mutateNames(noteId) {
+                        CheckpointNames(emptyMap(), emptyMap(), generation = generation)
+                    }
 
-        val work = parts.storage.workFiles(noteId)
-        val generation = parts.voices.generationBlocking()
-        parts.storage.mutateNames(noteId) { CheckpointNames(emptyMap(), emptyMap(), generation = generation) }
-
-        copyTruncated(stagedOpus, work.encodedAudio, snap.encoder.length)
-        copyTruncated(stagedClips, work.clips, minClipsBytes)
-        val stagedWhistle = File(parts.stagingDir, WORK_WHISTLE_SEGMENTS)
-        if (stagedWhistle.isFile) {
-            parts.storage.whistleSegmentCache(noteId)?.let { dest ->
-                stagedWhistle.copyTo(dest, overwrite = true)
+                    copyTruncated(stagedOpus, work.encodedAudio, snap.encoder.length)
+                    copyTruncated(stagedClips, work.clips, minClipsBytes)
+                    val stagedWhistle = File(parts.stagingDir, WORK_WHISTLE_SEGMENTS)
+                    if (stagedWhistle.isFile) {
+                        parts.storage.whistleSegmentCache(noteId)?.let { dest ->
+                            stagedWhistle.copyTo(dest, overwrite = true)
+                        }
+                    }
+                    val state = CheckpointState(
+                        source = audioFile.name,
+                        signature = CheckpointState.signature(audioFile),
+                        model = parts.speechModel.identity,
+                        speakers = ModelCatalog.diarizationModel.sha256,
+                        recognition = snap.recognition,
+                        encoder = snap.encoder,
+                        diarizer = snap.diarizer,
+                        speakerPrefix = snap.speakerPrefix,
+                        speakerFailure = snap.speakerFailure,
+                        clipSamples = snap.clipSamples,
+                        voiceClips = snap.voiceClips,
+                        positionSamples = snap.positionSamples,
+                        doneMs = snap.doneMs,
+                        durationMs = 0L,
+                        elapsedMs = snap.elapsedMs,
+                        origin = CheckpointOrigin.PRECOMPUTE,
+                        committedPrefix = null,
+                    )
+                    parts.storage.saveCheckpoint(noteId, state)
+                }
             }
         }
-        val state = CheckpointState(
-            source = audioFile.name,
-            signature = CheckpointState.signature(audioFile),
-            model = parts.speechModel.identity,
-            speakers = ModelCatalog.diarizationModel.sha256,
-            recognition = snap.recognition,
-            encoder = snap.encoder,
-            diarizer = snap.diarizer,
-            speakerPrefix = snap.speakerPrefix,
-            speakerFailure = snap.speakerFailure,
-            clipSamples = snap.clipSamples,
-            voiceClips = snap.voiceClips,
-            positionSamples = snap.positionSamples,
-            doneMs = snap.doneMs,
-            durationMs = 0L,
-            elapsedMs = snap.elapsedMs,
-            origin = CheckpointOrigin.PRECOMPUTE,
-            committedPrefix = null,
-        )
-        parts.storage.saveCheckpoint(noteId, state)
     }
 
     private fun copyTruncated(src: File, dst: File, length: Long) {
