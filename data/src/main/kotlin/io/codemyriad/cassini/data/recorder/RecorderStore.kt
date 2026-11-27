@@ -75,14 +75,14 @@ data class RecorderDeviceState(
 
 /**
  * Everything about recorders: the bound one ([binding]), the "Auto sync" switch, the "Sync while the recorder records"
- * switch ([syncWhileRecording], off by default; the recorder's firmware decides whether it can) and the sync state of
+ * switch ([syncWhileRecording], on by default; the recorder's firmware decides whether it can) and the sync state of
  * each recorder by address. The sync state stays after "Forget recorder", so a recorder bound again does not import its
  * files again.
  */
 data class RecorderSettings(
     val binding: RecorderBinding? = null,
     val autoSync: Boolean = false,
-    val syncWhileRecording: Boolean = false,
+    val syncWhileRecording: Boolean = true,
     val devices: Map<String, RecorderDeviceState> = emptyMap(),
 ) {
     /** The state of the bound recorder; null when no recorder is bound. */
@@ -207,7 +207,7 @@ internal object RecorderJson {
         return RecorderSettings(
             binding = binding,
             autoSync = json.optBoolean("autoSync", false),
-            syncWhileRecording = json.optBoolean("syncWhileRecording", false),
+            syncWhileRecording = json.optBoolean("syncWhileRecording", true),
             devices = devices.keys().asSequence().associateWith { decodeDevice(devices.getJSONObject(it)) },
         )
     }
@@ -229,7 +229,11 @@ internal object RecorderJson {
             .putOpt("transcriptsUnsupportedAt", state.transcriptsUnsupportedAt)
             .putOpt("lastSuccessAt", state.lastSuccessAt)
         state.partial?.let {
-            json.put("partial", JSONObject().put("name", it.name).put("size", it.size).put("bytes", it.bytes))
+            json.put(
+                "partial",
+                JSONObject().put("name", it.name).put("size", it.size).put("bytes", it.bytes)
+                    .putOpt("liveHeaderPending", it.liveHeaderPending.takeIf { pending -> pending }),
+            )
         }
         state.lastSync?.let {
             json.put(
@@ -247,7 +251,12 @@ internal object RecorderJson {
         return RecorderDeviceState(
             recordings = (0 until recordings.length()).map { decodeRecording(recordings.getJSONObject(it)) },
             partial = json.optJSONObject("partial")?.let {
-                PartialDownload(it.getString("name"), it.getLong("size"), it.getLong("bytes"))
+                PartialDownload(
+                    it.getString("name"),
+                    it.getLong("size"),
+                    it.getLong("bytes"),
+                    liveHeaderPending = it.optBoolean("liveHeaderPending", false),
+                )
             },
             lastSync = json.optJSONObject("lastSync")?.let {
                 LastSync(

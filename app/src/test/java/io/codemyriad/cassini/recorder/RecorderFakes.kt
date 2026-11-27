@@ -108,6 +108,7 @@ internal class FakeVault : KeyVault {
 internal class FakeLibrary : RecorderLibrary {
     val imported: MutableMap<String, ByteArray> = Collections.synchronizedMap(LinkedHashMap())
     val titles: MutableMap<String, String> = Collections.synchronizedMap(LinkedHashMap())
+    val startedAtByNote: MutableMap<String, String> = Collections.synchronizedMap(LinkedHashMap())
     val transcribed: MutableList<String> = Collections.synchronizedList(mutableListOf())
     val ready: MutableMap<String, RecorderTranscript> = Collections.synchronizedMap(LinkedHashMap())
 
@@ -135,6 +136,10 @@ internal class FakeLibrary : RecorderLibrary {
                 LibraryImport.Created(noteId)
             }
         }
+    }
+
+    override suspend fun setRecordingStartIfAbsent(noteId: String, startedAt: String) {
+        synchronized(startedAtByNote) { startedAtByNote.putIfAbsent(noteId, startedAt) }
     }
 
     override suspend fun transcribe(noteId: String) {

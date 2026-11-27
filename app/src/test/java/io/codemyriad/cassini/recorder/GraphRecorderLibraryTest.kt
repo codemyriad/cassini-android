@@ -12,6 +12,7 @@ import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.db.NoteCache
 import io.codemyriad.cassini.data.models.ModelFetcher
+import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -21,6 +22,8 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
@@ -143,6 +146,35 @@ class GraphRecorderLibraryTest {
         val info = RecorderNotes.info(row)
         assertEquals(NoteSyncInfo("REC_0031", null, transcribed = false, noSpeech = true), info)
         assertEquals(setOf(noteId), RecorderNotes.pushable(mapOf(noteId to info)))
+    }
+
+    @Test fun setRecordingStartIfAbsentPopulatesDateUnknownNoteWithoutOverwritingExistingStart() = runBlocking {
+        val paths = AppPaths(folder.newFolder(), folder.newFolder(), modelRoot = folder.newFolder())
+        graph = AppGraph(
+            context,
+            AppGraph.Config(
+                paths = paths,
+                dispatchers = CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined),
+                fetcher = ModelFetcher { _, _, _ -> fail("No model is fetched in this test") },
+                network = { false },
+            ),
+        )
+        val library = GraphRecorderLibrary(graph) { "Speaker $it" }
+        val wav = File(folder.newFolder(), "REC_0001.wav.part").apply { writeBytes(wav(16_000)) }
+        val created = withTimeout(TIMEOUT_MS) { library.import(wav, "REC_0001.wav") } as LibraryImport.Created
+        val noteId = created.noteId
+
+        val initialRow = graph.awaitCatalogue().notes.library().first().single { it.id == noteId }
+        assertNull(initialRow.recordingTime())
+
+        library.setRecordingStartIfAbsent(noteId, "2026-11-25T09:15:44+01:00")
+        val updatedRow = graph.awaitCatalogue().notes.library().first().single { it.id == noteId }
+        assertEquals("2026-11-25T09:15:44+01:00", updatedRow.startedAt)
+        assertNotNull(updatedRow.recordingTime())
+
+        library.setRecordingStartIfAbsent(noteId, "2026-11-26T12:00:00+01:00")
+        val preservedRow = graph.awaitCatalogue().notes.library().first().single { it.id == noteId }
+        assertEquals("2026-11-25T09:15:44+01:00", preservedRow.startedAt)
     }
 
     private fun sealedDocument(title: String, words: List<String>): File {

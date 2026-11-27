@@ -10,6 +10,8 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Collections
 
 /**
@@ -56,8 +58,17 @@ class FakeRecorder(
     @Volatile var recordingRate: Int = RECORDING_RATE,
     /** Advertises `sync=1` in PONG and accepts `+XREC:SYNC,<pending>[,<eta>]`. */
     @Volatile var syncStatusSupported: Boolean = false,
+    /** Advertises `live=1` in PONG and streams flushed active `.wav` bytes during mono/stereo recording. */
+    @Volatile var liveRecordingSupported: Boolean = false,
+    /** Simulated flushed size on disk for the active `.wav`; null uses `files[active]?.size`. */
+    @Volatile var activeFlushedBytes: Int? = null,
+    /** Advertises `lst=1` in PONG and supports `+XREC:LS,T` emitting `+XREC:FT,...`. */
+    @Volatile var listTimestampsSupported: Boolean = false,
+    /** Default exFAT creation timestamp returned by `+XREC:LS,T` when [fileTimes] has no entry for the file. */
+    @Volatile var defaultFileTime: LocalDateTime? = null,
 ) : Closeable {
     val files: MutableMap<String, ByteArray> = Collections.synchronizedMap(LinkedHashMap())
+    val fileTimes: MutableMap<String, LocalDateTime?> = Collections.synchronizedMap(LinkedHashMap())
     val cassini: MutableMap<String, ByteArray> = Collections.synchronizedMap(LinkedHashMap())
     val dropFrames: MutableSet<Long> = Collections.synchronizedSet(HashSet())
     val corruptFrames: MutableSet<Long> = Collections.synchronizedSet(HashSet())
@@ -71,6 +82,9 @@ class FakeRecorder(
 
     /** The device answers `ERR,LATER,30000` instead of the GETS frame at this offset, and ends the window (once). */
     @Volatile var laterAtFrame: Long? = null
+
+    /** The device answers `ERR,BUSY` instead of the GETS frame at this offset, and ends the window (once). */
+    @Volatile var busyAtFrame: Long? = null
 
     /** The `ERR,LATER` and `OK,RTC,LATER` replies the device sent. */
     @Volatile var laterReplies = 0
@@ -158,10 +172,15 @@ class FakeRecorder(
             stereo,
             recordingRate,
             syncStatusSupported,
+            liveRecordingSupported,
+            activeFlushedBytes,
+            listTimestampsSupported,
+            defaultFileTime,
         )
         next.lastSyncPending = lastSyncPending
         next.lastSyncEtaSeconds = lastSyncEtaSeconds
         synchronized(files) { next.files.putAll(files) }
+        synchronized(fileTimes) { next.fileTimes.putAll(fileTimes) }
         synchronized(cassini) { next.cassini.putAll(cassini) }
         next.dropFrames += dropFrames
         next.corruptFrames += corruptFrames
@@ -173,6 +192,7 @@ class FakeRecorder(
         next.disconnectAtFrame = disconnectAtFrame
         next.dropPutEndAck = dropPutEndAck
         next.laterAtFrame = laterAtFrame
+        next.busyAtFrame = busyAtFrame
         next.beforePut = beforePut
         next.beforePutEnd = beforePutEnd
         next.afterList = afterList
@@ -254,11 +274,9 @@ class FakeRecorder(
             cmd == "RTC" -> reply("+XREC:RTC,2026-11-25 10:11:12,2")
             cmd.startsWith("RTC,") && waitsForRecording() -> later("+XREC:OK,RTC,LATER")
             cmd.startsWith("RTC,") -> reply("+XREC:OK,RTC")
-            cmd == "LS" -> {
-                synchronized(files) { files.forEach { (name, data) -> reply("+XREC:F,${data.size},$name") } }
-                reply("+XREC:END")
-                afterList?.invoke()
-            }
+            cmd == "LS" -> listFiles(withTimestamps = false)
+            cmd == "LS,T" -> if (listTimestampsSupported) listFiles(withTimestamps = true) else err("CMD")
+            cmd.startsWith("LS,") -> err(if (listTimestampsSupported) "ARGS" else "CMD")
             cmd.startsWith("GETS,") -> gets(cmd.removePrefix("GETS,"))
             cmd.startsWith("DEL,") -> delete(cmd.removePrefix("DEL,"))
             cmd == "PUTEND" -> putEnd()
@@ -267,16 +285,55 @@ class FakeRecorder(
         }
     }
 
+    private fun listFiles(withTimestamps: Boolean) {
+        synchronized(files) {
+            files.forEach { (name, data) ->
+                val sz = flushedSize(name, data.size)
+                if (!withTimestamps) {
+                    reply("+XREC:F,$sz,$name")
+                } else {
+                    val time = synchronized(fileTimes) {
+                        val explicit = fileTimes.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }
+                        if (explicit != null) explicit.value else defaultFileTime
+                    }
+                    val stamp = time?.format(ENTRY_TIME_FORMAT) ?: "-"
+                    reply("+XREC:FT,$sz,$stamp,$name")
+                }
+            }
+        }
+        reply("+XREC:END")
+        afterList?.invoke()
+    }
+
+    private fun flushedSize(name: String, dataSize: Int): Int {
+        val active = activeFile()
+        if (!liveRecordingSupported || active == null || !active.equals(name, ignoreCase = true)) return dataSize
+        return minOf(dataSize, activeFlushedBytes ?: dataSize)
+    }
+
+    private fun effectiveRecordingRate(): Int =
+        if (stereo && liveRecordingSupported && recordingRate > 0) {
+            minOf(recordingRate, STEREO_RECORDING_RATE)
+        } else {
+            recordingRate
+        }
+
     private fun stat() {
         val base = "+XREC:STAT,87,3990,0,0,${if (recording) "33,12" else "16,0"},1500,7600"
         if (!syncsWhileRecording) return reply(base)
-        val index = activeFile()?.let { REC_NAME.matchEntire(it)?.groupValues?.get(1)?.toLong() } ?: 0L
+        val active = activeFile()
+        val index = active?.let { REC_NAME.matchEntire(it)?.groupValues?.get(1)?.toLong() } ?: 0L
+        val rate = effectiveRecordingRate()
         val pace = when {
             !recording -> 0L
-            stereo || recordingRate <= 0 -> LATER_MS
-            else -> (XrecLimits.RECORDING_GETS_WINDOW * 1000L + recordingRate - 1) / recordingRate
+            (stereo && !liveRecordingSupported) || rate <= 0 -> LATER_MS
+            else -> (XrecLimits.RECORDING_GETS_WINDOW * 1000L + rate - 1) / rate
         }
-        reply("$base,$index,$pace")
+        if (!liveRecordingSupported) return reply("$base,$index,$pace")
+        val flushed = active?.let { name ->
+            synchronized(files) { files[name]?.size }?.let { flushedSize(name, it) }
+        } ?: 0
+        reply("$base,$index,$pace,$flushed")
     }
 
     /** The firmware that syncs while it records, and records now. */
@@ -295,6 +352,8 @@ class FakeRecorder(
         val flags = buildString {
             append("bound=${flag(key != null)},auth=${flag(authenticated)},pair=${flag(pairingPin != null)}")
             if (syncStatusSupported) append(",sync=1")
+            if (liveRecordingSupported) append(",live=1")
+            if (listTimestampsSupported) append(",lst=1")
         }
         reply("+XREC:PONG,$firmware,v5,$flags")
     }
@@ -348,10 +407,17 @@ class FakeRecorder(
         if (!XrecNames.isSafe(name)) return err("NAME")
         if (name in unreadable) return err("SDIO")
         val found = find(name)
-        if (found != null && found == activeFile()) return err("BUSY")
-        if (waitsForRecording() && stereo) return later()
-        val data = found?.let(files::get) ?: return err("NOENT")
-        val paced = waitsForRecording() && recordingRate > 0
+        val fullData = found?.let(files::get)
+        val isActive = found != null && found == activeFile()
+        val flushed = if (found != null && fullData != null) flushedSize(found, fullData.size) else 0
+        if (isActive && (!liveRecordingSupported || fullData == null || flushed <= WAV_HEADER_BYTES)) {
+            return err("BUSY")
+        }
+        if (waitsForRecording() && stereo && !liveRecordingSupported) return later()
+        val rawData = fullData ?: return err("NOENT")
+        val data = if (isActive && flushed < rawData.size) rawData.copyOf(flushed) else rawData
+        val rate = effectiveRecordingRate()
+        val paced = waitsForRecording() && rate > 0
         val started = System.nanoTime()
         var sent = 0L
         var at = offset
@@ -365,9 +431,13 @@ class FakeRecorder(
                 laterAtFrame = null
                 return later()
             }
+            if (busyAtFrame == at) {
+                busyAtFrame = null
+                return err("BUSY")
+            }
             if (paced) {
                 // The token bucket of the firmware, without its burst: the payload leaves at the capped rate.
-                val due = started + sent * NANOS_PER_SECOND / recordingRate
+                val due = started + sent * NANOS_PER_SECOND / rate
                 val wait = due - System.nanoTime()
                 if (wait > 0) Thread.sleep(wait / NANOS_PER_MILLI, (wait % NANOS_PER_MILLI).toInt())
                 sent += got
@@ -538,8 +608,13 @@ class FakeRecorder(
         /** The firmware's GETS cap while a mono recording runs (`XREC_REC_GETS_RATE_BPS`). */
         const val RECORDING_RATE = 48_000
 
+        /** The firmware's GETS cap while a stereo recording runs (`XREC_REC_STEREO_RATE_BPS`). */
+        const val STEREO_RECORDING_RATE = 36_000
+
         /** The `<ms>` of the firmware's `ERR,LATER` (`XREC_LATER_MS`). */
         const val LATER_MS = 30_000L
+        private val ENTRY_TIME_FORMAT = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss")
+        private const val WAV_HEADER_BYTES = 44
         private val REC_NAME = Regex("REC_([0-9]+)\\.wav", RegexOption.IGNORE_CASE)
         private const val NANOS_PER_SECOND = 1_000_000_000L
         private const val NANOS_PER_MILLI = 1_000_000L

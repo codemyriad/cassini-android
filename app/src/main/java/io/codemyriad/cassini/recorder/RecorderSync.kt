@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.recorder
 
 import android.util.Log
+import io.codemyriad.cassini.core.format.StartedAt
 import io.codemyriad.cassini.core.recorder.CwxEncoder
 import io.codemyriad.cassini.core.recorder.XrecAuth
 import io.codemyriad.cassini.core.recorder.XrecClient
@@ -45,6 +46,7 @@ import java.security.SecureRandom
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.Locale
 
 /** What the recorder sync does now, for the Recorder screen and the notification. */
@@ -205,9 +207,14 @@ class RecorderSync(private val parts: Parts) {
          * write does not, and ignores interrupts.
          */
         val stallMillis: Long = DEFAULT_STALL_MS,
+        val livePollMillis: Long = DEFAULT_LIVE_POLL_MS,
+        val sidecarPollMillis: Long = DEFAULT_SIDECAR_POLL_MS,
+        val maxSidecarWaitMillis: Long = DEFAULT_MAX_SIDECAR_WAIT_MS,
+        val wait: suspend (Long) -> Unit = { delay(it) },
     )
 
     private val store = parts.store
+    private val liveTailer by lazy { RecorderLiveTailer(LiveHost()) }
     private val lock = Mutex()
     private val stateLock = Any()
 
@@ -470,7 +477,7 @@ class RecorderSync(private val parts: Parts) {
         val pong = session.call { ping() }
         session.call { authenticate(key) }
         current.value = RecorderActivity.Syncing(SyncStep.CHECKING)
-        val (listing, status, steady) = steadyListing(session)
+        var (listing, status, steady) = steadyListing(session, pong.listTimestampsSupported)
         // The recorder does not set its clock while it records (open_fw answers OK,RTC,LATER): the next sync sets it.
         if (!status.recording) setClock(session)
         markAbsent(address, listing)
@@ -481,9 +488,10 @@ class RecorderSync(private val parts: Parts) {
         val versions = transcripts.mapValues { it.value.version }
         val suspects = SyncPlanner.suspects(listing, deviceState(address).syncState(), versions)
         val unverified = verifySuspects(session, address, suspects)
+        backfillRecordingStarts(address, listing, unverified)
         val state = deviceState(address).syncState()
         val plan = SyncPlanner.plan(listing, status, state, versions, syncWhileRecording)
-        val waitingForRecording = plan.skipped.count { it.reason in WAITING_REASONS }
+        var waitingForRecording = plan.skipped.count { it.reason in WAITING_REASONS }
         // A firmware that names the file it records refuses every card write while it records: transcripts wait.
         val holdUploads = status.recording && status.namesActiveFile
         if (mode == SyncMode.UPLOADS) {
@@ -531,6 +539,28 @@ class RecorderSync(private val parts: Parts) {
                 }
             }
         }
+        val needFreshStat = pong.liveRecordingSupported && syncWhileRecording && plan.downloads.isNotEmpty()
+        val tailStatus = if (needFreshStat && status.recording) session.call { stat() } else status
+        val liveCapable = pong.liveRecordingSupported && syncWhileRecording && deferred == 0
+        val shouldLiveTail = liveCapable && tailStatus.recording && (tailStatus.recordingIndex ?: 0L) > 0L
+        var deferredWait = false
+        if (shouldLiveTail) {
+            if (pong.syncStatusSupported) {
+                reportSyncState(session, maxOf(1, waitingForRecording))
+            }
+            val tail = liveTailer.tail(session, address, pong, listing, tailStatus)
+            downloaded += tail.downloaded
+            deferred += tail.deferred
+            recording = tail.recording
+            deferredWait = tail.deferredWait
+            listing = tail.listing
+            status = tail.status
+            if (!status.recording) setClock(session)
+            val refreshedState = deviceState(address).syncState()
+            val refreshedPlan = SyncPlanner.plan(listing, status, refreshedState, versions, syncWhileRecording)
+            waitingForRecording = refreshedPlan.skipped.count { it.reason in WAITING_REASONS }
+        }
+        val finalHoldUploads = status.recording && status.namesActiveFile
         // A transcript can have finished during the downloads or during earlier uploads: drain on this open session.
         val checked = (suspects.map { fileKey(it.name) } + plan.downloads.map { fileKey(it.name) }).toSet()
         val sent = uploadDraining(
@@ -539,7 +569,7 @@ class RecorderSync(private val parts: Parts) {
             pong,
             listing,
             status,
-            holdUploads,
+            finalHoldUploads,
             SuspectChecks(checked, unverified),
         )
         withContext(parts.io) { deleteStrayParts(address) }
@@ -549,15 +579,16 @@ class RecorderSync(private val parts: Parts) {
         }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
         val waiting = waitingForRecording + deferred + sent.deferred
+        val pollAgain = (plan.whileRecording || deferredWait) && waiting > 0
         return SyncOutcome.Done(
             downloaded,
             sent.uploaded,
-            plan.skipped.size + deferred,
+            if (shouldLiveTail) waitingForRecording + deferred else plan.skipped.size + deferred,
             recording,
             failed,
             speed,
             deferredUploads = sent.deferred,
-            recordingPoll = plan.whileRecording && waiting > 0,
+            recordingPoll = pollAgain,
         )
     }
 
@@ -570,11 +601,11 @@ class RecorderSync(private val parts: Parts) {
      * end), so LS runs again (at most [MAX_LISTINGS] times) until both STATs show the same recording. Still changing:
      * the recording STAT is used, and the sync plans as if the setting were off (not [Listing.steady]).
      */
-    private suspend fun steadyListing(session: Session): Listing {
+    private suspend fun steadyListing(session: Session, withTimestamps: Boolean): Listing {
         var before = session.call { stat() }
         var listings = 0
         while (true) {
-            val listing = session.call { list() }
+            val listing = session.call { list(withTimestamps) }
             val after = session.call { stat() }
             val steady = sameRecording(before, after)
             if (steady || ++listings >= MAX_LISTINGS) {
@@ -671,6 +702,26 @@ class RecorderSync(private val parts: Parts) {
         return unverified
     }
 
+    private suspend fun backfillRecordingStarts(
+        address: String,
+        listing: List<XrecReply.Entry>,
+        unverified: Set<String>,
+    ) {
+        val byName = listing.associateBy { fileKey(it.name) }
+        deviceState(address).recordings.forEach { stored ->
+            val noteId = stored.recording.noteId
+            val key = fileKey(stored.recording.name)
+            val entry = byName[key]?.takeIf { it.size == stored.recording.size }
+            val recordedAt = entry?.let(RecorderTimestamps::resolve)
+            if (noteId != null && key !in unverified && recordedAt != null) {
+                parts.library.setRecordingStartIfAbsent(noteId, formatStartedAt(recordedAt))
+            }
+        }
+    }
+
+    private fun formatStartedAt(local: LocalDateTime): String =
+        StartedAt.format(ZonedDateTime.of(local, parts.zone()).toOffsetDateTime())
+
     /** The SHA-256 of the first 4 KiB of [recording] on the recorder; null when the recorder cannot give them now. */
     private suspend fun headOnRecorder(session: Session, recording: SyncedRecording): String? {
         val head = ByteArrayOutputStream()
@@ -710,7 +761,10 @@ class RecorderSync(private val parts: Parts) {
         // The file length is the truth: after process death the stored offset can be behind it.
         val resume = if (planned.resume != null && part.isFile) part.length().coerceAtMost(planned.size) else 0L
         withContext(parts.io) { prepare(part, resume) }
-        store.updateDevice(address) { it.copy(partial = PartialDownload(planned.name, planned.size, resume)) }
+        val liveHeaderPending = resume > 0L && planned.resume?.liveHeaderPending == true
+        store.updateDevice(address) {
+            it.copy(partial = PartialDownload(planned.name, planned.size, resume, liveHeaderPending))
+        }
         progress(SyncStep.DOWNLOADING, planned.name, resume, planned.size)
         val stats = try {
             fetch(session, planned, part, pace)
@@ -721,6 +775,9 @@ class RecorderSync(private val parts: Parts) {
             Log.i(TAG, "${planned.name} waits for the end of the recording, at $bytes bytes")
             return FileResult.DEFERRED
         }
+        if (liveHeaderPending) {
+            refreshLiveHeaderIfNeeded(session, address, planned, part)?.let { return it }
+        }
         stats?.let {
             measured(it)
             Log.i(
@@ -730,6 +787,29 @@ class RecorderSync(private val parts: Parts) {
             )
         }
         return import(address, planned, part)
+    }
+
+    private suspend fun refreshLiveHeaderIfNeeded(
+        session: Session,
+        address: String,
+        planned: PlannedDownload,
+        part: File,
+    ): FileResult? {
+        if (planned.size < XrecLimits.EMPTY_WAV_BYTES) return null
+        return try {
+            refreshWavHeader(session, planned.name, part, planned.size, parts.io)
+            store.updateDevice(address) {
+                it.copy(partial = it.partial?.copy(bytes = planned.size, liveHeaderPending = false))
+            }
+            null
+        } catch (error: XrecException) {
+            if (error.failure == XrecFailure.LATER) {
+                Log.i(TAG, "${planned.name} header refresh waits for the end of the recording")
+                FileResult.DEFERRED
+            } else {
+                downloadFailed(address, planned, part, error)
+            }
+        }
     }
 
     /**
@@ -776,16 +856,30 @@ class RecorderSync(private val parts: Parts) {
         return FileResult.FAILED
     }
 
-    private suspend fun import(address: String, planned: PlannedDownload, part: File): FileResult {
+    private suspend fun import(
+        address: String,
+        planned: PlannedDownload,
+        part: File,
+        precompute: LivePrecomputeSession? = null,
+        recordedAt: LocalDateTime? = planned.recordedAt,
+    ): FileResult {
         current.value = RecorderActivity.Syncing(SyncStep.IMPORTING, planned.name)
         movingCallback?.invoke()
         val head = withContext(parts.io) { headSha256(part) }
         val noteId = when (val imported = parts.library.import(part, planned.name)) {
             is LibraryImport.Rejected -> return rejected(address, planned, part, head, imported.failure)
-            is LibraryImport.Created -> imported.noteId.also { parts.library.transcribe(it) }
+            is LibraryImport.Created -> imported.noteId.also {
+                recordedAt?.let { start -> parts.library.setRecordingStartIfAbsent(it, formatStartedAt(start)) }
+                precompute?.finishAndInstall(it)
+                parts.library.transcribe(it)
+            }
             // The sync can have stopped between an import and its transcription request: ask now if nothing runs.
             is LibraryImport.Existing -> imported.noteId.also {
-                if (parts.library.needsTranscription(it)) parts.library.transcribe(it)
+                recordedAt?.let { start -> parts.library.setRecordingStartIfAbsent(it, formatStartedAt(start)) }
+                if (parts.library.needsTranscription(it)) {
+                    precompute?.finishAndInstall(it)
+                    parts.library.transcribe(it)
+                }
             }
         }
         store.updateDevice(address) { state ->
@@ -793,6 +887,44 @@ class RecorderSync(private val parts: Parts) {
         }
         withContext(parts.io) { part.delete() }
         return FileResult.DONE
+    }
+
+    private inner class LiveHost : RecorderLiveTailer.Host {
+        override val parts: Parts get() = this@RecorderSync.parts
+
+        override fun partFile(address: String, name: String): File = this@RecorderSync.partFile(address, name)
+
+        override fun prepare(part: File, keep: Long) = this@RecorderSync.prepare(part, keep)
+
+        override fun progress(step: SyncStep, file: String, done: Long, total: Long) =
+            this@RecorderSync.progress(step, file, done, total)
+
+        override fun headSha256(file: File): String = this@RecorderSync.headSha256(file)
+
+        override suspend fun partial(address: String): PartialDownload? = deviceState(address).partial
+
+        override suspend fun updatePartial(address: String, partial: PartialDownload?) {
+            store.updateDevice(address) { it.copy(partial = partial) }
+        }
+
+        @Suppress("LongParameterList") // Carries finalized segment metadata and optional precompute session.
+        override suspend fun importFinalized(
+            address: String,
+            name: String,
+            size: Long,
+            part: File,
+            precompute: LivePrecomputeSession?,
+            recordedAt: LocalDateTime?,
+        ): String? {
+            val result = import(address, PlannedDownload(name, size, null, recordedAt), part, precompute)
+            return if (result == FileResult.DONE) {
+                deviceState(address).recordings.lastOrNull {
+                    it.recording.name.equals(name, ignoreCase = true)
+                }?.recording?.noteId
+            } else {
+                null
+            }
+        }
     }
 
     /** A refused import: kept for the next sync when the refusal can pass (space, saving), else recorded for good. */
@@ -1060,7 +1192,7 @@ class RecorderSync(private val parts: Parts) {
      * One link and its client. [call] runs a blocking client call on IO, interrupted by cancellation; [touch] marks
      * progress inside a long call (a frame, a chunk), so that [stalled] tells a blocked call from a long one.
      */
-    private class Session(val client: XrecClient, private val io: CoroutineDispatcher) {
+    internal class Session(val client: XrecClient, private val io: CoroutineDispatcher) {
         @Volatile private var busy = false
 
         @Volatile private var lastProgress = 0L
@@ -1262,6 +1394,9 @@ class RecorderSync(private val parts: Parts) {
 
         /** A blocked call closes the link after this long without progress. */
         const val DEFAULT_STALL_MS = 60_000L
+        const val DEFAULT_LIVE_POLL_MS = 500L
+        const val DEFAULT_SIDECAR_POLL_MS = 150L
+        const val DEFAULT_MAX_SIDECAR_WAIT_MS = 30_000L
 
         const val OUTCOME_OK = "OK"
         const val OUTCOME_UNREACHABLE = "UNREACHABLE"
