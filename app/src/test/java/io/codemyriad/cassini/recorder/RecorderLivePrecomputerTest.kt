@@ -47,10 +47,12 @@ import io.codemyriad.cassini.engine.job.TranscriptionJob
 import io.codemyriad.cassini.engine.job.WorkFiles
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
@@ -71,7 +73,9 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 class RecorderLivePrecomputerTest {
@@ -222,6 +226,296 @@ class RecorderLivePrecomputerTest {
 
         assertTrue(lockSeenByGuard)
         assertEquals(CheckpointLoad.Missing, storage.loadCheckpoint("note-locked"))
+        assertFalse(stagingDir.exists())
+    }
+
+    private class PrecomputeRig(
+        private val partFile: File,
+        private val stagingDir: File,
+        private val storage: TestJobStorage,
+        private val engines: JobEngines,
+        private val env: JobEnvironment,
+        private val deleteStaging: (File) -> Unit = { it.deleteRecursively() },
+    ) {
+        fun start(onCheckpointed: (Long) -> Unit): RecorderLivePrecomputer = RecorderLivePrecomputer(
+            RecorderLivePrecomputer.Parts(
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+                partFile = partFile,
+                stagingDir = stagingDir,
+                speechModel = SpeechModel.PARAKEET,
+                models = TestModelAccess(),
+                engines = engines,
+                env = env,
+                storage = storage,
+                voices = TestJobVoices(),
+                speakerPrefix = { "diar_live_" },
+                onCheckpointed = onCheckpointed,
+                deleteStaging = deleteStaging,
+            ),
+        ).also { it.onBytesAvailable(partFile.length()) }
+    }
+
+    @Test fun livePrecomputerResumesAcrossDisconnectAndMatchesSinglePass() = runBlocking {
+        val totalSeconds = 65
+        val wav = buildPcmWav(sampleRate = 16_000, channels = 1, frames = 16_000 * totalSeconds)
+        val prefixBytes = 44 + 16_000 * 30 * 2
+        val partFile = temp.newFile("REC_0010.wav.part").apply {
+            writeBytes(buildWavHeader(dataBytes = 1024, sampleRate = 16_000, channels = 1))
+            appendBytes(wav.copyOfRange(44, prefixBytes))
+        }
+        val stagingDir = temp.newFolder("staging-resume")
+        val noteDir = temp.newFolder("note-resume")
+        val finalAudio = File(noteDir, "source.wav")
+        val storage = TestJobStorage(noteDir, finalAudio, SpeechModel.PARAKEET)
+        val decodedWindows = CopyOnWriteArrayList<Long>()
+        val engines = buildTestEngines(decodedWindows, CopyOnWriteArrayList())
+        val env = JobEnvironment(placeholderLabel = { "Speaker $it" }, inference = inference, io = Dispatchers.IO)
+
+        val ckpt1 = CompletableDeferred<Long>()
+        val rig = PrecomputeRig(partFile, stagingDir, storage, engines, env)
+        val pre1 = rig.start { if (it > 0L) ckpt1.complete(it) }
+        assertEquals(28_000L, withTimeout(TIMEOUT_MS) { ckpt1.await() })
+        pre1.awaitStopped()
+        pre1.close()
+        assertTrue(stagingDir.isDirectory && File(stagingDir, "checkpoint.json").isFile)
+
+        partFile.appendBytes(wav.copyOfRange(prefixBytes, wav.size))
+        val ckpt2 = CompletableDeferred<Long>()
+        val pre2 = rig.start { if (it >= 54_000L) ckpt2.complete(it) }
+        assertEquals(54_000L, withTimeout(TIMEOUT_MS) { ckpt2.await() })
+        assertEquals(listOf(0L, 26_000L), decodedWindows.toList())
+
+        finalAudio.writeBytes(wav)
+        RandomAccessFile(partFile, "rw").use { raf ->
+            raf.seek(0L)
+            raf.write(wav.copyOf(44))
+        }
+        pre2.finishAndInstall("note-resume")
+        assertFalse(stagingDir.exists())
+        assertEquals(54_000L, (storage.loadCheckpoint("note-resume") as CheckpointLoad.Valid).state.doneMs)
+
+        val job = TranscriptionJob(
+            "note-resume",
+            storage,
+            TestJobVoices(),
+            TestModelAccess(),
+            engines,
+            env,
+            SpeechModel.PARAKEET,
+        )
+        assertEquals(JobOutcome.Done, job.run())
+        assertEquals(listOf(0L, 26_000L, 52_000L), decodedWindows.toList())
+        assertEquals(
+            (0 until totalSeconds).map { "w$it" },
+            storage.markedDocument!!.selected(null)!!.transcript!!.words.map { it.text },
+        )
+    }
+
+    @Test fun standaloneInstallInstallsDurableCheckpointAfterPostStopReconnect() = runBlocking {
+        val totalSeconds = 40
+        val wav = buildPcmWav(sampleRate = 16_000, channels = 1, frames = 16_000 * totalSeconds)
+        val prefixBytes = 44 + 16_000 * 30 * 2
+        val partFile = temp.newFile("REC_0011.wav.part").apply {
+            writeBytes(buildWavHeader(dataBytes = 1024, sampleRate = 16_000, channels = 1))
+            appendBytes(wav.copyOfRange(44, prefixBytes))
+        }
+        val stagingDir = temp.newFolder("staging-poststop")
+        val noteDir = temp.newFolder("note-poststop")
+        val finalAudio = File(noteDir, "source.wav")
+        val storage = TestJobStorage(noteDir, finalAudio, SpeechModel.PARAKEET)
+        val decodedWindows = CopyOnWriteArrayList<Long>()
+        val engines = buildTestEngines(decodedWindows, CopyOnWriteArrayList())
+        val env = JobEnvironment(placeholderLabel = { "Speaker $it" }, inference = inference, io = Dispatchers.IO)
+
+        val ckpt = CompletableDeferred<Long>()
+        val pre = PrecomputeRig(partFile, stagingDir, storage, engines, env)
+            .start { if (it > 0L) ckpt.complete(it) }
+        assertEquals(28_000L, withTimeout(TIMEOUT_MS) { ckpt.await() })
+        pre.awaitStopped()
+        pre.close()
+
+        partFile.writeBytes(wav)
+        finalAudio.writeBytes(wav)
+        val checkpointFile = File(stagingDir, "checkpoint.json")
+        val checkpoint = JSONObject(checkpointFile.readText())
+        File(stagingDir, "live-source.json").writeText(checkpoint.remove("liveSource").toString())
+        checkpointFile.writeText(checkpoint.toString())
+        RecorderLivePrecomputeStore.installIntoNote(
+            noteId = "note-poststop",
+            partFile = partFile,
+            stagingDir = stagingDir,
+            speechModel = SpeechModel.PARAKEET,
+            models = TestModelAccess(),
+            storage = storage,
+            voices = TestJobVoices(),
+            env = env,
+            canInstallBlocking = { true },
+        )
+        assertFalse(stagingDir.exists())
+        assertEquals(28_000L, (storage.loadCheckpoint("note-poststop") as CheckpointLoad.Valid).state.doneMs)
+
+        val job = TranscriptionJob(
+            "note-poststop",
+            storage,
+            TestJobVoices(),
+            TestModelAccess(),
+            engines,
+            env,
+            SpeechModel.PARAKEET,
+        )
+        assertEquals(JobOutcome.Done, job.run())
+        assertEquals(listOf(0L, 26_000L), decodedWindows.toList())
+        assertEquals(
+            (0 until totalSeconds).map { "w$it" },
+            storage.markedDocument!!.selected(null)!!.transcript!!.words.map { it.text },
+        )
+    }
+
+    @Test fun discardDeletesStagingOnlyAfterTheWorkerStopsSaving() = runBlocking {
+        val wav = buildPcmWav(sampleRate = 16_000, channels = 1, frames = 16_000 * 30)
+        val partFile = temp.newFile("REC_0013.wav.part").apply { writeBytes(wav) }
+        val stagingDir = temp.newFolder("staging-discard")
+        val noteDir = temp.newFolder("note-discard")
+        val storage = TestJobStorage(noteDir, File(noteDir, "source.wav"), SpeechModel.PARAKEET)
+        val engines = buildTestEngines(CopyOnWriteArrayList(), CopyOnWriteArrayList())
+        val env = JobEnvironment(placeholderLabel = { "Speaker $it" }, inference = inference, io = Dispatchers.IO)
+        val saving = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val pre = PrecomputeRig(partFile, stagingDir, storage, engines, env).start {
+            if (it > 0L) {
+                saving.countDown()
+                awaitIgnoringInterrupts(release)
+            }
+        }
+        assertTrue(saving.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+        val stopped = CompletableDeferred<Unit>()
+        pre.discard()
+        pre.invokeOnStopped { stopped.complete(Unit) }
+        // The cancelled worker is still inside its checkpoint save: the staging directory must outlive it.
+        assertTrue(File(stagingDir, "checkpoint.json").isFile)
+        release.countDown()
+        withTimeout(TIMEOUT_MS) { stopped.await() }
+        assertFalse(stagingDir.exists())
+    }
+
+    @Test fun reopeningWaitsForAnInFlightDiscardDeletion() = runBlocking {
+        val wav = buildPcmWav(sampleRate = 16_000, channels = 1, frames = 16_000 * 30)
+        val partFile = temp.newFile("REC_0014.wav.part").apply { writeBytes(wav) }
+        val stagingDir = temp.newFolder("staging-reopen")
+        val noteDir = temp.newFolder("note-reopen")
+        val storage = TestJobStorage(noteDir, File(noteDir, "source.wav"), SpeechModel.PARAKEET)
+        val engines = buildTestEngines(CopyOnWriteArrayList(), CopyOnWriteArrayList())
+        val env = JobEnvironment(placeholderLabel = { "Speaker $it" }, inference = inference, io = Dispatchers.IO)
+        val events = CopyOnWriteArrayList<String>()
+        val deleting = CountDownLatch(1)
+        val releaseDelete = CountDownLatch(1)
+        val checkpointed = CompletableDeferred<Long>()
+        val pre = PrecomputeRig(partFile, stagingDir, storage, engines, env, deleteStaging = { dir ->
+            events += "delete-start"
+            deleting.countDown()
+            awaitIgnoringInterrupts(releaseDelete)
+            dir.deleteRecursively()
+            events += "delete-end"
+        }).start { if (it > 0L) checkpointed.complete(it) }
+        withTimeout(TIMEOUT_MS) { checkpointed.await() }
+        pre.discard()
+        // The worker has finished (its job already counts as completed) and the deletion is now blocked mid-way.
+        assertTrue(deleting.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+        // Undispatched: with a bare job join the reopen would pass straight through before this launch returns.
+        val reopen = launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
+            pre.awaitStopped()
+            events += "reopen"
+        }
+        val handled = CompletableDeferred<Unit>()
+        pre.invokeOnStopped {
+            events += "stopped-handler"
+            handled.complete(Unit)
+        }
+        assertEquals(listOf("delete-start"), events.toList())
+        releaseDelete.countDown()
+        withTimeout(TIMEOUT_MS) { reopen.join() }
+        withTimeout(TIMEOUT_MS) { handled.await() }
+        assertEquals("delete-end", events[1])
+        assertTrue(events.containsAll(listOf("reopen", "stopped-handler")))
+        assertEquals(4, events.size)
+        assertFalse(stagingDir.exists())
+
+        // A discard arriving after the worker stopped still deletes before a later reopen proceeds.
+        val second = CountDownLatch(1)
+        val secondCheckpoint = CompletableDeferred<Long>()
+        val pre2 = PrecomputeRig(partFile, stagingDir, storage, engines, env)
+            .start { if (it > 0L) secondCheckpoint.complete(it) }
+        withTimeout(TIMEOUT_MS) { secondCheckpoint.await() }
+        pre2.awaitStopped()
+        assertTrue(stagingDir.isDirectory)
+        pre2.discard()
+        pre2.invokeOnStopped { second.countDown() }
+        pre2.awaitStopped()
+        assertTrue(second.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+        assertFalse(stagingDir.exists())
+    }
+
+    private fun awaitIgnoringInterrupts(latch: CountDownLatch) {
+        var interrupted = false
+        while (true) {
+            try {
+                latch.await()
+                break
+            } catch (_: InterruptedException) {
+                interrupted = true
+            }
+        }
+        if (interrupted) Thread.currentThread().interrupt()
+    }
+
+    @Test fun mutatedPcmDiscardsStaleStagedPrecomputeCleanly() = runBlocking {
+        val wav = buildPcmWav(sampleRate = 16_000, channels = 1, frames = 16_000 * 30)
+        val partFile = temp.newFile("REC_0012.wav.part").apply { writeBytes(wav) }
+        val stagingDir = temp.newFolder("staging-corrupt")
+        val noteDir = temp.newFolder("note-corrupt")
+        val finalAudio = File(noteDir, "source.wav")
+        val storage = TestJobStorage(noteDir, finalAudio, SpeechModel.PARAKEET)
+        val models = TestModelAccess()
+        val decodedWindows = CopyOnWriteArrayList<Long>()
+        val engines = buildTestEngines(decodedWindows, CopyOnWriteArrayList())
+        val env = JobEnvironment(placeholderLabel = { "Speaker $it" }, inference = inference, io = Dispatchers.IO)
+
+        val ckpt = CompletableDeferred<Long>()
+        val pre = RecorderLivePrecomputer(
+            RecorderLivePrecomputer.Parts(
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+                partFile = partFile,
+                stagingDir = stagingDir,
+                speechModel = SpeechModel.PARAKEET,
+                models = models,
+                engines = engines,
+                env = env,
+                storage = storage,
+                voices = TestJobVoices(),
+                onCheckpointed = { doneMs -> if (doneMs > 0L) ckpt.complete(doneMs) },
+            ),
+        )
+        pre.onBytesAvailable(partFile.length())
+        assertEquals(28_000L, withTimeout(TIMEOUT_MS) { ckpt.await() })
+        pre.awaitStopped()
+        pre.close()
+
+        val bytes = partFile.readBytes()
+        bytes[100] = (bytes[100].toInt() xor 0x5A).toByte()
+        partFile.writeBytes(bytes)
+        // Opening the replacement must recover in the same worker, even when verification removes the old directory.
+        val replacementCheckpoint = CompletableDeferred<Long>()
+        val replacement = PrecomputeRig(partFile, stagingDir, storage, engines, env)
+            .start { replacementCheckpoint.complete(it) }
+        assertEquals(28_000L, withTimeout(TIMEOUT_MS) { replacementCheckpoint.await() })
+        replacement.awaitStopped()
+        assertEquals(listOf(0L, 0L), decodedWindows.toList())
+
+        // The source can also change between the worker stopping and import. A cached snapshot must be revalidated.
+        partFile.writeBytes(wav)
+        finalAudio.writeBytes(wav)
+        replacement.finishAndInstall("note-corrupt")
+        assertEquals(CheckpointLoad.Missing, storage.loadCheckpoint("note-corrupt"))
         assertFalse(stagingDir.exists())
     }
 

@@ -13,6 +13,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -189,6 +190,27 @@ class RecorderAutoSyncTest {
         val outcome = withTimeout(TIMEOUT_MS) { wake.await() } as SyncOutcome.Done
         assertEquals(SyncOutcome.Done(1, 0, 0, false), outcome.copy(speed = null))
         assertEquals(2, library.imported.size)
+        assertEquals(1, services.size)
+    }
+
+    @Test fun fullAttemptReturnsAtOnceAndHoldsServiceUntilRoundTripTranscriptionEnds() = runBlocking {
+        radio.device.files["REC_0001.wav"] = recording(2_000)
+        val (sync, store) = recorderSync(folder.root, radio, library)
+        store.bound(key)
+        library.activeCount = 1
+        val runner = RecorderRunner(scope, sync) { services.add(Unit) }
+
+        val run = runner.attempt(SyncMode.FULL, roundTripHoldMs = 5_000L)
+        withTimeout(TIMEOUT_MS) { while (library.imported.isEmpty()) delay(10) }
+        assertTrue(runner.serviceActive.value)
+
+        // The outcome does not wait for the round trip: Auto sync must be able to poll again meanwhile.
+        val outcome = withTimeout(TIMEOUT_MS) { run.await() } as SyncOutcome.Done
+        assertEquals(1, outcome.downloaded)
+        assertTrue(runner.serviceActive.value)
+
+        library.activeCount = 0
+        withTimeout(TIMEOUT_MS) { runner.serviceActive.first { !it } }
         assertEquals(1, services.size)
     }
 

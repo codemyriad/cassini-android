@@ -3,6 +3,7 @@ package io.codemyriad.cassini
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
+import android.os.Process
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.net.toUri
@@ -90,7 +91,9 @@ import io.codemyriad.cassini.processing.ThermalMonitor
 import io.codemyriad.cassini.processing.TranscriptionJobFactory
 import io.codemyriad.cassini.recorder.LivePrecomputeSession
 import io.codemyriad.cassini.recorder.RecorderFeature
+import io.codemyriad.cassini.recorder.RecorderLivePrecomputeStore
 import io.codemyriad.cassini.recorder.RecorderLivePrecomputer
+import io.codemyriad.cassini.recorder.StreamingWavPrefixReader
 import io.codemyriad.cassini.recording.AndroidRecordingPlatform
 import io.codemyriad.cassini.recording.CaptureSource
 import io.codemyriad.cassini.recording.FactoryCaptureSource
@@ -136,7 +139,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
-import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
@@ -272,6 +274,11 @@ class AppGraph(context: Context, val config: Config) {
         } else {
             requireUser(speech.included.await(), Failure.INCLUDED_UNAVAILABLE)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val customReplay = if (precompute && file.name.endsWith(PART_FILE_SUFFIX)) {
+                    StreamingWavPrefixReader.whistleReplay(file)
+                } else {
+                    null
+                }
                 WhistleJobs.of(
                     app,
                     engines,
@@ -280,6 +287,7 @@ class AppGraph(context: Context, val config: Config) {
                     segmentCacheFile,
                     config.processing.onWhistleFinish ?: {},
                     { seg -> config.processing.onWhistleSegment?.invoke(seg, precompute) },
+                    customReplay = customReplay,
                 )
             } else {
                 throw UserFacingException(Failure.INCLUDED_UNAVAILABLE)
@@ -573,6 +581,7 @@ class AppGraph(context: Context, val config: Config) {
      */
     fun close(whileWaiting: () -> Unit = {}) {
         recordingPrecompute.getAndSet(null)?.close()
+        recorderLivePrecompute.getAndSet(null)?.close()
         if (thermalHolder.isInitialized()) thermalHolder.value.close()
         val work = appScope.coroutineContext.job
         work.cancel()
@@ -759,14 +768,53 @@ class AppGraph(context: Context, val config: Config) {
         return decision.spawnWorkerDuringRecording && transcriptionConsented() && isRecorderPrecomputeAllowed()
     }
 
-    private suspend fun createRecorderLivePrecompute(partFile: File): LivePrecomputeSession {
+    internal suspend fun installRecorderLivePrecompute(partFile: File, noteId: String) {
+        val stagingDir = RecorderLivePrecomputeStore.stagingDirFor(partFile)
+        if (!stagingDir.isDirectory) return
+        val active = recorderLivePrecompute.get()
+        if (active != null && active.stagingDir == stagingDir) {
+            active.finishAndInstall(noteId)
+            recorderLivePrecompute.compareAndSet(active, null)
+            return
+        }
+        ready.await()
         val catalogue = awaitCatalogue()
         val model = speech.selected()
-        val stagingDir = File(paths.cache, "recorder-live-${UUID.randomUUID()}")
+        val choices = settings.speakerChoices.first()
+        RecorderLivePrecomputeStore.installIntoNote(
+            noteId = noteId,
+            partFile = partFile,
+            stagingDir = stagingDir,
+            speechModel = model,
+            models = SelectedModelAccess(modelAccess, choices),
+            storage = catalogue.jobStorage,
+            voices = catalogue.jobVoices,
+            env = jobEnvironment,
+            canInstallBlocking = { id -> canInstallLivePrecomputeBlocking(catalogue, id) },
+        )
+    }
+
+    internal fun discardRecorderLivePrecompute(partFile: File) {
+        val stagingDir = RecorderLivePrecomputeStore.stagingDirFor(partFile)
+        val active = recorderLivePrecompute.get()
+        if (active != null && active.stagingDir == stagingDir) {
+            // The slot keeps the worker until it stops, so a new session on this part waits for the deletion.
+            active.discard()
+            active.invokeOnStopped { recorderLivePrecompute.compareAndSet(active, null) }
+        } else {
+            stagingDir.deleteRecursively()
+        }
+    }
+
+    private suspend fun createRecorderLivePrecompute(partFile: File): LivePrecomputeSession {
+        recorderLivePrecompute.getAndSet(null)?.awaitStopped()
+        val catalogue = awaitCatalogue()
+        val model = speech.selected()
+        val stagingDir = RecorderLivePrecomputeStore.stagingDirFor(partFile)
         val workerEngines = jobEngines(
             model,
             partFile,
-            File(stagingDir, "whistle-segments.json"),
+            File(stagingDir, RecorderLivePrecomputeStore.WORK_WHISTLE_SEGMENTS),
             precompute = true,
         )
         val choices = settings.speakerChoices.first()
@@ -782,14 +830,41 @@ class AppGraph(context: Context, val config: Config) {
                 storage = catalogue.jobStorage,
                 voices = catalogue.jobVoices,
                 shouldContinue = ::isRecorderPrecomputeAllowed,
-                canInstallBlocking = { id ->
-                    catalogue.database.jobs().jobBlocking(id) == null &&
-                        catalogue.database.notes().noteBlocking(id)?.audioKind == AudioKind.PLAIN
-                },
+                canInstallBlocking = { id -> canInstallLivePrecomputeBlocking(catalogue, id) },
+                runWithPriority = ::runRecorderPrecomputePriority,
             ),
         )
         recorderLivePrecompute.getAndSet(precomputer)?.preempt()
         return LivePrecomputeHandle(precomputer, recorderLivePrecompute)
+    }
+
+    private fun canInstallLivePrecomputeBlocking(catalogue: Catalogue, noteId: String): Boolean =
+        catalogue.database.jobs().jobBlocking(noteId) == null &&
+            catalogue.database.notes().noteBlocking(noteId)?.audioKind == AudioKind.PLAIN
+
+    private fun runRecorderPrecomputePriority(block: () -> Unit) {
+        val previous = try {
+            Process.getThreadPriority(Process.myTid())
+        } catch (_: RuntimeException) {
+            null
+        }
+        val target = if (visibility.visible.value) {
+            Process.THREAD_PRIORITY_DEFAULT + VISIBLE_PRECOMPUTE_NICE
+        } else {
+            Process.THREAD_PRIORITY_DEFAULT
+        }
+        try {
+            if (previous != null) Process.setThreadPriority(target)
+            block()
+        } finally {
+            if (previous != null) {
+                try {
+                    Process.setThreadPriority(previous)
+                } catch (_: RuntimeException) {
+                    // Best-effort restore.
+                }
+            }
+        }
     }
 
     private fun isPhoneRecording(): Boolean {
@@ -805,6 +880,8 @@ class AppGraph(context: Context, val config: Config) {
         private val precomputer: RecorderLivePrecomputer,
         private val slot: AtomicReference<RecorderLivePrecomputer?>,
     ) : LivePrecomputeSession {
+        override val isActive: Boolean get() = precomputer.isActive
+
         override fun onBytesAvailable(bytes: Long) = precomputer.onBytesAvailable(bytes)
 
         override suspend fun awaitStopped() = precomputer.awaitStopped()
@@ -821,7 +898,9 @@ class AppGraph(context: Context, val config: Config) {
             try {
                 precomputer.close()
             } finally {
-                slot.compareAndSet(precomputer, null)
+                // Free the slot only once the worker stopped: the next session over the same staging directory
+                // joins it first instead of loading or clearing files that a cancelled save still writes.
+                precomputer.invokeOnStopped { slot.compareAndSet(precomputer, null) }
             }
         }
     }
@@ -907,6 +986,8 @@ class AppGraph(context: Context, val config: Config) {
         private const val CLOSE_WAIT_MS = 10_000L
         private const val CLOSE_POLL_MS = 10L
         private const val PRECOMPUTE_POLL_MS = 500L
+        private const val PART_FILE_SUFFIX = ".part"
+        private const val VISIBLE_PRECOMPUTE_NICE = 2
 
         // The startup steps in their order (architecture 4.8), as Config.onStartupStep names them.
         const val STEP_DATABASE = "database"

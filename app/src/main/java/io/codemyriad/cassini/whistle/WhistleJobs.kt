@@ -25,9 +25,10 @@ object WhistleJobs {
         segmentCacheFile: File? = null,
         onWorkerFinished: (Bundle) -> Unit = {},
         onWorkerSegment: (Bundle) -> Unit = {},
+        customReplay: WhistleReplay? = null,
     ): JobEngines {
         val source = DecoderAudioSource(AudioDecoder(context.contentResolver, cache, included = true))
-        val replay = WhistleReplay { samples, sink -> prefix(source, file, samples, sink) }
+        val replay = customReplay ?: WhistleReplay { samples, sink -> prefix(source, file, samples, sink) }
         val store = segmentCacheFile?.let(::FileWhistleSegmentStore)
         return JobEngines(
             WhistleRecognizers(context, replay, store, onWorkerFinished, onWorkerSegment),

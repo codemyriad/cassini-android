@@ -166,7 +166,7 @@ internal class FakeLibrary : RecorderLibrary {
 internal fun recorderSync(
     root: File,
     radio: FakeRadio,
-    library: FakeLibrary,
+    library: RecorderLibrary,
     clock: () -> Long = { NOW },
     stallMillis: Long = RecorderSync.DEFAULT_STALL_MS,
     vault: KeyVault = FakeVault(),

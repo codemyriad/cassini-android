@@ -536,39 +536,51 @@ class RecorderSync(private val parts: Parts) {
                 }
             }
         }
-        val needFreshStat = pong.liveRecordingSupported && syncWhileRecording && plan.downloads.isNotEmpty()
-        val tailStatus = if (needFreshStat && status.recording) session.call { stat() } else status
         val liveCapable = pong.liveRecordingSupported && syncWhileRecording && deferred == 0
-        val shouldLiveTail = liveCapable && tailStatus.recording && (tailStatus.recordingIndex ?: 0L) > 0L
+        var didLiveTail = false
         var deferredWait = false
-        if (shouldLiveTail) {
-            if (pong.syncStatusSupported) {
-                reportSyncState(session, maxOf(1, waitingForRecording))
-            }
-            val tail = liveTailer.tail(session, address, pong, listing, tailStatus)
-            downloaded += tail.downloaded
-            deferred += tail.deferred
-            recording = tail.recording
-            deferredWait = tail.deferredWait
-            listing = tail.listing
-            status = tail.status
-            if (!status.recording) setClock(session)
-            val refreshedState = deviceState(address).syncState()
-            val refreshedPlan = SyncPlanner.plan(listing, status, refreshedState, versions, syncWhileRecording)
-            waitingForRecording = refreshedPlan.skipped.count { it.reason in WAITING_REASONS }
-        }
-        val finalHoldUploads = status.recording && status.namesActiveFile
-        // A transcript can have finished during the downloads or during earlier uploads: drain on this open session.
-        val checked = (suspects.map { fileKey(it.name) } + plan.downloads.map { fileKey(it.name) }).toSet()
-        val sent = uploadDraining(
-            session,
-            address,
-            pong,
-            listing,
-            status,
-            finalHoldUploads,
-            SuspectChecks(checked, unverified),
+        val checks = SuspectChecks(
+            (suspects.map { fileKey(it.name) } + plan.downloads.map { fileKey(it.name) }).toSet(),
+            unverified,
         )
+        var totalUploaded = 0
+        var sent = NO_UPLOADS
+        repeat(2) { pass ->
+            val retryAfterHold = liveCapable && !didLiveTail && sent.sawRecordingHold
+            if (pass == 0 || retryAfterHold) {
+                val tailStatus = if (liveCapable) session.call { stat() } else status
+                val activeTail = liveCapable && tailStatus.recording && (tailStatus.recordingIndex ?: 0L) > 0L
+                if (activeTail) {
+                    didLiveTail = true
+                    if (pong.syncStatusSupported) {
+                        reportSyncState(session, maxOf(1, waitingForRecording))
+                    }
+                    val tail = liveTailer.tail(session, address, pong, listing, tailStatus)
+                    downloaded += tail.downloaded
+                    deferred += tail.deferred
+                    recording = tail.recording
+                    deferredWait = tail.deferredWait
+                    listing = tail.listing
+                    status = tail.status
+                    if (!status.recording) setClock(session)
+                    val refreshedState = deviceState(address).syncState()
+                    val refreshedPlan = SyncPlanner.plan(
+                        listing,
+                        status,
+                        refreshedState,
+                        versions,
+                        syncWhileRecording,
+                    )
+                    waitingForRecording = refreshedPlan.skipped.count { it.reason in WAITING_REASONS }
+                }
+                if (pass == 0 || activeTail) {
+                    val holdNow = status.recording && status.namesActiveFile
+                    sent = uploadDraining(session, address, pong, listing, status, holdNow, checks)
+                    totalUploaded += sent.uploaded
+                }
+            }
+        }
+        if (sent.sawRecordingHold) recording = true
         withContext(parts.io) { deleteStrayParts(address) }
         if (pong.syncStatusSupported) {
             val pending = waitingForRecording + deferred + failed + sent.deferred + remainingSidecarWork(address)
@@ -576,11 +588,12 @@ class RecorderSync(private val parts: Parts) {
         }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
         val waiting = waitingForRecording + deferred + sent.deferred
-        val pollAgain = (plan.whileRecording || deferredWait) && waiting > 0
+        val holdPoll = syncWhileRecording && sent.sawRecordingHold
+        val pollAgain = (plan.whileRecording || deferredWait || holdPoll) && waiting > 0
         return SyncOutcome.Done(
             downloaded,
-            sent.uploaded,
-            if (shouldLiveTail) waitingForRecording + deferred else plan.skipped.size + deferred,
+            totalUploaded,
+            if (didLiveTail) waitingForRecording + deferred else plan.skipped.size + deferred,
             recording,
             failed,
             speed,
@@ -751,20 +764,71 @@ class RecorderSync(private val parts: Parts) {
         measured: (XrecDownloadStats) -> Unit,
     ): FileResult {
         val part = partFile(address, planned.name)
-        val previousPart = planned.resume?.let { partFile(address, it.name) }
-        if (previousPart != null && previousPart != part) {
-            withContext(parts.io) { if (previousPart.isFile && !part.exists()) previousPart.renameTo(part) }
-        }
+        migratePreviousPart(address, planned, part)
         // The file length is the truth: after process death the stored offset can be behind it.
-        val resume = if (planned.resume != null && part.isFile) part.length().coerceAtMost(planned.size) else 0L
+        val diskBytes = if (planned.resume != null && part.isFile) part.length() else 0L
+        val resume = if (planned.resume?.liveHeaderPending == true) {
+            try {
+                liveTailer.verifiedLiveOffset(session, planned.name, part, diskBytes, planned.size)
+            } catch (error: XrecException) {
+                if (error.failure in LINK_FAILURES) throw error
+                if (error.failure == XrecFailure.LATER) return FileResult.DEFERRED
+                Log.w(TAG, "Could not verify the live prefix of ${planned.name} (${error.failure})")
+                return FileResult.FAILED
+            }
+        } else {
+            diskBytes.coerceAtMost(planned.size)
+        }
         withContext(parts.io) { prepare(part, resume) }
         val liveHeaderPending = resume > 0L && planned.resume?.liveHeaderPending == true
         store.updateDevice(address) {
             it.copy(partial = PartialDownload(planned.name, planned.size, resume, liveHeaderPending))
         }
         progress(SyncStep.DOWNLOADING, planned.name, resume, planned.size)
+        val precompute = openDownloadPrecompute(part, planned, resume)
+        return try {
+            completeDownload(session, address, planned, part, pace, liveHeaderPending, precompute, measured)
+        } finally {
+            precompute?.close()
+        }
+    }
+
+    private suspend fun migratePreviousPart(address: String, planned: PlannedDownload, part: File) {
+        val previousPart = planned.resume?.let { partFile(address, it.name) } ?: return
+        if (previousPart == part) return
+        withContext(parts.io) {
+            if (previousPart.isFile && !part.exists()) previousPart.renameTo(part)
+            val prevStage = RecorderLivePrecomputeStore.stagingDirFor(previousPart)
+            val newStage = RecorderLivePrecomputeStore.stagingDirFor(part)
+            if (prevStage.isDirectory && !newStage.exists()) prevStage.renameTo(newStage)
+        }
+    }
+
+    private suspend fun openDownloadPrecompute(
+        part: File,
+        planned: PlannedDownload,
+        resume: Long,
+    ): LivePrecomputeSession? {
+        if (planned.size < MIN_DOWNLOAD_PRECOMPUTE_BYTES || resume >= planned.size) return null
+        return parts.library.openLivePrecompute(part, planned.name)?.also { sessionObj ->
+            if (resume > XrecLimits.EMPTY_WAV_BYTES) sessionObj.onBytesAvailable(resume)
+        }
+    }
+
+    // Completes fetch, optional header refresh, precompute stop, and import.
+    @Suppress("LongParameterList", "ReturnCount")
+    private suspend fun completeDownload(
+        session: Session,
+        address: String,
+        planned: PlannedDownload,
+        part: File,
+        pace: Pace,
+        liveHeaderPending: Boolean,
+        precompute: LivePrecomputeSession?,
+        measured: (XrecDownloadStats) -> Unit,
+    ): FileResult {
         val stats = try {
-            fetch(session, planned, part, pace)
+            fetch(session, planned, part, pace, precompute)
         } catch (error: XrecException) {
             if (error.failure != XrecFailure.LATER) return downloadFailed(address, planned, part, error)
             val bytes = withContext(parts.io) { part.length() }
@@ -775,15 +839,19 @@ class RecorderSync(private val parts: Parts) {
         if (liveHeaderPending) {
             refreshLiveHeaderIfNeeded(session, address, planned, part)?.let { return it }
         }
-        stats?.let {
-            measured(it)
-            Log.i(
-                METRICS_TAG,
-                "${planned.name}: ${it.bytes} bytes in ${it.millis} ms, ${it.bytesPerSecond / BYTES_PER_KB} KB/s, " +
-                    "${it.retries} retries, ${it.requests} GETS of ${it.window} bytes",
-            )
-        }
-        return import(address, planned, part)
+        reportDownloadStats(planned.name, stats, measured)
+        precompute?.awaitStopped()
+        return import(address, planned, part, precompute)
+    }
+
+    private fun reportDownloadStats(name: String, stats: XrecDownloadStats?, measured: (XrecDownloadStats) -> Unit) {
+        val s = stats ?: return
+        measured(s)
+        Log.i(
+            METRICS_TAG,
+            "$name: ${s.bytes} bytes in ${s.millis} ms, " +
+                "${s.bytesPerSecond / BYTES_PER_KB} KB/s, ${s.retries} retries, ${s.requests} GETS of ${s.window} bytes",
+        )
     }
 
     private suspend fun refreshLiveHeaderIfNeeded(
@@ -814,8 +882,15 @@ class RecorderSync(private val parts: Parts) {
      * the file also when the download fails, and a complete file is synced to the disk. A flush that fails after a
      * failed download does not hide the download's failure (a LATER or a lost link): it is added as suppressed.
      */
-    private suspend fun fetch(session: Session, planned: PlannedDownload, part: File, pace: Pace): XrecDownloadStats? {
+    private suspend fun fetch(
+        session: Session,
+        planned: PlannedDownload,
+        part: File,
+        pace: Pace,
+        precompute: LivePrecomputeSession? = null,
+    ): XrecDownloadStats? {
         val offset = withContext(parts.io) { part.length() }
+        var flushedForPrecompute = offset
         return session.call {
             FileOutputStream(part, true).use { out ->
                 val buffered = BufferedOutputStream(out, PART_BUFFER_BYTES)
@@ -823,6 +898,11 @@ class RecorderSync(private val parts: Parts) {
                     download(planned.name, planned.size, buffered, offset, pace.window, pace.pauseMillis) { done ->
                         session.touch()
                         progress(SyncStep.DOWNLOADING, planned.name, done, planned.size)
+                        if (precompute != null && done - flushedForPrecompute >= FETCH_PRECOMPUTE_FLUSH_BYTES) {
+                            buffered.flush()
+                            flushedForPrecompute = done
+                            precompute.onBytesAvailable(done)
+                        }
                     }
                 }
                 out.fd.sync()
@@ -839,7 +919,10 @@ class RecorderSync(private val parts: Parts) {
     ): FileResult {
         if (error.failure in CHANGED_FAILURES) {
             Log.i(TAG, "${planned.name} changed on the recorder (${error.failure}); the next sync lists it again")
-            withContext(parts.io) { part.delete() }
+            withContext(parts.io) {
+                parts.library.discardLivePrecompute(part)
+                part.delete()
+            }
             store.updateDevice(address) { it.copy(partial = null) }
             return FileResult.CHANGED
         }
@@ -867,14 +950,14 @@ class RecorderSync(private val parts: Parts) {
             is LibraryImport.Rejected -> return rejected(address, planned, part, head, imported.failure)
             is LibraryImport.Created -> imported.noteId.also {
                 recordedAt?.let { start -> parts.library.setRecordingStartIfAbsent(it, formatStartedAt(start)) }
-                precompute?.finishAndInstall(it)
+                installOrPrecompute(part, it, precompute)
                 parts.library.transcribe(it)
             }
             // The sync can have stopped between an import and its transcription request: ask now if nothing runs.
             is LibraryImport.Existing -> imported.noteId.also {
                 recordedAt?.let { start -> parts.library.setRecordingStartIfAbsent(it, formatStartedAt(start)) }
                 if (parts.library.needsTranscription(it)) {
-                    precompute?.finishAndInstall(it)
+                    installOrPrecompute(part, it, precompute)
                     parts.library.transcribe(it)
                 }
             }
@@ -882,8 +965,19 @@ class RecorderSync(private val parts: Parts) {
         store.updateDevice(address) { state ->
             state.withRecording(SyncedRecording(planned.name, planned.size, noteId, head), failure = null)
         }
-        withContext(parts.io) { part.delete() }
+        withContext(parts.io) {
+            parts.library.discardLivePrecompute(part)
+            part.delete()
+        }
         return FileResult.DONE
+    }
+
+    private suspend fun installOrPrecompute(part: File, noteId: String, precompute: LivePrecomputeSession?) {
+        if (precompute != null) {
+            precompute.finishAndInstall(noteId)
+        } else {
+            parts.library.installLivePrecompute(part, noteId)
+        }
     }
 
     private inner class LiveHost : RecorderLiveTailer.Host {
@@ -940,7 +1034,10 @@ class RecorderSync(private val parts: Parts) {
         store.updateDevice(address) { state ->
             state.withRecording(SyncedRecording(planned.name, planned.size, null, head), IMPORT_FAILURE + failure)
         }
-        withContext(parts.io) { part.delete() }
+        withContext(parts.io) {
+            parts.library.discardLivePrecompute(part)
+            part.delete()
+        }
         return FileResult.DONE
     }
 
@@ -956,6 +1053,7 @@ class RecorderSync(private val parts: Parts) {
         val uploaded: Int,
         val deferred: Int,
         val sentSidecars: Set<String> = emptySet(),
+        val sawRecordingHold: Boolean = false,
     )
 
     /**
@@ -990,7 +1088,7 @@ class RecorderSync(private val parts: Parts) {
         if (!allowed) return NO_UPLOADS
         if (hold) {
             Log.i(TAG, "${uploads.size} transcripts wait for the end of the recording")
-            return Uploads(0, uploads.size)
+            return Uploads(0, uploads.size, sawRecordingHold = true)
         }
         val (ready, waiting) = uploads.partition { fileKey(it.recording.name) !in unverified }
         if (waiting.isNotEmpty()) Log.i(TAG, "${waiting.size} transcripts wait until their recording can be compared")
@@ -1001,7 +1099,12 @@ class RecorderSync(private val parts: Parts) {
             val failure = uploadOne(session, upload, transcript)
             if (failure == XrecFailure.LATER) {
                 Log.i(TAG, "The recorder records: ${ready.size - index} transcripts wait for its end")
-                return Uploads(uploaded, ready.size - index + waiting.size, sentSidecars)
+                return Uploads(
+                    uploaded,
+                    ready.size - index + waiting.size,
+                    sentSidecars,
+                    sawRecordingHold = true,
+                )
             }
             if (failure == XrecFailure.FIRMWARE_TOO_OLD) {
                 Log.w(TAG, "The recorder firmware $firmware does not take transcripts")
@@ -1284,6 +1387,7 @@ class RecorderSync(private val parts: Parts) {
     ): Uploads {
         var totalUploaded = 0
         var lastDeferred = 0
+        var sawHold = false
         var currentChecks = checks
         val alreadySent = HashSet<String>()
         repeat(MAX_UPLOAD_PASSES) {
@@ -1292,12 +1396,15 @@ class RecorderSync(private val parts: Parts) {
             val sent = upload(session, address, pong, remaining, latest.transcripts, hold, latest.unverified)
             totalUploaded += sent.uploaded
             lastDeferred = sent.deferred
+            sawHold = sawHold || sent.sawRecordingHold
             alreadySent += sent.sentSidecars
-            if (sent.uploaded == 0 || sent.deferred > 0) return Uploads(totalUploaded, lastDeferred, alreadySent)
+            if (sent.uploaded == 0 || sent.deferred > 0) {
+                return Uploads(totalUploaded, lastDeferred, alreadySent, sawHold)
+            }
             val newlyChecked = remaining.map { fileKey(it.recording.name) } + latest.unverified
             currentChecks = SuspectChecks(currentChecks.checked + newlyChecked, latest.unverified)
         }
-        return Uploads(totalUploaded, lastDeferred, alreadySent)
+        return Uploads(totalUploaded, lastDeferred, alreadySent, sawHold)
     }
 
     private suspend fun reportSyncState(session: Session, pending: Int) {
@@ -1329,13 +1436,28 @@ class RecorderSync(private val parts: Parts) {
     /** Deletes the `.part` files of downloads that the state no longer continues. */
     private suspend fun deleteStrayParts(address: String) {
         val keep = deviceState(address).partial?.let { partFile(address, it.name) }
-        deviceDirectory(address).listFiles()?.filter { it.isFile && it.name.endsWith(PART) && it != keep }
-            ?.forEach { it.delete() }
+        val dir = deviceDirectory(address)
+        dir.listFiles()?.forEach { entry ->
+            when {
+                entry.isFile && entry.name.endsWith(PART) && entry != keep -> {
+                    parts.library.discardLivePrecompute(entry)
+                    entry.delete()
+                }
+                entry.isDirectory && entry.name.endsWith(PRECOMPUTE_SUFFIX) -> {
+                    val owner = File(dir, entry.name.removeSuffix(PRECOMPUTE_SUFFIX))
+                    if (owner != keep || !owner.isFile) {
+                        parts.library.discardLivePrecompute(owner)
+                        entry.deleteRecursively()
+                    }
+                }
+            }
+        }
     }
 
     private fun prepare(part: File, keep: Long) {
         part.parentFile?.mkdirs()
         if (keep == 0L) {
+            parts.library.discardLivePrecompute(part)
             part.delete()
         } else {
             RandomAccessFile(part, "rw").use { it.setLength(keep) }
@@ -1384,6 +1506,9 @@ class RecorderSync(private val parts: Parts) {
         private const val PERCENT = 100L
         private const val MAX_SYNC_PENDING = 0xFFFF
         private const val PART = ".part"
+        private const val PRECOMPUTE_SUFFIX = ".precompute"
+        private const val MIN_DOWNLOAD_PRECOMPUTE_BYTES = 1_000_000L
+        private const val FETCH_PRECOMPUTE_FLUSH_BYTES = 256 * 1024L
         private const val NANOS_PER_MILLI = 1_000_000L
         private const val WATCHDOG_TICKS = 4
         private const val MIN_TICK_MS = 10L
