@@ -102,6 +102,9 @@ class FakeRecorder(
     /** Runs on the device thread after an LS listing was sent (a recording can stop or split then). */
     @Volatile var afterList: (() -> Unit)? = null
 
+    /** Runs on the device thread before a STAT reply is built. */
+    @Volatile var beforeStat: (() -> Unit)? = null
+
     /** Runs on the device thread before PUTEND is handled. */
     @Volatile var beforePutEnd: (() -> Unit)? = null
 
@@ -196,6 +199,7 @@ class FakeRecorder(
         next.beforePut = beforePut
         next.beforePutEnd = beforePutEnd
         next.afterList = afterList
+        next.beforeStat = beforeStat
         return next
     }
 
@@ -319,6 +323,7 @@ class FakeRecorder(
         }
 
     private fun stat() {
+        beforeStat?.invoke()
         val base = "+XREC:STAT,87,3990,0,0,${if (recording) "33,12" else "16,0"},1500,7600"
         if (!syncsWhileRecording) return reply(base)
         val active = activeFile()

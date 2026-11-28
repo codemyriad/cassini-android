@@ -106,9 +106,9 @@ data class SyncPlan(
  *   starts again from the lowest free one, so finished recordings can have higher numbers. The caller lists between two
  *   STATs that show the same recording (a split or a stop during LS changes it), so no other file of the listing grows.
  *   A stopped download of the same name and size resumes.
- * - Upload the transcript of each imported recording that is still on the recorder, when the note has a transcript and
- *   the recorder has no sidecar for it or an older one, unless the recorder refused that version for good. Uploads
- *   also run while the recorder records: they go to a temporary file that PUTEND commits.
+ * - Upload the transcript of each imported recording that is still on the recorder, newest first, when the note has a
+ *   transcript and the recorder has no sidecar for it or an older one, unless the recorder refused that version for good.
+ *   Uploads also run while the recorder records: they go to a temporary file that PUTEND commits.
  */
 object SyncPlanner {
     fun plan(
@@ -130,7 +130,7 @@ object SyncPlanner {
                 !XrecNames.isSidecar(entry.name) -> skipped += SkippedFile(entry.name, reason)
             }
         }
-        val uploads = state.recordings.mapNotNull { upload(it, listing, transcriptVersions) }
+        val uploads = state.recordings.asReversed().mapNotNull { upload(it, listing, transcriptVersions) }
         return SyncPlan(downloads, uploads, skipped, status.recording, whileRecording)
     }
 

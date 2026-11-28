@@ -35,6 +35,7 @@ internal class RecorderLiveTailer(
         fun headSha256(file: File): String
         suspend fun partial(address: String): PartialDownload?
         suspend fun updatePartial(address: String, partial: PartialDownload?)
+        suspend fun mayUploadTranscripts(address: String, pong: XrecReply.Pong): Boolean
 
         @Suppress("LongParameterList") // Carries finalized segment metadata and optional precompute session.
         suspend fun importFinalized(
@@ -44,12 +45,20 @@ internal class RecorderLiveTailer(
             part: File,
             precompute: LivePrecomputeSession?,
             recordedAt: LocalDateTime?,
-        ): String?
+        ): FinalizedImport
     }
+
+    /** Import result of a finalized live segment so temporary failures remain distinguishable from rejections. */
+    data class FinalizedImport(
+        val downloaded: Int,
+        val failed: Int,
+        val noteId: String?,
+    )
 
     /** Result of tailing all consecutive live segments (including 2 GiB splits) until stopped or deferred. */
     data class Outcome(
         val downloaded: Int,
+        val failed: Int,
         val deferred: Int,
         val recording: Boolean,
         val deferredWait: Boolean,
@@ -57,7 +66,7 @@ internal class RecorderLiveTailer(
         val status: XrecReply.Status,
     )
 
-    @Suppress("ReturnCount") // Segment loop handles stop, split, and early deferral cleanly.
+    @Suppress("ReturnCount") // Segment loop handles stop, split, back-to-back recordings, and deferral cleanly.
     suspend fun tail(
         session: RecorderSync.Session,
         address: String,
@@ -68,54 +77,53 @@ internal class RecorderLiveTailer(
         var listing = initialListing
         var status = initialStatus
         var downloaded = 0
+        var failed = 0
         var lastNoteId: String? = null
         var segments = 0
         while (status.recording && (status.recordingIndex ?: 0L) > 0L && segments < MAX_SEGMENTS) {
             segments++
-            val result = try {
-                tailOneSegment(session, address, pong.listTimestampsSupported, listing, status)
-            } catch (error: XrecException) {
-                if (error.failure != XrecFailure.LATER) throw error
-                SegmentResult(deferred = true, listing = listing, status = status)
-            }
+            val result = tailSegmentOrDefer(session, address, pong.listTimestampsSupported, listing, status)
             listing = result.listing
             status = result.status
-            if (result.downloaded > 0) {
-                downloaded += result.downloaded
-                lastNoteId = result.noteId
-            }
-            if (result.deferred) {
+            downloaded += result.import.downloaded
+            failed += result.import.failed
+            if (result.import.downloaded > 0) lastNoteId = result.import.noteId
+            if (result.deferred || result.aborted) {
+                listing = if (result.aborted) {
+                    refreshMissingActiveListing(session, pong.listTimestampsSupported, listing, status)
+                } else {
+                    listing
+                }
                 return Outcome(
                     downloaded = downloaded,
-                    deferred = 1,
-                    recording = true,
-                    deferredWait = true,
+                    failed = failed,
+                    deferred = if (result.deferred) 1 else 0,
+                    recording = result.deferred || status.recording,
+                    deferredWait = result.deferred,
                     listing = listing,
                     status = status,
                 )
             }
-            if (result.aborted) {
-                return Outcome(
-                    downloaded = downloaded,
-                    deferred = 0,
-                    recording = status.recording,
-                    deferredWait = false,
-                    listing = listing,
-                    status = status,
-                )
+            if (!status.recording && lastNoteId != null && host.mayUploadTranscripts(address, pong)) {
+                status = waitForTranscript(session, lastNoteId, status)
+                lastNoteId = null
             }
         }
-        if (!status.recording && lastNoteId != null && pong.recordTarget) {
-            status = waitForTranscript(session, lastNoteId, status)
-        }
-        return Outcome(
-            downloaded = downloaded,
-            deferred = 0,
-            recording = status.recording,
-            deferredWait = false,
-            listing = listing,
-            status = status,
-        )
+        listing = refreshMissingActiveListing(session, pong.listTimestampsSupported, listing, status)
+        return Outcome(downloaded, failed, 0, status.recording, false, listing, status)
+    }
+
+    private suspend fun tailSegmentOrDefer(
+        session: RecorderSync.Session,
+        address: String,
+        withTimestamps: Boolean,
+        listing: List<XrecReply.Entry>,
+        status: XrecReply.Status,
+    ): SegmentResult = try {
+        tailOneSegment(session, address, withTimestamps, listing, status)
+    } catch (error: XrecException) {
+        if (error.failure != XrecFailure.LATER) throw error
+        SegmentResult(deferred = true, listing = listing, status = status)
     }
 
     @Suppress("ReturnCount") // Aborts cleanly when recording metadata disappears.
@@ -129,8 +137,9 @@ internal class RecorderLiveTailer(
         val activeIndex = initialStatus.recordingIndex
             ?: return SegmentResult(aborted = true, listing = initialListing, status = initialStatus)
         val found = locateActiveEntry(session, activeIndex, withTimestamps, initialListing, initialStatus)
-            ?: return SegmentResult(aborted = true, listing = initialListing, status = initialStatus)
-        val activeName = found.entry.name
+        val activeEntry = found.entry
+            ?: return SegmentResult(aborted = true, listing = found.listing, status = found.status)
+        val activeName = activeEntry.name
         val fallbackStart = LocalDateTime.ofInstant(
             Instant.ofEpochMilli(
                 host.parts.clock() - found.status.recordingSeconds.coerceAtLeast(0L) * MILLIS_PER_SECOND,
@@ -270,8 +279,8 @@ internal class RecorderLiveTailer(
     ): SegmentResult {
         val listing = session.call { list(withTimestamps) }
         val finalEntry = listing.firstOrNull { it.name.equals(activeName, ignoreCase = true) }
-        if (finalEntry == null) {
-            return SegmentResult(aborted = true, listing = listing, status = stream.status)
+        if (finalEntry == null || finalEntry.size <= WAV_HEADER_BYTES) {
+            return SegmentResult(aborted = finalEntry == null, listing = listing, status = stream.status)
         }
         val finalSize = finalEntry.size
         var offset = stream.offset
@@ -287,19 +296,14 @@ internal class RecorderLiveTailer(
             val window = if (stream.status.recording) XrecLimits.RECORDING_GETS_WINDOW else null
             pullRange(session, RangeRequest(activeName, part, offset, finalSize, window, pace), precompute)
         }
-        if (needsHeaderRefresh && finalSize >= WAV_HEADER_BYTES) {
+        if (needsHeaderRefresh) {
             refreshWavHeader(session, activeName, part, finalSize, host.parts.io)
         }
         // Wait for the precompute loop to stop touching `part` or `stagingDir` before import/install starts.
         precompute?.awaitStopped()
         val recordedAt = RecorderTimestamps.resolve(finalEntry) ?: fallbackStart
-        val noteId = host.importFinalized(address, activeName, finalSize, part, precompute, recordedAt)
-        return SegmentResult(
-            downloaded = if (noteId != null) 1 else 0,
-            noteId = noteId,
-            listing = listing,
-            status = stream.status,
-        )
+        val imported = host.importFinalized(address, activeName, finalSize, part, precompute, recordedAt)
+        return SegmentResult(import = imported, listing = listing, status = stream.status)
     }
 
     private suspend fun locateActiveEntry(
@@ -308,7 +312,7 @@ internal class RecorderLiveTailer(
         withTimestamps: Boolean,
         initialListing: List<XrecReply.Entry>,
         initialStatus: XrecReply.Status,
-    ): Located? {
+    ): Located {
         var listing = initialListing
         var status = initialStatus
         var match = listing.firstOrNull { recordingIndexOf(it.name) == activeIndex }
@@ -318,14 +322,22 @@ internal class RecorderLiveTailer(
             if (attempt > 0) host.parts.wait(host.parts.livePollMillis)
             attempt++
             status = session.call { stat() }
-            if (!status.recording || status.recordingIndex != activeIndex) {
-                active = false
-            } else {
-                listing = session.call { list(withTimestamps) }
-                match = listing.firstOrNull { recordingIndexOf(it.name) == activeIndex }
-            }
+            active = status.recording && status.recordingIndex == activeIndex
+            listing = session.call { list(withTimestamps) }
+            match = listing.firstOrNull { recordingIndexOf(it.name) == activeIndex }
         }
-        return match?.let { Located(it, listing, status) }
+        return Located(match, listing, status)
+    }
+
+    private suspend fun refreshMissingActiveListing(
+        session: RecorderSync.Session,
+        withTimestamps: Boolean,
+        listing: List<XrecReply.Entry>,
+        status: XrecReply.Status,
+    ): List<XrecReply.Entry> {
+        val activeIndex = status.recordingIndex?.takeIf { status.recording && it > 0L }
+        val needsRefresh = activeIndex != null && listing.none { recordingIndexOf(it.name) == activeIndex }
+        return if (needsRefresh) session.call { list(withTimestamps) } else listing
     }
 
     private suspend fun prepareLivePart(
@@ -436,7 +448,7 @@ internal class RecorderLiveTailer(
         }
     }
 
-    private suspend fun waitForTranscript(
+    internal suspend fun waitForTranscript(
         session: RecorderSync.Session,
         noteId: String,
         initialStatus: XrecReply.Status,
@@ -511,14 +523,13 @@ internal class RecorderLiveTailer(
     )
 
     private class Located(
-        val entry: XrecReply.Entry,
+        val entry: XrecReply.Entry?,
         val listing: List<XrecReply.Entry>,
         val status: XrecReply.Status,
     )
 
     private class SegmentResult(
-        val downloaded: Int = 0,
-        val noteId: String? = null,
+        val import: FinalizedImport = FinalizedImport(0, 0, null),
         val deferred: Boolean = false,
         val aborted: Boolean = false,
         val listing: List<XrecReply.Entry>,

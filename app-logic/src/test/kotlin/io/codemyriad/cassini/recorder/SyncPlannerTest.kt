@@ -157,7 +157,7 @@ class SyncPlannerTest {
         val versions = mapOf("n1" to "v1", "n2" to "v1", "n3" to "v2", "n4" to "v1", "n6" to "v1")
         val plan = SyncPlanner.plan(listing, recording, state, versions)
         assertEquals(
-            listOf("REC_0001.cwx" to "v1", "REC_0003.cwx" to "v2", "REC_0004.cwx" to "v1"),
+            listOf("REC_0004.cwx" to "v1", "REC_0003.cwx" to "v2", "REC_0001.cwx" to "v1"),
             plan.uploads.map { it.sidecarName to it.transcriptVersion },
         )
         assertTrue(plan.downloads.isEmpty())

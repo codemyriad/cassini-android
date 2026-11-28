@@ -130,7 +130,7 @@ One sync runs at a time (a `Mutex`). A sync does these steps:
    - An import refused for lack of space or a save error keeps the downloaded file, and the next sync imports it
      again without a download. Another refusal (for example a WAV that is not 16-bit PCM) is final.
    - At the end of a sync, the app deletes the `.part` files that no stopped download continues.
-6. For each copied recording that is still on the recorder and whose note has a finished transcript: the app makes the
+6. Starting with the newest copied recording, for each one that is still on the recorder and whose note has a finished transcript: the app makes the
    CWX1 sidecar from the shown variant (the words, the note title, the audio duration, and the speaker labels and
    colours as the Note screen shows them, in the colours of the dark theme). It uploads the sidecar with
    `PUT ...,REC,<stem>.cwx:` and commits it with `PUTEND`. The first chunk is 64 bytes (the CWX header), the others
@@ -289,7 +289,7 @@ device chooser are optional features (`android:required="false"`).
   a download; a transcript that waits at the start goes; an unreachable recorder is tried again with growing waits
   until it takes the transcript, and at most 25 times; a sync that fails each time is tried 3 times; a recording that
   left the recorder ends the push after one sync; a busy recorder is no failure and a full sync takes the new
-  transcript; a note that loses its transcript does not stop the others; no attempt when no transcript waits), `RecorderTranscriptsTest`, `GraphRecorderLibraryTest` and `RecorderViewModelTest`.
+  transcript; a note that loses its transcript does not stop the others; no attempt when no transcript waits), `RecorderLiveStreamingTest` (live chunk tailing while recording, stereo streaming, header refresh and PCM reuse after disconnect or stop, legacy-firmware waiting, and preempting checks or uploads for a new recording), `RecorderLiveRecoveryTest` (short recordings stopping during live locate, back-to-back recordings starting during transcript wait, temporary import failures preserving partials, post-stop transcript waiting, deleted live files clearing stale partials, and newest-first sidecar uploads), `RecorderTranscriptsTest`, `GraphRecorderLibraryTest` and `RecorderViewModelTest`.
 
 ## Limits
 
