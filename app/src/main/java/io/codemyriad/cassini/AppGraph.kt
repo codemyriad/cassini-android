@@ -798,10 +798,12 @@ class AppGraph(context: Context, val config: Config) {
         val stagingDir = RecorderLivePrecomputeStore.stagingDirFor(partFile)
         val active = recorderLivePrecompute.get()
         if (active != null && active.stagingDir == stagingDir) {
-            recorderLivePrecompute.compareAndSet(active, null)
-            active.close()
+            // The slot keeps the worker until it stops, so a new session on this part waits for the deletion.
+            active.discard()
+            active.invokeOnStopped { recorderLivePrecompute.compareAndSet(active, null) }
+        } else {
+            stagingDir.deleteRecursively()
         }
-        stagingDir.deleteRecursively()
     }
 
     private suspend fun createRecorderLivePrecompute(partFile: File): LivePrecomputeSession {
@@ -896,7 +898,9 @@ class AppGraph(context: Context, val config: Config) {
             try {
                 precomputer.close()
             } finally {
-                slot.compareAndSet(precomputer, null)
+                // Free the slot only once the worker stopped: the next session over the same staging directory
+                // joins it first instead of loading or clearing files that a cancelled save still writes.
+                precomputer.invokeOnStopped { slot.compareAndSet(precomputer, null) }
             }
         }
     }

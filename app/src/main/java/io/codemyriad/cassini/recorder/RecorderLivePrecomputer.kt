@@ -337,6 +337,21 @@ class RecorderLivePrecomputer(
         worker.cancel()
     }
 
+    /**
+     * Stops the worker and removes its staging directory once the worker has stopped writing to it. Deleting the
+     * directory right away could race a checkpoint that the cancelled worker is still saving.
+     */
+    fun discard() {
+        if (installing.get()) return
+        close()
+        worker.invokeOnCompletion { parts.stagingDir.deleteRecursively() }
+    }
+
+    /** Runs [handler] once the worker has stopped (immediately when it already has). */
+    fun invokeOnStopped(handler: () -> Unit) {
+        worker.invokeOnCompletion { handler() }
+    }
+
     @Suppress("TooGenericExceptionCaught") // Strictly best-effort: never throw into Bluetooth sync or UI.
     private suspend fun runWorker() {
         try {

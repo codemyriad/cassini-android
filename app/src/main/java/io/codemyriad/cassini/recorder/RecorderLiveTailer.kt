@@ -552,6 +552,8 @@ internal class RecorderLiveTailer(
             val timeDue = now - lastAttemptMs >= PRECOMPUTE_RETRY_MS
             val bytesDue = offset - lastAttemptOffset >= PRECOMPUTE_RETRY_BYTES
             if (timeDue || bytesDue) {
+                // Join the stopped worker before a new one opens the same staging directory.
+                existing?.awaitStopped()
                 existing?.close()
                 active = null
                 tryOpen(offset)

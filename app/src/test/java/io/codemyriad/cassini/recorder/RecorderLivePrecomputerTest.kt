@@ -71,7 +71,9 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 class RecorderLivePrecomputerTest {
@@ -363,6 +365,46 @@ class RecorderLivePrecomputerTest {
             (0 until totalSeconds).map { "w$it" },
             storage.markedDocument!!.selected(null)!!.transcript!!.words.map { it.text },
         )
+    }
+
+    @Test fun discardDeletesStagingOnlyAfterTheWorkerStopsSaving() = runBlocking {
+        val wav = buildPcmWav(sampleRate = 16_000, channels = 1, frames = 16_000 * 30)
+        val partFile = temp.newFile("REC_0013.wav.part").apply { writeBytes(wav) }
+        val stagingDir = temp.newFolder("staging-discard")
+        val noteDir = temp.newFolder("note-discard")
+        val storage = TestJobStorage(noteDir, File(noteDir, "source.wav"), SpeechModel.PARAKEET)
+        val engines = buildTestEngines(CopyOnWriteArrayList(), CopyOnWriteArrayList())
+        val env = JobEnvironment(placeholderLabel = { "Speaker $it" }, inference = inference, io = Dispatchers.IO)
+        val saving = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val pre = PrecomputeRig(partFile, stagingDir, storage, engines, env).start {
+            if (it > 0L) {
+                saving.countDown()
+                awaitIgnoringInterrupts(release)
+            }
+        }
+        assertTrue(saving.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+        val stopped = CompletableDeferred<Unit>()
+        pre.discard()
+        pre.invokeOnStopped { stopped.complete(Unit) }
+        // The cancelled worker is still inside its checkpoint save: the staging directory must outlive it.
+        assertTrue(File(stagingDir, "checkpoint.json").isFile)
+        release.countDown()
+        withTimeout(TIMEOUT_MS) { stopped.await() }
+        assertFalse(stagingDir.exists())
+    }
+
+    private fun awaitIgnoringInterrupts(latch: CountDownLatch) {
+        var interrupted = false
+        while (true) {
+            try {
+                latch.await()
+                break
+            } catch (_: InterruptedException) {
+                interrupted = true
+            }
+        }
+        if (interrupted) Thread.currentThread().interrupt()
     }
 
     @Test fun mutatedPcmDiscardsStaleStagedPrecomputeCleanly() = runBlocking {

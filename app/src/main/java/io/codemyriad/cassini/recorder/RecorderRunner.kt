@@ -67,6 +67,7 @@ class RecorderRunner(
         roundTripHoldMs: Long = ROUND_TRIP_HOLD_MS,
     ): Deferred<SyncOutcome> = scope.async {
         var started = false
+        var handedOff = false
         try {
             sync.sync(mode) {
                 if (!started) {
@@ -80,10 +81,21 @@ class RecorderRunner(
                     roundTripHoldMs > 0 &&
                     outcome is SyncOutcome.Done &&
                     outcome.downloaded > 0
-                if (shouldHold) holdForPendingRoundTrip(roundTripHoldMs)
+                if (shouldHold) {
+                    // The outcome returns at once so Auto sync keeps polling (a new recording is tailed live); the
+                    // service run alone stays until the new notes transcribed and their sidecars went back.
+                    handedOff = true
+                    scope.launch {
+                        try {
+                            holdForPendingRoundTrip(roundTripHoldMs)
+                        } finally {
+                            releaseService()
+                        }
+                    }
+                }
             }
         } finally {
-            if (started) releaseService()
+            if (started && !handedOff) releaseService()
         }
     }
 
