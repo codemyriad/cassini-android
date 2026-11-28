@@ -516,6 +516,7 @@ class RecorderSync(private val parts: Parts) {
         var recording = plan.deviceRecording
         var deferred = 0
         var speed: DownloadSpeed? = null
+        var resumedLiveNoteId: String? = null
         for ((index, download) in plan.downloads.withIndex()) {
             // A recording can start after STAT: its file grows, so no download starts while one runs.
             val started = index > 0 && statEachFile && session.call { stat() }.recording
@@ -525,7 +526,12 @@ class RecorderSync(private val parts: Parts) {
                 download(session, address, download, pace) { stats -> speed = (speed ?: NO_SPEED) + stats }
             }
             when (result) {
-                FileResult.DONE -> downloaded++
+                FileResult.DONE -> {
+                    downloaded++
+                    if (download.resume?.liveHeaderPending == true) {
+                        resumedLiveNoteId = importedNoteId(address, download.name)
+                    }
+                }
                 FileResult.FAILED -> failed++
                 FileResult.CHANGED -> Unit
                 FileResult.DEFERRED -> {
@@ -536,9 +542,16 @@ class RecorderSync(private val parts: Parts) {
                 }
             }
         }
+        resumedLiveNoteId?.takeIf {
+            !recording && deferred == 0 && mayUploadTranscripts(address, pong)
+        }?.let { noteId ->
+            status = liveTailer.waitForTranscript(session, noteId, status)
+            recording = status.recording
+        }
         val liveCapable = pong.liveRecordingSupported && syncWhileRecording && deferred == 0
         var didLiveTail = false
         var deferredWait = false
+        var postTailDownloads = 0
         val checks = SuspectChecks(
             (suspects.map { fileKey(it.name) } + plan.downloads.map { fileKey(it.name) }).toSet(),
             unverified,
@@ -546,17 +559,19 @@ class RecorderSync(private val parts: Parts) {
         var totalUploaded = 0
         var sent = NO_UPLOADS
         repeat(2) { pass ->
-            val retryAfterHold = liveCapable && !didLiveTail && sent.sawRecordingHold
+            val retryAfterHold = liveCapable && sent.sawRecordingHold
             if (pass == 0 || retryAfterHold) {
                 val tailStatus = if (liveCapable) session.call { stat() } else status
                 val activeTail = liveCapable && tailStatus.recording && (tailStatus.recordingIndex ?: 0L) > 0L
                 if (activeTail) {
                     didLiveTail = true
+                    sent = NO_UPLOADS
                     if (pong.syncStatusSupported) {
                         reportSyncState(session, maxOf(1, waitingForRecording))
                     }
                     val tail = liveTailer.tail(session, address, pong, listing, tailStatus)
                     downloaded += tail.downloaded
+                    failed += tail.failed
                     deferred += tail.deferred
                     recording = tail.recording
                     deferredWait = tail.deferredWait
@@ -572,6 +587,7 @@ class RecorderSync(private val parts: Parts) {
                         syncWhileRecording,
                     )
                     waitingForRecording = refreshedPlan.skipped.count { it.reason in WAITING_REASONS }
+                    postTailDownloads = (refreshedPlan.downloads.size - tail.failed).coerceAtLeast(0)
                 }
                 if (pass == 0 || activeTail) {
                     val holdNow = status.recording && status.namesActiveFile
@@ -582,18 +598,18 @@ class RecorderSync(private val parts: Parts) {
         }
         if (sent.sawRecordingHold) recording = true
         withContext(parts.io) { deleteStrayParts(address) }
+        val waiting = waitingForRecording + postTailDownloads + deferred + sent.deferred
         if (pong.syncStatusSupported) {
-            val pending = waitingForRecording + deferred + failed + sent.deferred + remainingSidecarWork(address)
+            val pending = waiting + failed + remainingSidecarWork(address)
             reportSyncState(session, pending)
         }
         // TODO(recorder-sync): delete synced recordings from the recorder (DEL) once the user can choose it.
-        val waiting = waitingForRecording + deferred + sent.deferred
         val holdPoll = syncWhileRecording && sent.sawRecordingHold
         val pollAgain = (plan.whileRecording || deferredWait || holdPoll) && waiting > 0
         return SyncOutcome.Done(
             downloaded,
             totalUploaded,
-            if (didLiveTail) waitingForRecording + deferred else plan.skipped.size + deferred,
+            if (didLiveTail) waitingForRecording + postTailDownloads + deferred else plan.skipped.size + deferred,
             recording,
             failed,
             speed,
@@ -771,10 +787,8 @@ class RecorderSync(private val parts: Parts) {
             try {
                 liveTailer.verifiedLiveOffset(session, planned.name, part, diskBytes, planned.size)
             } catch (error: XrecException) {
-                if (error.failure in LINK_FAILURES) throw error
                 if (error.failure == XrecFailure.LATER) return FileResult.DEFERRED
-                Log.w(TAG, "Could not verify the live prefix of ${planned.name} (${error.failure})")
-                return FileResult.FAILED
+                return downloadFailed(address, planned, part, error)
             }
         } else {
             diskBytes.coerceAtMost(planned.size)
@@ -980,6 +994,11 @@ class RecorderSync(private val parts: Parts) {
         }
     }
 
+    private suspend fun importedNoteId(address: String, name: String): String? =
+        deviceState(address).recordings.lastOrNull {
+            it.recording.name.equals(name, ignoreCase = true)
+        }?.recording?.noteId
+
     private inner class LiveHost : RecorderLiveTailer.Host {
         override val parts: Parts get() = this@RecorderSync.parts
 
@@ -998,6 +1017,9 @@ class RecorderSync(private val parts: Parts) {
             store.updateDevice(address) { it.copy(partial = partial) }
         }
 
+        override suspend fun mayUploadTranscripts(address: String, pong: XrecReply.Pong): Boolean =
+            this@RecorderSync.mayUploadTranscripts(address, pong)
+
         @Suppress("LongParameterList") // Carries finalized segment metadata and optional precompute session.
         override suspend fun importFinalized(
             address: String,
@@ -1006,15 +1028,14 @@ class RecorderSync(private val parts: Parts) {
             part: File,
             precompute: LivePrecomputeSession?,
             recordedAt: LocalDateTime?,
-        ): String? {
+        ): RecorderLiveTailer.FinalizedImport {
             val result = import(address, PlannedDownload(name, size, null, recordedAt), part, precompute)
-            return if (result == FileResult.DONE) {
-                deviceState(address).recordings.lastOrNull {
-                    it.recording.name.equals(name, ignoreCase = true)
-                }?.recording?.noteId
-            } else {
-                null
-            }
+            val noteId = if (result == FileResult.DONE) importedNoteId(address, name) else null
+            return RecorderLiveTailer.FinalizedImport(
+                downloaded = if (noteId != null) 1 else 0,
+                failed = if (result == FileResult.FAILED) 1 else 0,
+                noteId = noteId,
+            )
         }
     }
 
@@ -1056,6 +1077,17 @@ class RecorderSync(private val parts: Parts) {
         val sawRecordingHold: Boolean = false,
     )
 
+    private suspend fun mayUploadTranscripts(address: String, pong: XrecReply.Pong): Boolean {
+        val state = deviceState(address)
+        return TranscriptUploadProbe.mayUpload(
+            state.transcriptsUnsupportedFirmware,
+            state.transcriptsUnsupportedAt,
+            pong.firmware,
+            parts.clock(),
+            pong.recordTarget,
+        )
+    }
+
     /**
      * Sends [uploads]. With [hold] (the recorder records and refuses card writes until it stops) none goes: they all
      * wait for the end of the recording. An `ERR,LATER` (a recording started meanwhile) ends the uploads the same way.
@@ -1073,19 +1105,9 @@ class RecorderSync(private val parts: Parts) {
         unverified: Set<String>,
     ): Uploads {
         if (uploads.isEmpty()) return NO_UPLOADS
+        if (!mayUploadTranscripts(address, pong)) return NO_UPLOADS
         val firmware = pong.firmware
-        val state = deviceState(address)
         val now = parts.clock()
-        val refused = state.transcriptsUnsupportedFirmware
-        val advertised = pong.recordTarget
-        val allowed = TranscriptUploadProbe.mayUpload(
-            refused,
-            state.transcriptsUnsupportedAt,
-            firmware,
-            now,
-            advertised,
-        )
-        if (!allowed) return NO_UPLOADS
         if (hold) {
             Log.i(TAG, "${uploads.size} transcripts wait for the end of the recording")
             return Uploads(0, uploads.size, sawRecordingHold = true)
