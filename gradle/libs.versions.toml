@@ -42,7 +42,7 @@ sherpaOnnx = "1.13.7-0c2ee3f3"
 
 # Tests
 junit = "4.13.2"
-robolectric = "4.17"
+robolectric = "4.18"
 # Screenshot tests in :ui (Robolectric native graphics).
 roborazzi = "1.77.0"
 turbine = "1.2.1"
