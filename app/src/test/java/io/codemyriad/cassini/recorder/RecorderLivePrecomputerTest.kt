@@ -47,10 +47,12 @@ import io.codemyriad.cassini.engine.job.TranscriptionJob
 import io.codemyriad.cassini.engine.job.WorkFiles
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
@@ -233,6 +235,7 @@ class RecorderLivePrecomputerTest {
         private val storage: TestJobStorage,
         private val engines: JobEngines,
         private val env: JobEnvironment,
+        private val deleteStaging: (File) -> Unit = { it.deleteRecursively() },
     ) {
         fun start(onCheckpointed: (Long) -> Unit): RecorderLivePrecomputer = RecorderLivePrecomputer(
             RecorderLivePrecomputer.Parts(
@@ -247,6 +250,7 @@ class RecorderLivePrecomputerTest {
                 voices = TestJobVoices(),
                 speakerPrefix = { "diar_live_" },
                 onCheckpointed = onCheckpointed,
+                deleteStaging = deleteStaging,
             ),
         ).also { it.onBytesAvailable(partFile.length()) }
     }
@@ -391,6 +395,63 @@ class RecorderLivePrecomputerTest {
         assertTrue(File(stagingDir, "checkpoint.json").isFile)
         release.countDown()
         withTimeout(TIMEOUT_MS) { stopped.await() }
+        assertFalse(stagingDir.exists())
+    }
+
+    @Test fun reopeningWaitsForAnInFlightDiscardDeletion() = runBlocking {
+        val wav = buildPcmWav(sampleRate = 16_000, channels = 1, frames = 16_000 * 30)
+        val partFile = temp.newFile("REC_0014.wav.part").apply { writeBytes(wav) }
+        val stagingDir = temp.newFolder("staging-reopen")
+        val noteDir = temp.newFolder("note-reopen")
+        val storage = TestJobStorage(noteDir, File(noteDir, "source.wav"), SpeechModel.PARAKEET)
+        val engines = buildTestEngines(CopyOnWriteArrayList(), CopyOnWriteArrayList())
+        val env = JobEnvironment(placeholderLabel = { "Speaker $it" }, inference = inference, io = Dispatchers.IO)
+        val events = CopyOnWriteArrayList<String>()
+        val deleting = CountDownLatch(1)
+        val releaseDelete = CountDownLatch(1)
+        val checkpointed = CompletableDeferred<Long>()
+        val pre = PrecomputeRig(partFile, stagingDir, storage, engines, env, deleteStaging = { dir ->
+            events += "delete-start"
+            deleting.countDown()
+            awaitIgnoringInterrupts(releaseDelete)
+            dir.deleteRecursively()
+            events += "delete-end"
+        }).start { if (it > 0L) checkpointed.complete(it) }
+        withTimeout(TIMEOUT_MS) { checkpointed.await() }
+        pre.discard()
+        // The worker has finished (its job already counts as completed) and the deletion is now blocked mid-way.
+        assertTrue(deleting.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+        // Undispatched: with a bare job join the reopen would pass straight through before this launch returns.
+        val reopen = launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
+            pre.awaitStopped()
+            events += "reopen"
+        }
+        val handled = CompletableDeferred<Unit>()
+        pre.invokeOnStopped {
+            events += "stopped-handler"
+            handled.complete(Unit)
+        }
+        assertEquals(listOf("delete-start"), events.toList())
+        releaseDelete.countDown()
+        withTimeout(TIMEOUT_MS) { reopen.join() }
+        withTimeout(TIMEOUT_MS) { handled.await() }
+        assertEquals("delete-end", events[1])
+        assertTrue(events.containsAll(listOf("reopen", "stopped-handler")))
+        assertEquals(4, events.size)
+        assertFalse(stagingDir.exists())
+
+        // A discard arriving after the worker stopped still deletes before a later reopen proceeds.
+        val second = CountDownLatch(1)
+        val secondCheckpoint = CompletableDeferred<Long>()
+        val pre2 = PrecomputeRig(partFile, stagingDir, storage, engines, env)
+            .start { if (it > 0L) secondCheckpoint.complete(it) }
+        withTimeout(TIMEOUT_MS) { secondCheckpoint.await() }
+        pre2.awaitStopped()
+        assertTrue(stagingDir.isDirectory)
+        pre2.discard()
+        pre2.invokeOnStopped { second.countDown() }
+        pre2.awaitStopped()
+        assertTrue(second.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
         assertFalse(stagingDir.exists())
     }
 

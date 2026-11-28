@@ -27,6 +27,7 @@ import io.codemyriad.cassini.engine.job.Recognizer
 import io.codemyriad.cassini.engine.job.StreamingDiarizer
 import io.codemyriad.cassini.engine.whistle.WhistleReplay
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -282,6 +283,7 @@ class RecorderLivePrecomputer(
         val canInstallBlocking: (String) -> Boolean = { true },
         val runWithPriority: (() -> Unit) -> Unit = { it() },
         val onCheckpointed: (Long) -> Unit = {},
+        val deleteStaging: (File) -> Unit = { it.deleteRecursively() },
     )
 
     internal val stagingDir: File get() = parts.stagingDir
@@ -289,7 +291,17 @@ class RecorderLivePrecomputer(
     private val allowed = AtomicBoolean(true)
     private val installing = AtomicBoolean(false)
     private val wakeups = Channel<Unit>(Channel.CONFLATED)
-    private val worker: Job = parts.scope.launch { runWorker() }
+
+    // A job counts as completed before its completion handlers run, so joining [worker] alone does not wait for a
+    // discard's deletion. [stopped] completes only after the worker has finished and any discard requested by then
+    // has deleted the staging directory; [lifecycle] serializes that deletion with a discard that arrives later.
+    private val lifecycle = Any()
+    private var workerDone = false // Guarded by lifecycle.
+    private var discardRequested = false // Guarded by lifecycle.
+    private val stopped = CompletableDeferred<Unit>()
+    private val worker: Job = parts.scope.launch { runWorker() }.also { job ->
+        job.invokeOnCompletion { onWorkerFinished() }
+    }
 
     override val isActive: Boolean
         get() = allowed.get() && worker.isActive
@@ -309,14 +321,14 @@ class RecorderLivePrecomputer(
     override suspend fun awaitStopped() {
         allowed.set(false)
         wakeups.trySend(Unit)
-        worker.cancelAndJoin()
+        joinStopped()
     }
 
     override suspend fun finishAndInstall(noteId: String) {
         installing.set(true)
         allowed.set(false)
         wakeups.trySend(Unit)
-        worker.cancelAndJoin()
+        joinStopped()
         RecorderLivePrecomputeStore.installIntoNote(
             noteId = noteId,
             partFile = parts.partFile,
@@ -339,17 +351,42 @@ class RecorderLivePrecomputer(
 
     /**
      * Stops the worker and removes its staging directory once the worker has stopped writing to it. Deleting the
-     * directory right away could race a checkpoint that the cancelled worker is still saving.
+     * directory right away could race a checkpoint that the cancelled worker is still saving. [awaitStopped],
+     * [finishAndInstall] and [invokeOnStopped] wait for that deletion to finish, so a replacement worker over the same
+     * staging directory never opens files this discard is still removing.
      */
     fun discard() {
         if (installing.get()) return
         close()
-        worker.invokeOnCompletion { parts.stagingDir.deleteRecursively() }
+        synchronized(lifecycle) {
+            if (discardRequested) return
+            discardRequested = true
+            // Once the worker has finished, delete here, under the lock that awaitStopped also takes.
+            if (workerDone) parts.deleteStaging(parts.stagingDir)
+        }
     }
 
-    /** Runs [handler] once the worker has stopped (immediately when it already has). */
+    /** Runs [handler] once the worker has stopped and any discard deletion has finished. */
     fun invokeOnStopped(handler: () -> Unit) {
-        worker.invokeOnCompletion { handler() }
+        stopped.invokeOnCompletion { handler() }
+    }
+
+    private fun onWorkerFinished() {
+        try {
+            synchronized(lifecycle) {
+                workerDone = true
+                if (discardRequested) parts.deleteStaging(parts.stagingDir)
+            }
+        } finally {
+            stopped.complete(Unit)
+        }
+    }
+
+    private suspend fun joinStopped() {
+        worker.cancelAndJoin()
+        stopped.await()
+        // A discard that arrived after the worker finished deletes under the lock: wait for it to release.
+        withContext(NonCancellable + parts.env.io) { synchronized(lifecycle) {} }
     }
 
     @Suppress("TooGenericExceptionCaught") // Strictly best-effort: never throw into Bluetooth sync or UI.
