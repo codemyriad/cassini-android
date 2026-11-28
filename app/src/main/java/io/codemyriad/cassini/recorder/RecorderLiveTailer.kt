@@ -140,9 +140,9 @@ internal class RecorderLiveTailer(
             activeName = activeName,
             flushed = found.status.recordingBytes ?: 0L,
         )
-        val precompute = host.parts.library.openLivePrecompute(part, activeName)
+        val precompute = PrecomputeHolder(part, activeName)
+        precompute.tryOpen(startState.startOffset)
         return try {
-            if (startState.startOffset > WAV_HEADER_BYTES) precompute?.onBytesAvailable(startState.startOffset)
             val stream = streamUntilBoundary(
                 session = session,
                 address = address,
@@ -164,11 +164,11 @@ internal class RecorderLiveTailer(
                     withTimestamps = withTimestamps,
                     fallbackStart = fallbackStart,
                     stream = stream,
-                    precompute = precompute,
+                    precompute = precompute.current(),
                 )
             }
         } finally {
-            precompute?.close()
+            precompute.close()
         }
     }
 
@@ -181,13 +181,14 @@ internal class RecorderLiveTailer(
         activeName: String,
         initialStatus: XrecReply.Status,
         startState: LivePartState,
-        precompute: LivePrecomputeSession?,
+        precompute: PrecomputeHolder,
     ): StreamState {
         var status = initialStatus
         var offset = startState.startOffset
         var liveHeaderPending = startState.liveHeaderPending
         var deferred = false
         while (!deferred && status.recording && status.recordingIndex == activeIndex) {
+            if (offset > WAV_HEADER_BYTES) precompute.ensureActive(offset)
             val flushed = status.recordingBytes ?: 0L
             if (flushed > offset && flushed > WAV_HEADER_BYTES) {
                 if (!liveHeaderPending) {
@@ -196,6 +197,7 @@ internal class RecorderLiveTailer(
                 }
                 val step = stepLiveRange(session, address, part, activeName, status, offset, flushed, precompute)
                 offset = step.offset
+                if (offset > WAV_HEADER_BYTES) precompute.ensureActive(offset)
                 deferred = step.deferred
             } else {
                 host.parts.wait(host.parts.livePollMillis)
@@ -214,7 +216,7 @@ internal class RecorderLiveTailer(
         status: XrecReply.Status,
         offset: Long,
         flushed: Long,
-        precompute: LivePrecomputeSession?,
+        precompute: PrecomputeHolder,
     ): StepResult {
         val req = RangeRequest(
             name = activeName,
@@ -230,7 +232,7 @@ internal class RecorderLiveTailer(
                     address,
                     PartialDownload(activeName, flushed, step.newOffset, liveHeaderPending = true),
                 )
-                precompute?.onBytesAvailable(step.newOffset)
+                precompute.onBytesAvailable(step.newOffset)
                 StepResult(offset = step.newOffset, deferred = false)
             }
             PullResult.Retry -> {
@@ -501,6 +503,49 @@ internal class RecorderLiveTailer(
         val status: XrecReply.Status,
     )
 
+    private inner class PrecomputeHolder(
+        private val part: File,
+        private val activeName: String,
+    ) : AutoCloseable {
+        private var active: LivePrecomputeSession? = null
+        private var lastAttemptMs: Long = Long.MIN_VALUE / 2
+        private var lastAttemptOffset: Long = 0L
+
+        fun current(): LivePrecomputeSession? = active
+
+        suspend fun tryOpen(offset: Long) {
+            lastAttemptMs = host.parts.clock()
+            lastAttemptOffset = offset
+            val opened = host.parts.library.openLivePrecompute(part, activeName)
+            active = opened
+            if (opened != null && offset > WAV_HEADER_BYTES) {
+                opened.onBytesAvailable(offset)
+            }
+        }
+
+        suspend fun ensureActive(offset: Long) {
+            val existing = active
+            if (existing != null && existing.isActive) return
+            val now = host.parts.clock()
+            val timeDue = now - lastAttemptMs >= PRECOMPUTE_RETRY_MS
+            val bytesDue = offset - lastAttemptOffset >= PRECOMPUTE_RETRY_BYTES
+            if (timeDue || bytesDue) {
+                existing?.close()
+                active = null
+                tryOpen(offset)
+            }
+        }
+
+        fun onBytesAvailable(bytes: Long) {
+            active?.takeIf { it.isActive }?.onBytesAvailable(bytes)
+        }
+
+        override fun close() {
+            active?.close()
+            active = null
+        }
+    }
+
     private sealed interface PullResult {
         data class Appended(val newOffset: Long) : PullResult
         data object Retry : PullResult
@@ -521,6 +566,8 @@ internal class RecorderLiveTailer(
         private const val KEEPALIVE_INTERVAL_MS = 1_500L
         private const val KEEPALIVE_ZERO_STEP_INTERVAL = 5
         private const val MAX_SIDECAR_POLLS = 256
+        private const val PRECOMPUTE_RETRY_MS = 5_000L
+        private const val PRECOMPUTE_RETRY_BYTES = 256 * 1024L
     }
 }
 

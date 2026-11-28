@@ -39,6 +39,8 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowPowerManager
+import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -188,5 +190,46 @@ class RecorderSyncServiceTest {
             "Sending 3 queued transcripts to the recorder…",
             queued.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
         )
+    }
+
+    @Test fun activeSyncRenewsWakeLockRepeatedlyEvenWhenProgressIsUnchangedAndReleasesOnStop() {
+        fakeRecorder.files["REC_0001.wav"] = recording(10_000)
+        val downloading = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        fakeRecorder.beforeGets = {
+            downloading.countDown()
+            release.await(5, TimeUnit.SECONDS)
+        }
+        runBlocking { app.graph.recorder.store.bound(key) }
+        val syncJob = app.graph.recorder.runner.syncNow()
+        try {
+            assertTrue(downloading.await(5, TimeUnit.SECONDS))
+            val service = Robolectric.buildService(RecorderSyncService::class.java).create().get()
+            val renewals = AtomicInteger()
+            service.wakeLockRenewMs = 25L
+            service.onWakeLockAcquired = { renewals.incrementAndGet() }
+
+            service.onStartCommand(RecorderSyncService.intent(app), 0, 1)
+            val mainLooper = shadowOf(Looper.getMainLooper())
+            mainLooper.idle()
+            assertEquals(1, renewals.get())
+            repeat(24) { mainLooper.idleFor(Duration.ofMillis(25)) }
+            assertTrue(
+                "Expected periodic wake-lock renewals during stalled sync",
+                renewals.get() >= 3,
+            )
+            assertTrue(ShadowPowerManager.getLatestWakeLock().isHeld)
+
+            release.countDown()
+            runBlocking { withTimeout(5_000) { syncJob.await() } }
+            mainDispatches.await(5_000) { shadowOf(service).isStoppedBySelf }
+            assertFalse(ShadowPowerManager.getLatestWakeLock().isHeld)
+            val countAtStop = renewals.get()
+            mainLooper.idleFor(Duration.ofMillis(100))
+            assertEquals(countAtStop, renewals.get())
+            assertFalse(ShadowPowerManager.getLatestWakeLock().isHeld)
+        } finally {
+            release.countDown()
+        }
     }
 }

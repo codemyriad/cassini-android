@@ -192,6 +192,24 @@ class RecorderAutoSyncTest {
         assertEquals(1, services.size)
     }
 
+    @Test fun fullAttemptHoldsForegroundServiceUntilRoundTripTranscriptionEnds() = runBlocking {
+        radio.device.files["REC_0001.wav"] = recording(2_000)
+        val (sync, store) = recorderSync(folder.root, radio, library)
+        store.bound(key)
+        library.activeCount = 1
+        val runner = RecorderRunner(scope, sync) { services.add(Unit) }
+
+        val run = runner.attempt(SyncMode.FULL, roundTripHoldMs = 5_000L)
+        withTimeout(TIMEOUT_MS) { while (library.imported.isEmpty()) delay(10) }
+        assertTrue(runner.serviceActive.value)
+
+        library.activeCount = 0
+        val outcome = withTimeout(TIMEOUT_MS) { run.await() } as SyncOutcome.Done
+        assertEquals(1, outcome.downloaded)
+        assertEquals(false, runner.serviceActive.value)
+        assertEquals(1, services.size)
+    }
+
     private companion object {
         const val TIMEOUT_MS = 10_000L
     }

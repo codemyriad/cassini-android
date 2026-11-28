@@ -22,6 +22,7 @@ import io.codemyriad.cassini.inAppLanguage
 import io.codemyriad.cassini.processing.NotificationChannels
 import io.codemyriad.cassini.startForegroundWithType
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -45,6 +46,8 @@ class RecorderSyncService : LifecycleService() {
     /** The last start request, and whether it came while [follow] ran: all on the main thread. */
     private var lastStartId = 0
     private var restarted = false
+    internal var wakeLockRenewMs: Long = WAKE_LOCK_RENEW_MS
+    internal var onWakeLockAcquired: () -> Unit = {}
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
@@ -73,35 +76,51 @@ class RecorderSyncService : LifecycleService() {
      * sync is idle and no service run remains, unless a new start request came meanwhile.
      */
     private suspend fun follow() {
-        do {
-            restarted = false
-            if (sync.activity.value == RecorderActivity.Idle && runner.serviceActive.value) {
-                val changed = withTimeoutOrNull(START_GRACE_MS) {
-                    combine(sync.activity, runner.serviceActive) { activity, active ->
-                        activity != RecorderActivity.Idle || !active
-                    }.first { it }
-                }
-                if (changed == null && !runner.serviceActive.value) break
+        val renewer = lifecycleScope.launch {
+            while (true) {
+                delay(wakeLockRenewMs)
+                if (foreground) acquireWakeLock()
             }
-            followActiveSync()
-            if (runner.serviceActive.value && sync.activity.value == RecorderActivity.Idle) {
-                // Waiting for background transcription + .cwx upload round-trip: stay foregrounded with a clear status.
-                val waitingTx = sync.activeTranscriptions()
-                val waitingUp = sync.pendingUploads().size
-                if (waitingTx > 0 || waitingUp > 0) {
-                    post(RecorderNotifications.buildWaiting(this, waitingTx, waitingUp))
-                }
-                withTimeoutOrNull(POST_INTERVAL_MS) {
-                    combine(sync.activity, runner.serviceActive) { activity, active ->
-                        activity != RecorderActivity.Idle || !active
-                    }.first { it }
-                }
-            }
-        } while (restarted || runner.serviceActive.value)
-        releaseWakeLock()
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-        foreground = false
-        stopSelfResult(lastStartId)
+        }
+        try {
+            do {
+                restarted = false
+                if (!awaitSyncStartOrIdleExit()) break
+                followActiveSync()
+                waitForRoundTripStep()
+            } while (restarted || runner.serviceActive.value)
+        } finally {
+            renewer.cancel()
+            releaseWakeLock()
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            foreground = false
+            stopSelfResult(lastStartId)
+        }
+    }
+
+    private suspend fun awaitSyncStartOrIdleExit(): Boolean {
+        if (sync.activity.value != RecorderActivity.Idle || !runner.serviceActive.value) return true
+        val changed = withTimeoutOrNull(START_GRACE_MS) {
+            combine(sync.activity, runner.serviceActive) { activity, active ->
+                activity != RecorderActivity.Idle || !active
+            }.first { it }
+        }
+        return changed != null || runner.serviceActive.value
+    }
+
+    private suspend fun waitForRoundTripStep() {
+        if (!runner.serviceActive.value || sync.activity.value != RecorderActivity.Idle) return
+        // Waiting for background transcription + .cwx upload round-trip: stay foregrounded with a clear status.
+        val waitingTx = sync.activeTranscriptions()
+        val waitingUp = sync.pendingUploads().size
+        if (waitingTx > 0 || waitingUp > 0) {
+            post(RecorderNotifications.buildWaiting(this, waitingTx, waitingUp))
+        }
+        withTimeoutOrNull(POST_INTERVAL_MS) {
+            combine(sync.activity, runner.serviceActive) { activity, active ->
+                activity != RecorderActivity.Idle || !active
+            }.first { it }
+        }
     }
 
     private suspend fun followActiveSync() {
@@ -110,7 +129,7 @@ class RecorderSyncService : LifecycleService() {
             post(RecorderNotifications.build(this, activity))
             withTimeoutOrNull(POST_INTERVAL_MS) { sync.activity.first { it == RecorderActivity.Idle } }
             if (sync.activity.value != RecorderActivity.Idle) {
-                sync.activity.first { it != activity }
+                withTimeoutOrNull(WAKE_LOCK_RENEW_MS) { sync.activity.first { it != activity } }
             }
             activity = sync.activity.value
         }
@@ -148,7 +167,10 @@ class RecorderSyncService : LifecycleService() {
                 it.setReferenceCounted(false)
                 wakeLock = it
             }
-        lock?.acquire(WAKE_LOCK_TIMEOUT_MS)
+        lock?.let {
+            it.acquire(WAKE_LOCK_TIMEOUT_MS)
+            onWakeLockAcquired()
+        }
     }
 
     private fun releaseWakeLock() {
@@ -159,6 +181,7 @@ class RecorderSyncService : LifecycleService() {
         private const val TAG = "RecorderSyncService"
         private const val WAKE_LOCK_TAG = "cassini:recorder_sync"
         private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60_000L
+        private const val WAKE_LOCK_RENEW_MS = 60_000L
         private const val START_GRACE_MS = 10_000L
         private const val POST_INTERVAL_MS = 500L
 

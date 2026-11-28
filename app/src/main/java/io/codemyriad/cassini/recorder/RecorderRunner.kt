@@ -62,7 +62,10 @@ class RecorderRunner(
         }
     }
 
-    fun attempt(mode: SyncMode = SyncMode.FULL): Deferred<SyncOutcome> = scope.async {
+    fun attempt(
+        mode: SyncMode = SyncMode.FULL,
+        roundTripHoldMs: Long = ROUND_TRIP_HOLD_MS,
+    ): Deferred<SyncOutcome> = scope.async {
         var started = false
         try {
             sync.sync(mode) {
@@ -72,6 +75,12 @@ class RecorderRunner(
                 }
             }.also { outcome ->
                 if (outcome == SyncOutcome.RebindNeeded) onRebindNeeded()
+                val shouldHold = started &&
+                    mode == SyncMode.FULL &&
+                    roundTripHoldMs > 0 &&
+                    outcome is SyncOutcome.Done &&
+                    outcome.downloaded > 0
+                if (shouldHold) holdForPendingRoundTrip(roundTripHoldMs)
             }
         } finally {
             if (started) releaseService()
@@ -148,7 +157,7 @@ class RecorderRunner(
     private companion object {
         const val TAG = "RecorderRunner"
         const val POKE_RETRY_MS = 1_500L
-        const val ROUND_TRIP_HOLD_MS = 5 * 60_000L
+        const val ROUND_TRIP_HOLD_MS = 30 * 60_000L
         const val ROUND_TRIP_POLL_MS = 500L
     }
 }

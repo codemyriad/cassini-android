@@ -87,6 +87,9 @@ data class RecorderTranscript(val variantId: String, val cwx: CwxTranscript)
 
 /** Incremental head-start transcription session attached while a recorder `.wav` streams in. */
 interface LivePrecomputeSession : AutoCloseable {
+    /** False once the worker stopped or was preempted, allowing [RecorderLiveTailer] to re-attach. */
+    val isActive: Boolean get() = true
+
     /** Signals that the `.part` file now has at least [bytes] written and synced to disk. */
     fun onBytesAvailable(bytes: Long)
 
@@ -109,6 +112,12 @@ interface RecorderLibrary {
 
     /** Opens an optional best-effort live precompute session over [partFile] as it grows; null when skipped. */
     suspend fun openLivePrecompute(partFile: File, displayName: String): LivePrecomputeSession? = null
+
+    /** Installs any durable staged precompute checkpoint on disk for [partFile] into [noteId]. */
+    suspend fun installLivePrecompute(partFile: File, noteId: String) = Unit
+
+    /** Cancels any active precompute session for [partFile] and removes its durable staging directory. */
+    fun discardLivePrecompute(partFile: File) = Unit
 
     /** Asks for a transcription of [noteId]; without model consent the note waits for it ("Needs model"). */
     suspend fun transcribe(noteId: String)

@@ -34,6 +34,12 @@ class GraphRecorderLibrary(
     override suspend fun openLivePrecompute(partFile: File, displayName: String): LivePrecomputeSession? =
         graph.openRecorderLivePrecompute(partFile)
 
+    override suspend fun installLivePrecompute(partFile: File, noteId: String) =
+        graph.installRecorderLivePrecompute(partFile, noteId)
+
+    override fun discardLivePrecompute(partFile: File) =
+        graph.discardRecorderLivePrecompute(partFile)
+
     override suspend fun setRecordingStartIfAbsent(noteId: String, startedAt: String) {
         graph.ready.await()
         val notes = graph.awaitCatalogue().notes
