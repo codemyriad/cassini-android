@@ -766,7 +766,19 @@ class RecorderSync(private val parts: Parts) {
         val part = partFile(address, planned.name)
         migratePreviousPart(address, planned, part)
         // The file length is the truth: after process death the stored offset can be behind it.
-        val resume = if (planned.resume != null && part.isFile) part.length().coerceAtMost(planned.size) else 0L
+        val diskBytes = if (planned.resume != null && part.isFile) part.length() else 0L
+        val resume = if (planned.resume?.liveHeaderPending == true) {
+            try {
+                liveTailer.verifiedLiveOffset(session, planned.name, part, diskBytes, planned.size)
+            } catch (error: XrecException) {
+                if (error.failure in LINK_FAILURES) throw error
+                if (error.failure == XrecFailure.LATER) return FileResult.DEFERRED
+                Log.w(TAG, "Could not verify the live prefix of ${planned.name} (${error.failure})")
+                return FileResult.FAILED
+            }
+        } else {
+            diskBytes.coerceAtMost(planned.size)
+        }
         withContext(parts.io) { prepare(part, resume) }
         val liveHeaderPending = resume > 0L && planned.resume?.liveHeaderPending == true
         store.updateDevice(address) {

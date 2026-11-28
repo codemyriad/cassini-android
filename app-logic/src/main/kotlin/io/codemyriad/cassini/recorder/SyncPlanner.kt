@@ -66,8 +66,8 @@ data class PlannedDownload(
     val name: String,
     val size: Long,
     /**
-     * The stopped download of this same file (name and size), or null: start from 0. The sync continues from the
-     * length of its `.part` file, which can be ahead of the stored bytes after process death.
+     * The stopped download of this file, or null to start from 0. A live prefix can grow and must be verified.
+     * The on-disk length of its `.part` file can be ahead of the stored byte count after process death.
      */
     val resume: PartialDownload? = null,
     val recordedAt: LocalDateTime? = null,
@@ -192,8 +192,10 @@ object SyncPlanner {
     private fun isActive(name: String, index: Long): Boolean = recordingNumber(name) == index
 
     private fun download(entry: XrecReply.Entry, state: RecorderSyncState): PlannedDownload {
-        val partial = state.partial?.takeIf { it.name.equals(entry.name, ignoreCase = true) && it.size == entry.size }
-            ?.takeIf { it.bytes in 0..entry.size }
+        val partial = state.partial?.takeIf {
+            val compatibleSize = it.size == entry.size || (it.liveHeaderPending && it.size < entry.size)
+            it.name.equals(entry.name, ignoreCase = true) && compatibleSize && it.bytes in 0..entry.size
+        }
         return PlannedDownload(entry.name, entry.size, partial, RecorderTimestamps.resolve(entry))
     }
 

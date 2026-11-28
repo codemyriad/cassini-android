@@ -230,8 +230,8 @@ internal object RecorderLivePrecomputeStore {
             speechModel = speechModel,
         )
         val ref = wordLog.save(ckptState)
-        writeAtomicallyText(File(stagingDir, SOURCE_FILE), sourceJson.toString())
-        writeAtomicallyText(File(stagingDir, CHECKPOINT_FILE), CheckpointState.encode(ckptState, ref).toString())
+        val checkpoint = CheckpointState.encode(ckptState, ref).put("liveSource", sourceJson)
+        writeAtomicallyText(File(stagingDir, CHECKPOINT_FILE), checkpoint.toString())
     }
 
     @Suppress("ReturnCount", "TooGenericExceptionCaught") // Stale or corrupt staging discards cleanly.
@@ -241,9 +241,8 @@ internal object RecorderLivePrecomputeStore {
         speechModel: SpeechModel,
         models: ModelAccess,
     ): StagedSnapshot? {
-        val sourceFile = File(stagingDir, SOURCE_FILE)
         val ckptFile = File(stagingDir, CHECKPOINT_FILE)
-        if (!hasRequiredFiles(partFile, stagingDir, sourceFile, ckptFile)) return null
+        if (!partFile.isFile || !ckptFile.isFile) return null
         return try {
             val loaded = decodeAndVerify(partFile, stagingDir, speechModel, models)
             if (loaded == null) stagingDir.deleteRecursively()
@@ -263,9 +262,6 @@ internal object RecorderLivePrecomputeStore {
         }
     }
 
-    private fun hasRequiredFiles(vararg required: File): Boolean =
-        required.all { it.exists() } && required[0].isFile && required[1].isDirectory
-
     @Suppress("ReturnCount") // Validates live WAV source hashes before loading checkpoint and staging artifacts.
     private fun decodeAndVerify(
         partFile: File,
@@ -273,9 +269,11 @@ internal object RecorderLivePrecomputeStore {
         speechModel: SpeechModel,
         models: ModelAccess,
     ): StagedSnapshot? {
-        if (!verifyLiveSource(partFile, File(stagingDir, SOURCE_FILE))) return null
         val ckptJson = JSONObject(File(stagingDir, CHECKPOINT_FILE).readText(Charsets.UTF_8))
         if (ckptJson.optInt("version", -1) != CheckpointState.VERSION) return null
+        // Older staging directories stored the PCM identity in a separate file.
+        val source = ckptJson.optJSONObject("liveSource") ?: JSONObject(File(stagingDir, SOURCE_FILE).readText())
+        if (!verifyLiveSource(partFile, source, ckptJson.getString("signature"))) return null
         val saved = CheckpointState.decode(ckptJson, StagedWordLog.read(stagingDir, ckptJson))
         val valid = isCompatibleModels(saved, speechModel, models) &&
             hasValidArtifacts(stagingDir, saved) &&
@@ -284,8 +282,7 @@ internal object RecorderLivePrecomputeStore {
     }
 
     @Suppress("ReturnCount") // Short-circuits on header or PCM slice mismatch cleanly.
-    private fun verifyLiveSource(partFile: File, sourceFile: File): Boolean {
-        val srcJson = JSONObject(sourceFile.readText(Charsets.UTF_8))
+    private fun verifyLiveSource(partFile: File, srcJson: JSONObject, signature: String): Boolean {
         val sampleRate = srcJson.getInt("sampleRate")
         val channels = srcJson.getInt("channels")
         val dataOffset = srcJson.getLong("dataOffset")
@@ -293,7 +290,7 @@ internal object RecorderLivePrecomputeStore {
         val inBounds = dataOffset >= WAV_HEADER_MIN &&
             verifiedBytes > dataOffset &&
             partFile.length() >= verifiedBytes
-        if (!inBounds) return false
+        if (!inBounds || signature != "$verifiedBytes:$sampleRate:$channels:$dataOffset") return false
         val header = StreamingWavPrefixReader.inspectHeader(partFile) ?: return false
         val headerMatches = header.sampleRate == sampleRate &&
             header.channels == channels &&
@@ -335,7 +332,6 @@ internal object RecorderLivePrecomputeStore {
         noteId: String,
         partFile: File,
         stagingDir: File,
-        inMemorySnapshot: StagedSnapshot?,
         speechModel: SpeechModel,
         models: ModelAccess,
         storage: JobStorage,
@@ -345,8 +341,7 @@ internal object RecorderLivePrecomputeStore {
     ) {
         withContext(NonCancellable + env.io) {
             try {
-                val snap = inMemorySnapshot?.takeIf { it.doneMs > 0L }
-                    ?: loadStaged(partFile, stagingDir, speechModel, models)
+                val snap = loadStaged(partFile, stagingDir, speechModel, models)
                     ?: return@withContext
                 val encoder = snap.encoder ?: return@withContext
                 val audioFile = storage.audioFile(noteId)

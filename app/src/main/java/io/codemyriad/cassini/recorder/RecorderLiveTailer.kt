@@ -72,7 +72,12 @@ internal class RecorderLiveTailer(
         var segments = 0
         while (status.recording && (status.recordingIndex ?: 0L) > 0L && segments < MAX_SEGMENTS) {
             segments++
-            val result = tailOneSegment(session, address, pong.listTimestampsSupported, listing, status)
+            val result = try {
+                tailOneSegment(session, address, pong.listTimestampsSupported, listing, status)
+            } catch (error: XrecException) {
+                if (error.failure != XrecFailure.LATER) throw error
+                SegmentResult(deferred = true, listing = listing, status = status)
+            }
             listing = result.listing
             status = result.status
             if (result.downloaded > 0) {
@@ -222,7 +227,8 @@ internal class RecorderLiveTailer(
             name = activeName,
             part = part,
             offset = offset,
-            endOffset = flushed,
+            // Repoll STAT between batches so Stop releases the recording-speed limit even with a large backlog.
+            endOffset = minOf(flushed, offset + LIVE_BATCH_BYTES),
             window = XrecLimits.RECORDING_GETS_WINDOW,
             paceMillis = status.paceMillis ?: 0L,
         )
@@ -271,6 +277,7 @@ internal class RecorderLiveTailer(
         var offset = stream.offset
         var needsHeaderRefresh = stream.hadLiveBytes
         if (offset > finalSize) {
+            precompute?.awaitStopped()
             withContext(host.parts.io) { host.prepare(part, 0L) }
             offset = 0L
             needsHeaderRefresh = false
@@ -278,7 +285,7 @@ internal class RecorderLiveTailer(
         if (offset < finalSize) {
             val pace = if (stream.status.recording) stream.status.paceMillis ?: 0L else 0L
             val window = if (stream.status.recording) XrecLimits.RECORDING_GETS_WINDOW else null
-            pullRange(session, RangeRequest(activeName, part, offset, finalSize, window, pace))
+            pullRange(session, RangeRequest(activeName, part, offset, finalSize, window, pace), precompute)
         }
         if (needsHeaderRefresh && finalSize >= WAV_HEADER_BYTES) {
             refreshWavHeader(session, activeName, part, finalSize, host.parts.io)
@@ -331,9 +338,8 @@ internal class RecorderLiveTailer(
         val storedPartial = host.partial(address)
         val existingLen = diskLength(part)
         val matchesStored = storedPartial != null && storedPartial.name.equals(activeName, ignoreCase = true)
-        val resumeOffset = if (matchesStored && existingLen >= MIN_VERIFY_OFFSET) {
-            val verifyEnd = minOf(existingLen, MAX_VERIFY_OFFSET)
-            if (verifyLivePrefix(session, activeName, part, verifyEnd)) existingLen else 0L
+        val resumeOffset = if (matchesStored) {
+            verifiedLiveOffset(session, activeName, part, existingLen, flushed)
         } else {
             0L
         }
@@ -346,34 +352,40 @@ internal class RecorderLiveTailer(
         return LivePartState(resumeOffset, liveHeaderPending)
     }
 
-    @Suppress("ReturnCount") // Validates length, fetches remote slice, compares bytes.
-    private suspend fun verifyLivePrefix(
+    /** Reused recorder numbers can share a silent opening. Probe both ends of the downloaded PCM, skipping the
+     * mutable WAV header. A failed transfer leaves the prefix intact for a later sync. */
+    suspend fun verifiedLiveOffset(
         session: RecorderSync.Session,
-        activeName: String,
+        name: String,
         part: File,
-        verifyEnd: Long,
+        length: Long,
+        available: Long,
+    ): Long {
+        if (length !in MIN_VERIFY_OFFSET..available) return 0L
+        val headEnd = minOf(length, MAX_VERIFY_OFFSET)
+        val tailStart = maxOf(headEnd, length - MAX_VERIFY_OFFSET)
+        val matches = matchesRange(session, name, part, WAV_HEADER_BYTES, headEnd) &&
+            (tailStart == length || matchesRange(session, name, part, tailStart, length))
+        return if (matches) length else 0L
+    }
+
+    private suspend fun matchesRange(
+        session: RecorderSync.Session,
+        name: String,
+        part: File,
+        from: Long,
+        end: Long,
     ): Boolean {
-        val length = verifyEnd - WAV_HEADER_BYTES
-        if (length <= 0L) return false
-        val remote = ByteArrayOutputStream(length.toInt())
-        val fetched = try {
-            session.call {
-                download(activeName, verifyEnd, remote, resumeOffset = WAV_HEADER_BYTES) { session.touch() }
-            }
-            true
-        } catch (error: XrecException) {
-            if (error.failure in LINK_FAILURES) throw error
-            false
-        }
-        if (!fetched || remote.size().toLong() != length) return false
         val local = withContext(host.parts.io) {
-            ByteArray(length.toInt()).also { dst ->
+            ByteArray((end - from).toInt()).also { dst ->
                 RandomAccessFile(part, "r").use { raf ->
-                    raf.seek(WAV_HEADER_BYTES)
+                    raf.seek(from)
                     raf.readFully(dst)
                 }
             }
         }
+        val remote = ByteArrayOutputStream(local.size)
+        session.call { download(name, end, remote, resumeOffset = from) { session.touch() } }
         return remote.toByteArray().contentEquals(local)
     }
 
@@ -394,7 +406,11 @@ internal class RecorderLiveTailer(
     private suspend fun diskLength(file: File): Long =
         withContext(host.parts.io) { if (file.isFile) file.length() else 0L }
 
-    private suspend fun pullRange(session: RecorderSync.Session, req: RangeRequest) {
+    private suspend fun pullRange(
+        session: RecorderSync.Session,
+        req: RangeRequest,
+        precompute: LivePrecomputeSession? = null,
+    ) {
         host.progress(SyncStep.DOWNLOADING, req.name, req.offset, req.endOffset)
         withContext(host.parts.io) {
             val actualLen = if (req.part.isFile) req.part.length() else 0L
@@ -403,9 +419,15 @@ internal class RecorderLiveTailer(
         session.call {
             FileOutputStream(req.part, true).use { out ->
                 val buffered = BufferedOutputStream(out, PART_BUFFER_BYTES)
+                var lastWake = req.offset
                 thenFlushing(buffered) {
                     download(req.name, req.endOffset, buffered, req.offset, req.window, req.paceMillis) { done ->
                         session.touch()
+                        if (precompute != null && done - lastWake >= FINAL_WAKE_BYTES) {
+                            buffered.flush()
+                            precompute.onBytesAvailable(done)
+                            lastWake = done
+                        }
                         host.progress(SyncStep.DOWNLOADING, req.name, done, req.endOffset)
                     }
                 }
@@ -555,12 +577,13 @@ internal class RecorderLiveTailer(
     companion object {
         private const val TAG = "RecorderLiveTailer"
         private val REC_NAME_REGEX = Regex("REC_([0-9]+)\\.wav", RegexOption.IGNORE_CASE)
-        private val LINK_FAILURES = setOf(XrecFailure.DISCONNECTED, XrecFailure.TIMEOUT, XrecFailure.PROTOCOL)
         private const val WAV_HEADER_BYTES = 44L
         private const val MILLIS_PER_SECOND = 1_000L
         private const val MIN_VERIFY_OFFSET = 108L
         private const val MAX_VERIFY_OFFSET = 512L
         private const val PART_BUFFER_BYTES = 64 * 1024
+        private const val LIVE_BATCH_BYTES = 4L * XrecLimits.RECORDING_GETS_WINDOW
+        private const val FINAL_WAKE_BYTES = 256 * 1024L
         private const val MAX_SEGMENTS = 8
         private const val MAX_LOCATE_ATTEMPTS = 4
         private const val KEEPALIVE_INTERVAL_MS = 1_500L

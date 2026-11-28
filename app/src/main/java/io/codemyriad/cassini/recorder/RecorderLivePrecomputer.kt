@@ -289,7 +289,6 @@ class RecorderLivePrecomputer(
     private val allowed = AtomicBoolean(true)
     private val installing = AtomicBoolean(false)
     private val wakeups = Channel<Unit>(Channel.CONFLATED)
-    private val latestSnapshot = AtomicReference<StagedSnapshot?>(null)
     private val worker: Job = parts.scope.launch { runWorker() }
 
     override val isActive: Boolean
@@ -322,7 +321,6 @@ class RecorderLivePrecomputer(
             noteId = noteId,
             partFile = parts.partFile,
             stagingDir = parts.stagingDir,
-            inMemorySnapshot = latestSnapshot.get(),
             speechModel = parts.speechModel,
             models = parts.models,
             storage = parts.storage,
@@ -391,15 +389,15 @@ class RecorderLivePrecomputer(
     }
 
     private fun openSession(owned: AtomicReference<Session?>): Session {
-        if (!parts.stagingDir.mkdirs() && !parts.stagingDir.isDirectory) {
-            throw IOException("Cannot create live precompute staging directory ${parts.stagingDir}")
-        }
         val resumed = RecorderLivePrecomputeStore.loadStaged(
             partFile = parts.partFile,
             stagingDir = parts.stagingDir,
             speechModel = parts.speechModel,
             models = parts.models,
         )
+        if (!parts.stagingDir.mkdirs() && !parts.stagingDir.isDirectory) {
+            throw IOException("Cannot create live precompute staging directory ${parts.stagingDir}")
+        }
         return if (resumed != null) {
             try {
                 openSessionWithState(owned, resumed)
@@ -446,7 +444,6 @@ class RecorderLivePrecomputer(
                 this.previousSaved = resumed?.doneMs ?: -1L
             }
             state.recognizer = parts.engines.recognizers.open(resumed?.recognition, callbacks(state))
-            if (resumed != null) latestSnapshot.set(resumed)
             owned.set(state)
             session = state
             return state
@@ -542,7 +539,6 @@ class RecorderLivePrecomputer(
             channels = session.reader.channels,
             dataOffset = session.reader.dataOffset,
         )
-        latestSnapshot.set(snapshot)
         session.previousSaved = recognizer.doneMs
         parts.onCheckpointed(recognizer.doneMs)
     }

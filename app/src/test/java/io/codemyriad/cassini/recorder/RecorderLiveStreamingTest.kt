@@ -191,6 +191,28 @@ class RecorderLiveStreamingTest {
         assertTrue(recorder.files.containsKey("REC_0001.cwx"))
     }
 
+    @Test fun stopDuringBacklogSwitchesToIdleTransferAndFeedsInferenceBeforeImport() = runBlocking {
+        val library = LiveRecordingLibrary()
+        val wav = liveWav(600_000, headerTag = 0x11)
+        recorder.files["REC_0001.wav"] = wav
+        recorder.recording = true
+        recorder.activeFlushedBytes = wav.size
+        recorder.beforeGets = {
+            recorder.recording = false
+            recorder.beforeGets = null
+        }
+        val (sync, store) = recorderSync(folder.root, radio, library)
+        store.bound(key)
+
+        val outcome = sync.sync() as SyncOutcome.Done
+        assertEquals(1, outcome.downloaded)
+        val commands = recorder.commands.dropWhile { !it.startsWith("+XREC:GETS,") }
+        val liveRequests = commands.takeWhile { it != "+XREC:STAT" }.count { it.startsWith("+XREC:GETS,") }
+        assertTrue("GETS before noticing Stop: $liveRequests", liveRequests in 1..4)
+        assertTrue(library.precomputeBytes.any { it in 262_144L until wav.size.toLong() })
+        assertArrayEquals(wav, library.backing.imported.getValue("note-1"))
+    }
+
     @Test fun stereoLiveStreamingSucceedsInsteadOfDeferringWithLater() = runBlocking {
         val library = FakeLibrary()
         val wav = liveWav(8_192, headerTag = 0x22)
@@ -343,10 +365,18 @@ class RecorderLiveStreamingTest {
         assertArrayEquals(finalizedWav, library.backing.imported.getValue("note-1"))
     }
 
-    @Test fun disconnectAndStopAtSameFlushedLengthRefreshesHeaderOnReconnect() = runBlocking {
+    @Test fun disconnectAndStopAtSameFlushedLengthRefreshesHeaderOnReconnect() = checkReconnect(8_192)
+
+    @Test fun growingRecordingReusesDownloadedPcmAfterDisconnectAndStop() = checkReconnect(16_384)
+
+    @Test fun reusedRecordingNumberWithSameOpeningRestartsFromZero() = checkReconnect(16_384, replaced = true)
+
+    private fun checkReconnect(finalSize: Int, replaced: Boolean = false) = runBlocking {
         val library = LiveRecordingLibrary()
         val liveBody = liveWav(8_192, headerTag = 0x11)
-        val finalizedWav = liveBody.copyOf().apply { for (i in 12 until 44) this[i] = 0x77.toByte() }
+        val finalizedWav = liveWav(finalSize, headerTag = 0x77).apply {
+            if (replaced) fill(0x44, 4_096, size)
+        }
         recorder.recording = true
         recorder.files["REC_0001.wav"] = liveBody
         recorder.activeFlushedBytes = 8_192
@@ -389,8 +419,14 @@ class RecorderLiveStreamingTest {
 
         val secondOutcome = sync.sync() as SyncOutcome.Done
         assertEquals(1, secondOutcome.downloaded)
-        assertTrue("+XREC:GETS,0,44,640,REC_0001.wav" in radio.device.commands)
-        assertTrue(radio.device.commands.none { it.startsWith("+XREC:GETS,0,8192,") })
+        val requests = radio.device.commands
+        if (replaced) {
+            assertTrue("+XREC:GETS,0,$finalSize,640,REC_0001.wav" in requests)
+        } else {
+            assertTrue("+XREC:GETS,0,44,640,REC_0001.wav" in requests)
+            assertTrue(requests.none { it.startsWith("+XREC:GETS,0,$finalSize,") })
+            if (finalSize > liveBody.size) assertTrue(requests.any { it.startsWith("+XREC:GETS,8192,") })
+        }
         assertArrayEquals(finalizedWav, library.backing.imported.getValue("note-1"))
 
         val importIdx = library.events.indexOf("import:REC_0001.wav")

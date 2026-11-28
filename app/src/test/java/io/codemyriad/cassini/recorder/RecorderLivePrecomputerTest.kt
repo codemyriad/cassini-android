@@ -330,11 +330,14 @@ class RecorderLivePrecomputerTest {
 
         partFile.writeBytes(wav)
         finalAudio.writeBytes(wav)
+        val checkpointFile = File(stagingDir, "checkpoint.json")
+        val checkpoint = JSONObject(checkpointFile.readText())
+        File(stagingDir, "live-source.json").writeText(checkpoint.remove("liveSource").toString())
+        checkpointFile.writeText(checkpoint.toString())
         RecorderLivePrecomputeStore.installIntoNote(
             noteId = "note-poststop",
             partFile = partFile,
             stagingDir = stagingDir,
-            inMemorySnapshot = null,
             speechModel = SpeechModel.PARAKEET,
             models = TestModelAccess(),
             storage = storage,
@@ -397,7 +400,19 @@ class RecorderLivePrecomputerTest {
         val bytes = partFile.readBytes()
         bytes[100] = (bytes[100].toInt() xor 0x5A).toByte()
         partFile.writeBytes(bytes)
-        assertNull(RecorderLivePrecomputeStore.loadStaged(partFile, stagingDir, SpeechModel.PARAKEET, models))
+        // Opening the replacement must recover in the same worker, even when verification removes the old directory.
+        val replacementCheckpoint = CompletableDeferred<Long>()
+        val replacement = PrecomputeRig(partFile, stagingDir, storage, engines, env)
+            .start { replacementCheckpoint.complete(it) }
+        assertEquals(28_000L, withTimeout(TIMEOUT_MS) { replacementCheckpoint.await() })
+        replacement.awaitStopped()
+        assertEquals(listOf(0L, 0L), decodedWindows.toList())
+
+        // The source can also change between the worker stopping and import. A cached snapshot must be revalidated.
+        partFile.writeBytes(wav)
+        finalAudio.writeBytes(wav)
+        replacement.finishAndInstall("note-corrupt")
+        assertEquals(CheckpointLoad.Missing, storage.loadCheckpoint("note-corrupt"))
         assertFalse(stagingDir.exists())
     }
 

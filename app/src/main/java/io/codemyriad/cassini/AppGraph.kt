@@ -785,7 +785,6 @@ class AppGraph(context: Context, val config: Config) {
             noteId = noteId,
             partFile = partFile,
             stagingDir = stagingDir,
-            inMemorySnapshot = null,
             speechModel = model,
             models = SelectedModelAccess(modelAccess, choices),
             storage = catalogue.jobStorage,
